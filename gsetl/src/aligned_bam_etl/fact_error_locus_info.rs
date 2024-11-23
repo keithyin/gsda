@@ -44,7 +44,7 @@ impl ErrorLocusInfo {
     }
 
     fn csv_header() -> &'static str {
-        "qstart\rqend\rstart\trend\tqseq\tdepth\rseq"
+        "qstart\tqend\tstart\trend\tqseq\tdepth\tseq"
     }
 }
 
@@ -239,8 +239,8 @@ fn aligned_seq_gen(
     let (q3, r3) = aligned_seq_single_part_gen(aligned_pairs, err_end, span_end, qseq, refseq);
 
     (
-        format!("{} {} {}", q1, q2, q3),
-        format!("{} {} {}", r1, r2, r3),
+        format!("{}[{}]{}", q1, q2, q3),
+        format!("{}[{}]{}", r1, r2, r3),
     )
 }
 

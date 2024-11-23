@@ -88,7 +88,7 @@ pub fn fact_ref_locus_info(
                 LocusStat::new(
                     pos,
                     format!(
-                        "{} {} {}",
+                        "{}[{}]{}",
                         &refseq[around_start..pos],
                         &refseq[pos..pos + 1],
                         &refseq[pos + 1..around_end]
