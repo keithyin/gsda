@@ -6,8 +6,7 @@ use std::{
 };
 
 use gskits::{
-    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
-    pbar,
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
 };
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
@@ -77,7 +76,7 @@ pub fn fact_error_locus_info(
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(
         &mut o_file_buff_writer,
-        "refname\t{}",
+        "qname\trefname\t{}",
         ErrorLocusInfo::csv_header()
     )
     .unwrap();
@@ -88,7 +87,6 @@ pub fn fact_error_locus_info(
         bam_h
             .fetch((refname, 0, refseq.len() as u64))
             .expect(&format!("fetch {} error", refname));
-        let ref_seq_len = refseq.len();
 
         let refseq_bytes = refseq.as_bytes();
 
@@ -110,10 +108,12 @@ pub fn fact_error_locus_info(
             let mut start_idx = None;
 
             let query_seq = record.seq().as_bytes();
+            let query_str = unsafe { String::from_utf8_unchecked(query_seq.clone()) };
 
-            let mut err_locus_info = None;
+            let mut record_err_locus_info = vec![];
 
-            let aligned_pairs_full = record.aligned_pairs_full().into_iter().collect::<Vec<_>>();
+            let aligned_pairs_full: Vec<[Option<i64>; 2]> =
+                record.aligned_pairs_full().into_iter().collect::<Vec<_>>();
 
             for (idx, [qpos, rpos]) in aligned_pairs_full.iter().enumerate() {
                 let qpos = *qpos;
@@ -169,18 +169,28 @@ pub fn fact_error_locus_info(
                         == *query_seq.get_unchecked(qpos.unwrap() as usize)
                     {
                         // eq
-                        if qdiff_start.is_some() {
+                        if let Some(start_idx_) = start_idx.take() {
+                            let seq_span_start = if start_idx_ < 5 { 0 } else { start_idx_ - 5 };
+                            let seq_span_end = cmp::min(idx + 6, aligned_pairs_full.len());
 
-                            
+                            let (q_aligned, r_aligned) = aligned_seq_gen(
+                                &aligned_pairs_full,
+                                seq_span_start,
+                                start_idx_,
+                                idx,
+                                seq_span_end,
+                                &query_str,
+                                refseq,
+                            );
 
-                            ErrorLocusInfo::new(
+                            record_err_locus_info.push(ErrorLocusInfo::new(
                                 qdiff_start.unwrap() as usize,
                                 qpos.unwrap() as usize,
                                 rdiff_start.unwrap() as usize,
                                 rpos.unwrap() as usize,
-                                qseq,
-                                rseq,
-                            );
+                                q_aligned,
+                                r_aligned,
+                            ));
                         }
 
                         qdiff_start = None;
@@ -191,6 +201,7 @@ pub fn fact_error_locus_info(
                         if qdiff_start.is_none() || rdiff_start.is_none() {
                             qdiff_start = qpos_cursor;
                             rdiff_start = rpos_cursor;
+                            start_idx = Some(idx);
                         }
                     }
                 }
@@ -198,8 +209,67 @@ pub fn fact_error_locus_info(
                 if rpos_cur_or_pre == (ref_end as usize - 1) {
                     break;
                 }
+
             }
+
+            // dump
+            let record_ext = BamRecordExt::new(&record);
+            let qname = record_ext.get_qname();
+
+            record_err_locus_info.into_iter().for_each(|error_locus_info| {
+                writeln!(&mut o_file_buff_writer, "{}\t{}\t{}", qname, refname, error_locus_info).unwrap();
+            });
+
         }
     }
     pb.finish();
+}
+
+fn aligned_seq_gen(
+    aligned_pairs: &Vec<[Option<i64>; 2]>,
+    span_start: usize,
+    err_start: usize,
+    err_end: usize,
+    span_end: usize,
+    qseq: &str,
+    refseq: &str,
+) -> (String, String) {
+    let (q1, r1) = aligned_seq_single_part_gen(aligned_pairs, span_start, err_start, qseq, refseq);
+    let (q2, r2) = aligned_seq_single_part_gen(aligned_pairs, err_start, err_end, qseq, refseq);
+    let (q3, r3) = aligned_seq_single_part_gen(aligned_pairs, err_end, span_end, qseq, refseq);
+
+    (
+        format!("{} {} {}", q1, q2, q3),
+        format!("{} {} {}", r1, r2, r3),
+    )
+}
+
+fn aligned_seq_single_part_gen(
+    aligned_pairs: &Vec<[Option<i64>; 2]>,
+    start: usize,
+    end: usize,
+    qseq: &str,
+    refseq: &str,
+) -> (String, String) {
+    let (qseq_part, rseq_part): (Vec<_>, Vec<_>) = aligned_pairs[start..end]
+        .iter()
+        .map(|[qpos, rpos]| {
+            (
+                if let Some(qpos_) = qpos {
+                    let qpos_ = *qpos_ as usize;
+                    &qseq[qpos_..qpos_ + 1]
+                } else {
+                    "-"
+                },
+                if let Some(rpos_) = rpos {
+                    let rpos_ = *rpos_ as usize;
+                    &refseq[rpos_..rpos_ + 1]
+                } else {
+                    "-"
+                },
+            )
+        })
+        .unzip();
+
+    (qseq_part.join(""), rseq_part.join(""))
 }

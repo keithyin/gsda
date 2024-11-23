@@ -30,6 +30,7 @@ fn main() {
 
             fact_record_stat(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
             fact_ref_locus_info(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
+            fact_ref_locus_info(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
         },
         cli::Subcommands::NonAlignedBam(_param) => {
 
