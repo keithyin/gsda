@@ -9,6 +9,7 @@ use rust_htslib::bam::Read;
 
 pub mod fact_record_stat;
 pub mod fact_ref_locus_info;
+pub mod fact_error_locus_info;
 
 pub struct FastaData {
     ref_name2seq: HashMap<String, String>,
