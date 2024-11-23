@@ -102,6 +102,9 @@ pub fn fact_ref_locus_info(
         for record in bam_h.records() {
             pb.inc(1);
             let record = record.unwrap();
+            if record.is_secondary() || record.is_unmapped() || record.is_supplementary() {
+                continue;
+            }
 
             let ref_start = record.reference_start();
             let ref_end = record.reference_end();
