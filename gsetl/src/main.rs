@@ -1,6 +1,6 @@
 use std::thread;
 
-use aligned_bam_etl::{fact_record_stat::fact_record_stat, fact_ref_locus_info::fact_ref_locus_info, get_hc_regions, get_hcvariants, FastaData};
+use aligned_bam_etl::{fact_error_locus_info::fact_error_locus_info, fact_record_stat::fact_record_stat, fact_ref_locus_info::fact_ref_locus_info, get_hc_regions, get_hcvariants, FastaData};
 use clap::Parser;
 
 mod cli;
@@ -30,7 +30,7 @@ fn main() {
 
             fact_record_stat(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
             fact_ref_locus_info(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
-            fact_ref_locus_info(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
+            fact_error_locus_info(param, &args.output_dir, hc_regions.as_ref(), hc_variants.as_ref(), &reffasta);
         },
         cli::Subcommands::NonAlignedBam(_param) => {
 
