@@ -75,6 +75,7 @@ impl RecordReplica {
 }
 
 
+#[allow(unused)]
 #[derive(Debug)]
 struct Stat {
     qname: String,
@@ -362,23 +363,36 @@ pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: O
 
         let pbar = pbar::get_spin_pb("fact_record_stat".to_string(), pbar::DEFAULT_INTERVAL);
 
+        // writeln!(&mut buf_csv_writer, 
+        //     "channel_id\treadLengthBp\tsubreadPasses\t\
+        //     queryConverage\tpredictedConcordance\t\
+        //     concordance\tconcordanceQv\tmatchBp\tmismatchBp\tnonHpInsertionBp\t\
+        //     nonHpDeletionBp\thpInsertionBp\thpDeletionBp\tignoreBp\t\
+        //     refStart\trefEnd\tmmRefPositions\tinsRefPositions\tdelRefPositions\tqname\trefname").unwrap();
+        // for stat in stat_receiver {
+        //     writeln!(&mut buf_csv_writer, "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t\"{16}\"\t\"{17}\"\t\"{18}\"\t{19}\t{20}", 
+        //         stat.ch, stat.q_len, stat.passes, 
+        //         stat.query_converage(), stat.rq.unwrap_or(0.), stat.concordance(), 
+        //         stat.concordance_qv(), stat.m, stat.mm, stat.non_h_ins, stat.non_h_del, 
+        //         stat.h_ins, stat.h_del, stat.ignore_bps,
+        //         stat.ref_start, stat.ref_end, stat.mm_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
+        //         stat.ins_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
+        //         stat.del_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
+        //         stat.qname,
+        //         stat.refname.as_str()
+        //     ).unwrap();
+        //     pbar.inc(1);
+        // }
+
         writeln!(&mut buf_csv_writer, 
-            "channel_id\treadLengthBp\tsubreadPasses\t\
-            queryConverage\tpredictedConcordance\t\
-            concordance\tconcordanceQv\tmatchBp\tmismatchBp\tnonHpInsertionBp\t\
-            nonHpDeletionBp\thpInsertionBp\thpDeletionBp\tignoreBp\t\
-            refStart\trefEnd\tmmRefPositions\tinsRefPositions\tdelRefPositions\tqname\trefname").unwrap();
+            "qname\tqueryCoverage\tconcordance\tconcordanceQv\tmatchBp\tmismatchBp\tnonHpInsertionBp\t\
+            nonHpDeletionBp\thpInsertionBp\thpDeletionBp\tignoreBp").unwrap();
         for stat in stat_receiver {
-            writeln!(&mut buf_csv_writer, "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t\"{16}\"\t\"{17}\"\t\"{18}\"\t{19}\t{20}", 
-                stat.ch, stat.q_len, stat.passes, 
-                stat.query_converage(), stat.rq.unwrap_or(0.), stat.concordance(), 
-                stat.concordance_qv(), stat.m, stat.mm, stat.non_h_ins, stat.non_h_del, 
-                stat.h_ins, stat.h_del, stat.ignore_bps,
-                stat.ref_start, stat.ref_end, stat.mm_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
-                stat.ins_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
-                stat.del_ref_positions.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(","),
+            writeln!(&mut buf_csv_writer, "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}", 
                 stat.qname,
-                stat.refname.as_str()
+                stat.query_converage(), stat.concordance(), 
+                stat.concordance_qv(), stat.m, stat.mm, stat.non_h_ins, stat.non_h_del, 
+                stat.h_ins, stat.h_del, stat.ignore_bps,                
             ).unwrap();
             pbar.inc(1);
         }

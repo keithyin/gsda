@@ -59,7 +59,7 @@ impl Display for ErrorLocusInfo {
 }
 
 /// qname refname qpos_start qpos_end rpos_start, rpos_end query ref
-pub fn fact_error_locus_info(
+pub fn fact_error_query_locus_info(
     args: &AlignedBamParams,
     output_dir: &str,
     hc_regions: Option<&BedInfo>,
@@ -71,7 +71,7 @@ pub fn fact_error_locus_info(
     let mut bam_h = bam::IndexedReader::from_path(bam_file).unwrap();
     bam_h.set_threads(4).unwrap();
 
-    let o_filepath = format!("{}/fact_error_locus_info.csv", output_dir);
+    let o_filepath = format!("{}/fact_error_query_locus_info.csv", output_dir);
     let o_file = fs::File::create(o_filepath).unwrap();
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(
@@ -81,7 +81,7 @@ pub fn fact_error_locus_info(
     )
     .unwrap();
 
-    let pb = pbar::get_spin_pb(format!("fact_error_locus_info"), pbar::DEFAULT_INTERVAL);
+    let pb = pbar::get_spin_pb(format!("fact_error_query_locus_info"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
         bam_h

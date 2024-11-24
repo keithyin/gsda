@@ -5,7 +5,10 @@ use std::{
     io::{BufWriter, Write},
 };
 
-use gskits::{file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, pbar};
+use gskits::{
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
+    pbar,
+};
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
 use crate::cli::AlignedBamParams;
@@ -19,24 +22,39 @@ struct LocusStat {
     ins: usize,
     del: usize,
     depth: usize, // how much records that aligned to this position
+    cur_base: String,
+    next_base: String,
+    cur_is_homo: i32,
+    next_is_homo: i32,
     around_bases: String,
 }
 
 impl LocusStat {
-    fn new(pos: usize, around_bases: String) -> Self {
+    fn new(
+        pos: usize,
+        cur_base: String,
+        next_base: String,
+        around_bases: String,
+        cur_is_homo: i32,
+        next_is_homo: i32,
+    ) -> Self {
         Self {
-            pos: pos,
+            pos,
             eq: 0,
             diff: 0,
             ins: 0,
             del: 0,
             depth: 0,
-            around_bases: around_bases,
+            cur_base,
+            next_base,
+            cur_is_homo,
+            next_is_homo,
+            around_bases,
         }
     }
 
     fn csv_header() -> &'static str {
-        "pos\teq\tdiff\tins\tdel\tdepth\taround_bases"
+        "pos\teq\tdiff\tins\tdel\tdepth\tcurBase\tcurIsHomo\tnextIsHomo\taroundBases"
     }
 }
 
@@ -44,8 +62,18 @@ impl Display for LocusStat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}",
-            self.pos, self.eq, self.diff, self.ins, self.del, self.depth, self.around_bases
+            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}",
+            self.pos,
+            self.eq,
+            self.diff,
+            self.ins,
+            self.del,
+            self.depth,
+            self.cur_base,
+            self.next_base,
+            self.cur_is_homo,
+            self.next_is_homo,
+            self.around_bases
         )
     }
 }
@@ -79,20 +107,38 @@ pub fn fact_ref_locus_info(
             .fetch((refname, 0, refseq.len() as u64))
             .expect(&format!("fetch {} error", refname));
         let ref_seq_len = refseq.len();
+        let ref_seq_bytes = refseq.as_bytes();
 
         let mut ref_locus_stat = (0..refseq.len())
             .into_iter()
             .map(|pos| {
                 let around_start = if pos < 10 { 0 } else { pos - 10 };
                 let around_end = cmp::min(pos + 11, ref_seq_len);
+
+                let cur_is_homo = is_homo_pos(ref_seq_bytes, pos);
+
+                let next_is_homo = if pos + 1 >= ref_seq_len {
+                    false
+                } else {
+                    is_homo_pos(ref_seq_bytes, pos + 1)
+                };
+
                 LocusStat::new(
                     pos,
+                    refseq[pos..pos + 1].to_string(),
+                    if pos + 1 >= ref_seq_len {
+                        "".to_string()
+                    } else {
+                        refseq[pos + 1..pos + 2].to_string()
+                    },
                     format!(
                         "{}[{}]{}",
                         &refseq[around_start..pos],
                         &refseq[pos..pos + 1],
                         &refseq[pos + 1..around_end]
                     ),
+                    if cur_is_homo {1} else {0},
+                    if next_is_homo {1} else {0},
                 )
             })
             .collect::<Vec<_>>();
@@ -193,4 +239,18 @@ pub fn fact_ref_locus_info(
         });
     }
     pb.finish();
+}
+
+fn is_homo_pos(bases: &[u8], pos: usize) -> bool {
+    let mut res = false;
+    let cur_base = bases[pos];
+    if pos > 0 {
+        res |= cur_base == bases[pos - 1];
+    }
+
+    if (pos + 1) < bases.len() {
+        res |= cur_base == bases[pos + 1];
+    }
+
+    res
 }
