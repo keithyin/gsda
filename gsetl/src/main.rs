@@ -1,4 +1,4 @@
-use std::thread;
+use std::{fs, io::Write, thread};
 
 use aligned_bam_etl::{
     fact_bam_basic::fact_bam_basic, fact_error_query_locus_info::fact_error_query_locus_info,
@@ -6,6 +6,7 @@ use aligned_bam_etl::{
     get_hcvariants, FastaData,
 };
 use clap::Parser;
+use gskits::utils::command_line_str;
 
 mod aligned_bam_etl;
 mod cli;
@@ -14,6 +15,10 @@ mod non_aligned_bam_etl;
 fn main() {
     let args = cli::Cli::parse();
     args.build_output_dir();
+
+    let mut meta_file = fs::File::create(&format!("{}/meta.txt", args.output_dir)).unwrap();
+    meta_file.write_all(format!("version: {}\n", env!("CARGO_PKG_VERSION")).as_bytes()).unwrap();
+    meta_file.write_all(format!("cmd_liine: {}\n", command_line_str()).as_bytes()).unwrap();
 
     match &args.commands {
         cli::Subcommands::AlignedBam(param) => {
