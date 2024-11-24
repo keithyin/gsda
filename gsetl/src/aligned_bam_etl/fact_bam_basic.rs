@@ -27,6 +27,9 @@ struct BasicInfo<'a> {
     qstart: usize,
     qend: usize,
     qlen: usize,
+    is_forward: bool,
+    ori_start: usize,
+    ori_end: usize
 }
 
 impl<'a> BasicInfo<'a> {
@@ -43,6 +46,9 @@ impl<'a> BasicInfo<'a> {
         qstart: usize,
         qend: usize,
         qlen: usize,
+        is_forward: bool,
+        ori_start: usize,
+        ori_end: usize
     ) -> Self {
         Self {
             qname,
@@ -57,11 +63,14 @@ impl<'a> BasicInfo<'a> {
             qstart,
             qend,
             qlen,
+            is_forward,
+            ori_start,
+            ori_end
         }
     }
 
     pub fn csv_header() -> &'static str {
-        "qname\trefname\tchannel\tnp\trq\tiy\tec\trstart\trend\tqstart\tqend\tqlen"
+        "qname\trefname\tchannel\tnp\trq\tiy\tec\trstart\trend\tqstart\tqend\tqlen\tfwd\tori_start\tori_end"
     }
 }
 
@@ -69,7 +78,7 @@ impl<'a> Display for BasicInfo<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}",
+            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}",
             self.qname,
             self.refname,
             self.channel,
@@ -81,7 +90,10 @@ impl<'a> Display for BasicInfo<'a> {
             self.rend,
             self.qstart,
             self.qend,
-            self.qlen
+            self.qlen,
+            self.is_forward,
+            self.ori_start,
+            self.ori_end
         )
     }
 }
@@ -97,7 +109,7 @@ pub fn fact_bam_basic(
     let mut bam_h = bam::IndexedReader::from_path(bam_file).unwrap();
     bam_h.set_threads(10).unwrap();
 
-    let o_filepath = format!("{}/fact_bam_basic.csv", output_dir);
+    let o_filepath = format!("{}/fact_aligned_bam_bam_basic.csv", output_dir);
     let o_file = fs::File::create(o_filepath).unwrap();
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(&mut o_file_buff_writer, "{}", BasicInfo::csv_header()).unwrap();
@@ -126,6 +138,8 @@ pub fn fact_bam_basic(
             let qend = record_ext.compute_qend();
             let qlen = record.seq_len_from_cigar(true);
 
+            let be = record_ext.get_be().unwrap_or(vec![0, 0]);
+
             let basic_info = BasicInfo::new(
                 qname,
                 refname,
@@ -139,6 +153,9 @@ pub fn fact_bam_basic(
                 qstart,
                 qend,
                 qlen,
+                !record.is_reverse(),
+                be[0] as usize,
+                be[1] as usize
             );
 
             writeln!(&mut o_file_buff_writer, "{}", basic_info).unwrap();

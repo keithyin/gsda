@@ -18,7 +18,7 @@ fn main() {
 
     let mut meta_file = fs::File::create(&format!("{}/meta.txt", args.output_dir)).unwrap();
     meta_file.write_all(format!("version: {}\n", env!("CARGO_PKG_VERSION")).as_bytes()).unwrap();
-    meta_file.write_all(format!("cmd_liine: {}\n", command_line_str()).as_bytes()).unwrap();
+    meta_file.write_all(format!("cmd_line: {}\n", command_line_str()).as_bytes()).unwrap();
 
     match &args.commands {
         cli::Subcommands::AlignedBam(param) => {

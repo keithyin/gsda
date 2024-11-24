@@ -357,7 +357,7 @@ pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: O
         drop(stat_sender);
 
         // write result
-        let csv_filepath = format!("{}/fact_record_stat.csv", output_dir);
+        let csv_filepath = format!("{}/fact_aligned_bam_record_stat.csv", output_dir);
         let csv_writer = fs::File::create(&csv_filepath).unwrap();
         let mut buf_csv_writer = BufWriter::new(csv_writer);
 

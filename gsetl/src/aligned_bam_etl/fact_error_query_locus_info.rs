@@ -44,7 +44,7 @@ impl ErrorLocusInfo {
     }
 
     fn csv_header() -> &'static str {
-        "qstart\tqend\trstart\trend\tqseq\tseq"
+        "qstart\tqend\trstart\trend\tqseq\trseq"
     }
 }
 

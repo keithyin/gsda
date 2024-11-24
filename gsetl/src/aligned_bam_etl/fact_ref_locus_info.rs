@@ -54,7 +54,7 @@ impl LocusStat {
     }
 
     fn csv_header() -> &'static str {
-        "pos\teq\tdiff\tins\tdel\tdepth\tcurBase\tcurIsHomo\tnextIsHomo\taroundBases"
+        "pos\teq\tdiff\tins\tdel\tdepth\tcurBase\tnextBase\tcurIsHomo\tnextIsHomo\taroundBases"
     }
 }
 
@@ -90,7 +90,7 @@ pub fn fact_ref_locus_info(
     let mut bam_h = bam::IndexedReader::from_path(bam_file).unwrap();
     bam_h.set_threads(4).unwrap();
 
-    let o_filepath = format!("{}/fact_ref_locus_info.csv", output_dir);
+    let o_filepath = format!("{}/fact_aligned_bam_ref_locus_info.csv", output_dir);
     let o_file = fs::File::create(o_filepath).unwrap();
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(
