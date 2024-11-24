@@ -44,7 +44,7 @@ impl ErrorLocusInfo {
     }
 
     fn csv_header() -> &'static str {
-        "qstart\tqend\tstart\trend\tqseq\tdepth\tseq"
+        "qstart\tqend\trstart\trend\tqseq\tseq"
     }
 }
 
@@ -76,7 +76,7 @@ pub fn fact_error_query_locus_info(
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(
         &mut o_file_buff_writer,
-        "qname\trefname\t{}",
+        "qname\t{}",
         ErrorLocusInfo::csv_header()
     )
     .unwrap();
@@ -217,7 +217,7 @@ pub fn fact_error_query_locus_info(
             let qname = record_ext.get_qname();
 
             record_err_locus_info.into_iter().for_each(|error_locus_info| {
-                writeln!(&mut o_file_buff_writer, "{}\t{}\t{}", qname, refname, error_locus_info).unwrap();
+                writeln!(&mut o_file_buff_writer, "{}\t{}", qname, error_locus_info).unwrap();
             });
 
         }
