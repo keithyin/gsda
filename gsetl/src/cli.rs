@@ -3,6 +3,7 @@ use std::{fs, path};
 use clap::{self, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
 pub struct Cli {
     #[arg(long = "outdir")]
     pub output_dir: String,
