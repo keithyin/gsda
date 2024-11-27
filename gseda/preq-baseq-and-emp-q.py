@@ -20,12 +20,16 @@ def main(args):
             )
         ]
     ).with_columns([utils.q2phreq_expr("emp_rq", "emp_phreq")])
-    figure = plt.figure(figsize=(20, 10))
+    figure = plt.figure(figsize=(10, 10))
     axs = figure.add_subplot(1, 1, 1)
     plt.sca(axs)
     plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
 
     sns.scatterplot(df.to_pandas(), x="baseq", y="emp_phreq", ax=axs)
+    axs.set_xticks(list(range(0, 60, 2)))
+    axs.set_yticks(list(range(0, 60, 2)))
+    axs.set_xlabel("PredictedBaseQ", fontdict={"size": 16})
+    axs.set_ylabel("EmpericalBaseQ", fontdict={"size": 16})
     perfect_line = pl.DataFrame(
         {
             "x": list(range(0, 60)),
