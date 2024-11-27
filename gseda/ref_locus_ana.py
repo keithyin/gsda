@@ -1,5 +1,6 @@
 import polars as pl
 import polars_init
+import argparse
 
 
 def ana(filepath: str):
@@ -20,12 +21,18 @@ def ana(filepath: str):
         .sort(by=["eq_rate2"], descending=[False])
     )
 
-    print(df.head(100))
+    print(df.head(200))
+
+    print(df.select((pl.col("eq_rate2") < 0.5).sum() / pl.len()))
+
+    # print(df.head(200))
 
 
 if __name__ == "__main__":
     polars_init.polars_env_init()
 
-    fp = "/data/ccs_data/case-study/kangweishiji-q20-low-ratio/bc1-np3-smc2ref-analysis/fact_aligned_bam_ref_locus_info.csv"
-    ana(filepath=fp)
+    parser = argparse.ArgumentParser(prog="")
+    parser.add_argument("fp", metavar="fact_aligned_bam_ref_locus_info.csv")
+    args = parser.parse_args()
+    ana(filepath=args.fp)
     pass

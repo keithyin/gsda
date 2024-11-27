@@ -52,3 +52,6 @@ if __name__ == "__main__":
     }
 
     main(argparse.Namespace(**params))
+
+
+# Z:\BC\共享文件夹\four\20241115_Sync_Y0701_03_H01_Run0003_called.bam  . 中南 STR

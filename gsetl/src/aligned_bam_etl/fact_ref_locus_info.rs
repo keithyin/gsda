@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    collections::HashMap,
     fmt::Display,
     fs,
     io::{BufWriter, Write},
@@ -15,11 +16,25 @@ use crate::cli::AlignedBamParams;
 
 use super::FastaData;
 
+fn base_cnt_map_2_str(base_cnt: &HashMap<u8, usize>) -> String {
+    let mut items = base_cnt
+        .iter()
+        .map(|(base, cnt)| (*base, *cnt))
+        .collect::<Vec<_>>();
+    items.sort_by_key(|v| v.0);
+
+    let items = items
+        .into_iter()
+        .map(|(base, cnt)| format!("{}:{}", base as char, cnt))
+        .collect::<Vec<_>>();
+    items.join(",")
+}
+
 struct LocusStat {
     pos: usize,
     eq: usize,
-    diff: usize,
-    ins: usize,
+    diff: HashMap<u8, usize>,
+    ins: HashMap<u8, usize>,
     del: usize,
     depth: usize, // how much records that aligned to this position
     cur_base: String,
@@ -41,8 +56,8 @@ impl LocusStat {
         Self {
             pos,
             eq: 0,
-            diff: 0,
-            ins: 0,
+            diff: HashMap::new(),
+            ins: HashMap::new(),
             del: 0,
             depth: 0,
             cur_base,
@@ -54,26 +69,46 @@ impl LocusStat {
     }
 
     fn csv_header() -> &'static str {
-        "pos\teq\tdiff\tins\tdel\tdepth\tcurBase\tnextBase\tcurIsHomo\tnextIsHomo\taroundBases"
+        "pos\teq\tdiff\tins\tdel\tdepth\tcurBase\tnextBase\tcurIsHomo\tnextIsHomo\taroundBases\tdiffDetail\tinsDetail"
     }
+
+    fn diff_str(&self) -> String {
+        base_cnt_map_2_str(&self.diff)
+    }
+
+    fn ins_str(&self) -> String {
+        base_cnt_map_2_str(&self.ins)
+    }
+
+    fn diff_tot(&self) -> usize {
+        self.diff.values().copied().reduce(|acc, v| acc + v).unwrap_or(0)
+    }
+
+    fn ins_tot(&self) -> usize {
+        self.ins.values().copied().reduce(|acc, v| acc + v).unwrap_or(0)
+        
+    }
+
 }
 
 impl Display for LocusStat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}",
+            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}",
             self.pos,
             self.eq,
-            self.diff,
-            self.ins,
+            self.diff_tot(),
+            self.ins_tot(),
             self.del,
             self.depth,
             self.cur_base,
             self.next_base,
             self.cur_is_homo,
             self.next_is_homo,
-            self.around_bases
+            self.around_bases,
+            self.diff_str(),
+            self.ins_str()
         )
     }
 }
@@ -137,8 +172,8 @@ pub fn fact_ref_locus_info(
                         &refseq[pos..pos + 1],
                         &refseq[pos + 1..around_end]
                     ),
-                    if cur_is_homo {1} else {0},
-                    if next_is_homo {1} else {0},
+                    if cur_is_homo { 1 } else { 0 },
+                    if next_is_homo { 1 } else { 0 },
                 )
             })
             .collect::<Vec<_>>();
@@ -213,7 +248,8 @@ pub fn fact_ref_locus_info(
                 if rpos.is_none() {
                     // insertion
                     unsafe {
-                        ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).ins += 1;
+                        let ins_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
+                        *ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).ins.entry(ins_base).or_insert(0) += 1;
                     }
                     continue;
                 }
@@ -224,7 +260,8 @@ pub fn fact_ref_locus_info(
                     {
                         ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).eq += 1;
                     } else {
-                        ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).diff += 1;
+                        let diff_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
+                        *ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).diff.entry(diff_base).or_insert(0) += 1;
                     }
                 }
 
