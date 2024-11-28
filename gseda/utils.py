@@ -1,25 +1,25 @@
 import pysam
-from typing import Mapping
+from typing import Mapping, Tuple
 from tqdm import tqdm
 import polars as pl
 
 
-def read_bam_file(bam_file: str) -> Mapping[str, str]:
+def read_bam_file(bam_file: str) -> Mapping[str, Tuple[str, int]]:
     res = {}
     with pysam.AlignmentFile(bam_file, mode="rb", threads=40, check_sq=False) as bam_h:
         for record in tqdm(
             bam_h.fetch(until_eof=True), desc=f"read_bam_file:>> reading {bam_file}"
         ):
-            res[record.query_name] = record.query_sequence
+            res[record.query_name] = (record.query_sequence, f"00_{record.query_name}")
 
     return res
 
 
-def read_fastx_file(fname: str):
+def read_fastx_file(fname: str) -> Mapping[str, Tuple[str, int]]:
     fh = pysam.FastxFile(fname)
     res = {}
     for entry in fh:
-        res[entry.name] = entry.sequence
+        res[entry.name] = (entry.sequence, f"00_{entry.name}")
     return res
 
 
