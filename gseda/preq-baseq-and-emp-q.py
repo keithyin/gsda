@@ -5,7 +5,6 @@ import argparse
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
-from numba import jit
 import polars_init
 
 

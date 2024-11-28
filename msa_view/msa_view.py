@@ -69,7 +69,7 @@ def init_matrix(num_rows, num_cols):
     return matrix
 
 
-class ResultMatrixV2:
+class ResultMatrix:
     """msa alignment matrix"""
 
     def __init__(
@@ -120,6 +120,9 @@ class ResultMatrixV2:
         ref_aligned = []
         query_aligned = []
 
+        qpos_start = None
+        qpos_end = None
+
         for qpos, rpos in record.get_aligned_pairs():
             if rpos is not None:
                 rpos_cursor = rpos
@@ -127,6 +130,12 @@ class ResultMatrixV2:
                 continue
             if rpos_cursor < self.ref_start or rpos_cursor >= self.ref_end:
                 continue
+
+            if qpos_start is None and qpos is not None:
+                qpos_start = qpos
+
+            if qpos is not None:
+                qpos_end = qpos
 
             if rpos_cursor not in self.rpos2matrix_col:
                 print(
@@ -152,6 +161,21 @@ class ResultMatrixV2:
         # query_aligned = "".join(query_aligned)
         # info = f"qname:{record.query_name}\n{ref_aligned}\n{query_aligned}"
         # print(info)
+
+        seq_len = record.query_length
+        if record.is_reverse:
+            qpos_start, qpos_end = seq_len - qpos_end, seq_len - qpos_start
+
+        called_start = None
+        called_end = None
+        if record.has_tag("be"):
+            shift = record.get_tag("be")[0]
+            called_start = qpos_start + shift
+            called_end = qpos_end + shift
+
+        print(
+            f"{record.query_name}: sbr:{qpos_start}-{qpos_end}, called:{called_start}-{called_end}"
+        )
 
     def get_raw_result(self):
         return self.matrix
@@ -289,7 +313,7 @@ def bam2fa4jalview(
 
     rpos2length = {pos: ins + 1 for pos, ins in rpos2maxins.items()}
 
-    result_matrix = ResultMatrixV2(
+    result_matrix = ResultMatrix(
         ref_start=interested_ref_start,
         ref_end=interested_ref_end,
         query_names=query_names,

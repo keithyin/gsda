@@ -5,7 +5,6 @@ import argparse
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
-from numba import jit
 
 
 class BaseQStat:
@@ -30,7 +29,6 @@ class BaseQStat:
         self.deletion += num
 
 
-# @jit
 def stat_one_record(aligned_pairs, qual, baseq2baseq_stat, query_seq, refseq, ref_end):
     ref_pos_cursor = None
     query_pos_cursor = None
