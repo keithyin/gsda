@@ -1,6 +1,13 @@
 import pysam
 import polars as pl
 import argparse
+
+import os
+import sys
+
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+sys.path.insert(0, cur_dir)
+
 import polars_init
 
 

@@ -1,3 +1,9 @@
+import os
+import sys
+
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+sys.path.insert(0, cur_dir)
+
 import pysam
 import utils
 import polars as pl

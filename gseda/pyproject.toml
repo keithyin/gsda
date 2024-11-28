@@ -1,0 +1,23 @@
+[project]
+name = "gseda"
+version = "0.0.1"
+authors = [
+  { name="keithyin", email="yinpenghhz@hotmail.com" },
+]
+description = "gsetl"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/keithyin/gsda"
+Issues = "https://github.com/keithyin/gsda/issues"
+
+# 构建后端，默认为 Hatchling
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

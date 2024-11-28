@@ -1,10 +1,18 @@
 import pysam
+import os
+import sys
+
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+sys.path.insert(0, cur_dir)
+
 import utils
 import polars as pl
 import argparse
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+
 import polars_init
 
 
