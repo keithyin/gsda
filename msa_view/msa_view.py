@@ -109,13 +109,6 @@ class ResultMatrixV2:
         print(f"self.end={self.ref_end}")
 
     def update(self, record: pysam.AlignedSegment, ref: str = None):
-        """
-        query1 query2 query3 , ....
-
-        A        A
-        .        A
-
-        """
 
         idx = self.query2idx[build_query_name(record)]
 
@@ -232,7 +225,7 @@ def build_ref_pos_maxins(
                     )
                 cur_query_ins = 0
 
-        if rpos_cursor > ref_start and rpos_cursor < ref_end:
+        if rpos_cursor > ref_start and rpos_cursor <= ref_end:
             rpos2max_ins[rpos_cursor - 1] = max(
                 cur_query_ins, rpos2max_ins[rpos_cursor - 1]
             )
