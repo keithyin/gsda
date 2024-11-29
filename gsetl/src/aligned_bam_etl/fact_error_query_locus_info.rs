@@ -96,9 +96,12 @@ pub fn fact_error_query_locus_info(
             if record.is_secondary() || record.is_unmapped() || record.is_supplementary() {
                 continue;
             }
+            let record_ext = BamRecordExt::new(&record);
 
-            let ref_start = record.reference_start();
-            let ref_end = record.reference_end();
+            let ref_start = record_ext.reference_start() as i64;
+            let ref_end = record_ext.reference_end() as i64;
+
+            let query_end = record_ext.query_alignment_end() as i64;
 
             let mut rpos_cursor = None;
             let mut qpos_cursor = None;
@@ -137,7 +140,11 @@ pub fn fact_error_query_locus_info(
                     continue;
                 }
 
-                if qpos_cursor.is_none() {
+                if let Some(qpos_cursor_) = qpos_cursor {
+                    if qpos_cursor_ >= query_end {
+                        break;
+                    }
+                } else {
                     continue;
                 }
 
@@ -206,9 +213,6 @@ pub fn fact_error_query_locus_info(
                     }
                 }
 
-                if rpos_cur_or_pre == (ref_end as usize - 1) {
-                    break;
-                }
 
             }
 

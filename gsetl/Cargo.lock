@@ -592,7 +592,7 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "gsetl"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -603,14 +603,15 @@ dependencies = [
 
 [[package]]
 name = "gskits"
-version = "0.8.4"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0060ff0685e3b54df862f20d0782b357e6f1e5231e6acfa6929bafb657210ae"
+checksum = "d229e430df9c777988e73063f95d12f8fa54eda6c564c98c1e474ace35f829b1"
 dependencies = [
  "anyhow",
  "bio",
  "chrono",
  "indicatif",
+ "lazy_static",
  "num_cpus",
  "rust-htslib",
  "tracing",

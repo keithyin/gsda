@@ -128,14 +128,16 @@ pub fn fact_bam_basic(
                 continue;
             }
 
-            let rstart = record.reference_start() as usize;
-            let rend = record.reference_end() as usize;
-            let qstart = record.pos() as usize;
+            let record_ext = BamRecordExt::new(&record);
+
+            let rstart = record_ext.reference_start() as usize;
+            let rend = record_ext.reference_end() as usize;
+            let qstart = record_ext.query_alignment_start() as usize;
 
             // dump
             let record_ext = BamRecordExt::new(&record);
             let qname = record_ext.get_qname();
-            let qend = record_ext.compute_qend();
+            let qend = record_ext.query_alignment_end();
             let qlen = record.seq_len_from_cigar(true);
 
             let be = record_ext.get_be().unwrap_or(vec![0, 0]);

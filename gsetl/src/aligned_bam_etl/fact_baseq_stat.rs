@@ -6,8 +6,7 @@ use std::{
 };
 
 use gskits::{
-    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
-    pbar,
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
 };
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
@@ -92,8 +91,11 @@ pub fn fact_baseq_stat(
                 continue;
             }
 
-            let ref_start = record.reference_start();
-            let ref_end = record.reference_end();
+            let record_ext = BamRecordExt::new(&record);
+
+            let ref_start = record_ext.reference_start() as i64;
+            let ref_end = record_ext.reference_end() as i64;
+            let query_end = record_ext.query_alignment_end() as i64;
 
             let mut rpos_cursor = None;
             let mut qpos_cursor = None;
@@ -120,7 +122,11 @@ pub fn fact_baseq_stat(
                     continue;
                 }
 
-                if qpos_cursor.is_none() {
+                if let Some(qpos_cursor_) = qpos_cursor {
+                    if qpos_cursor_ >= query_end {
+                        break;
+                    }
+                } else {
                     continue;
                 }
 
@@ -161,9 +167,7 @@ pub fn fact_baseq_stat(
                         stat.diff += 1;
                     }
                 }
-                if rpos_cursor.unwrap() as usize == (ref_end as usize - 1) {
-                    break;
-                }
+                
             }
         }
         let mut baseq2stat = baseq2stat.into_iter().collect::<Vec<_>>();

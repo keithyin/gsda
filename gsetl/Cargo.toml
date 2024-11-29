@@ -1,6 +1,6 @@
 [package]
 name = "gsetl"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "etl"
 license = "MIT"
@@ -22,4 +22,4 @@ anyhow = "1.0.82"
 #minimap2="0.1.20+minimap2.2.28"
 #num_cpus="1.16"
 crossbeam = "0.8"
-gskits="0.8"
+gskits="0.9"
