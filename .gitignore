@@ -3,3 +3,6 @@ ana/*
 *.png
 **/dist/*
 **/__pycache__/*
+*aligned.bam*
+*.jpg
+*.png
