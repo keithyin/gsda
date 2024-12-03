@@ -151,7 +151,14 @@ pub fn fact_baseq_stat(
                     stat.del += 1;
                     continue;
                 }
-                if rpos.is_none() {
+                if rpos.is_none() { // ins 需要加到 下一个 baseq 上
+                    let next_qpos = qpos_cursor.unwrap() + 1;
+                    if next_qpos >= query_end {
+                        continue;
+                    }
+
+                    let next_baseq = qual[next_qpos as usize];
+                    let stat = baseq2stat.entry(next_baseq).or_insert(BaseQStat::new(next_baseq));
                     stat.ins += 1;
                     continue;
                 }

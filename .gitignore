@@ -2,3 +2,4 @@
 ana/*
 *.png
 **/dist/*
+**/__pycache__/*

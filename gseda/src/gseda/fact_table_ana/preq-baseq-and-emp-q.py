@@ -11,6 +11,7 @@ import argparse
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
+import argparse
 
 
 import polars_init
@@ -54,11 +55,7 @@ def main(args):
 
 if __name__ == "__main__":
     polars_init.polars_env_init()
-    params = {
-        "data": "/data/ccs_data/ccs_eval2024q3/Ludaopei/subread_bak/output-all/analysis/fact_baseq_stat.csv",
-    }
+    parser = argparse.ArgumentParser(prog="")
+    parser.add_argument("data", metavar="fact_baseq_stat")
 
-    main(argparse.Namespace(**params))
-
-
-# Z:\BC\共享文件夹\four\20241115_Sync_Y0701_03_H01_Run0003_called.bam  . 中南 STR
+    main(parser.parse_args())
