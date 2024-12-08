@@ -1,6 +1,11 @@
 import pysam
 import argparse
 from tqdm import tqdm
+import os
+import sys
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+sys.path.insert(0, cur_dir)
+from range_identity import RangeIdentityCalculator
 
 
 def calculate_low_identity_windows(
@@ -27,25 +32,19 @@ def calculate_low_identity_windows(
         low_identity_found = False
         low_identity_length = 0
 
+        query_start = read.query_alignment_start
+        query_end = read.query_alignment_end
+
         # 遍历窗口
-        for start in range(0, query_length - window_size + 1, step_size):
-            end = start + window_size
-            window = sequence[start:end]
-            # 计算窗口的 identity：此处假设使用与参考序列的比对结果来计算 identity。
-            # 可以通过 `read.get_reference_positions()` 获取比对的参考位置来计算。
-            ref_positions = read.get_reference_positions(start=start, end=end)
-            if ref_positions is None:
-                continue
+        range_ideneity_calc = RangeIdentityCalculator(read.cigartuples)
+        for start in range(query_start, query_end, step_size):
+            end = min(start + window_size, query_end)
 
-            ref_sequence = [read.reference_sequence[pos] for pos in ref_positions]
-
-            # 计算该窗口的 identity
-            matching_bases = sum(1 for a, b in zip(window, ref_sequence) if a == b)
-            identity = matching_bases / len(window)
+            identity = range_ideneity_calc.range_identity(start=start, end=end)
 
             if identity < identity_threshold:
                 low_identity_found = True
-                low_identity_length += len(window)
+                low_identity_length += (end - start)
 
         if low_identity_found:
             queries_with_low_identity += 1
