@@ -3,6 +3,7 @@ import argparse
 from tqdm import tqdm
 import os
 import sys
+
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 sys.path.insert(0, cur_dir)
 from range_identity import RangeIdentityCalculator
@@ -44,7 +45,7 @@ def calculate_low_identity_windows(
 
             if identity < identity_threshold:
                 low_identity_found = True
-                low_identity_length += (end - start)
+                low_identity_length += end - start
 
         if low_identity_found:
             queries_with_low_identity += 1
