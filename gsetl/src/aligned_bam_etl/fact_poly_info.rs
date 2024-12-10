@@ -1,5 +1,4 @@
 use std::{
-    cmp,
     fmt::Display,
     fs,
     io::{BufWriter, Write},
@@ -10,7 +9,7 @@ use gskits::{
     gsbam::bam_record_ext::BamRecordExt,
     pbar,
 };
-use rust_htslib::bam::{self, ext::BamRecordExtensions, IndexedReader, Read, Record};
+use rust_htslib::bam::{self, ext::BamRecordExtensions, Read, Record};
 
 use crate::{
     cli::AlignedBamParams,
