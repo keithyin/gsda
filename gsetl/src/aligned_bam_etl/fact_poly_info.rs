@@ -99,7 +99,7 @@ pub fn fact_poly_info(
     .unwrap();
 
     let pb = pbar::get_spin_pb(
-        format!("fact_error_query_locus_info"),
+        format!("fact_poly_info"),
         pbar::DEFAULT_INTERVAL,
     );
 
