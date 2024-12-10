@@ -12,6 +12,7 @@ pub mod fact_ref_locus_info;
 pub mod fact_error_query_locus_info;
 pub mod fact_bam_basic;
 pub mod fact_baseq_stat;
+pub mod fact_poly_info;
 
 pub struct FastaData {
     ref_name2seq: HashMap<String, String>,
