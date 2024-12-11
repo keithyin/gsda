@@ -2,8 +2,9 @@ use std::{fs, io::Write, thread};
 
 use aligned_bam_etl::{
     fact_bam_basic::fact_bam_basic, fact_baseq_stat::fact_baseq_stat,
-    fact_error_query_locus_info::fact_error_query_locus_info, fact_record_stat::fact_record_stat,
-    fact_ref_locus_info::fact_ref_locus_info, get_hc_regions, get_hcvariants, FastaData,
+    fact_error_query_locus_info::fact_error_query_locus_info, fact_poly_info::fact_poly_info,
+    fact_record_stat::fact_record_stat, fact_ref_locus_info::fact_ref_locus_info, get_hc_regions,
+    get_hcvariants, FastaData,
 };
 use clap::Parser;
 use gskits::utils::command_line_str;
@@ -11,6 +12,7 @@ use gskits::utils::command_line_str;
 mod aligned_bam_etl;
 mod cli;
 mod non_aligned_bam_etl;
+mod poly_n;
 
 fn main() {
     let args = cli::Cli::parse();
@@ -63,6 +65,14 @@ fn main() {
             );
             fact_bam_basic(param, &args.output_dir, &reffasta);
             fact_baseq_stat(
+                param,
+                &args.output_dir,
+                hc_regions.as_ref(),
+                hc_variants.as_ref(),
+                &reffasta,
+            );
+
+            fact_poly_info(
                 param,
                 &args.output_dir,
                 hc_regions.as_ref(),
