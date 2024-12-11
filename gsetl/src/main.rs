@@ -42,43 +42,46 @@ fn main() {
             let hc_variants = vcf_thread.join().unwrap();
             let reffasta = FastaData::new(&param.ref_file);
 
-            fact_record_stat(
-                param,
-                &args.output_dir,
-                hc_regions.as_ref(),
-                hc_variants.as_ref(),
-                &reffasta,
-            );
-            fact_ref_locus_info(
-                param,
-                &args.output_dir,
-                hc_regions.as_ref(),
-                hc_variants.as_ref(),
-                &reffasta,
-            );
-            fact_error_query_locus_info(
-                param,
-                &args.output_dir,
-                hc_regions.as_ref(),
-                hc_variants.as_ref(),
-                &reffasta,
-            );
-            fact_bam_basic(param, &args.output_dir, &reffasta);
-            fact_baseq_stat(
-                param,
-                &args.output_dir,
-                hc_regions.as_ref(),
-                hc_variants.as_ref(),
-                &reffasta,
-            );
+            thread::scope(|s| {
+                let args = &args;
+                let hc_regions = hc_regions.as_ref();
+                let hc_variants = hc_variants.as_ref();
+                let reffasta = &reffasta;
 
-            fact_poly_info(
-                param,
-                &args.output_dir,
-                hc_regions.as_ref(),
-                hc_variants.as_ref(),
-                &reffasta,
-            );
+                s.spawn(move || {
+                    fact_record_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta)
+                });
+                s.spawn(move || {
+                    fact_ref_locus_info(param, &args.output_dir, hc_regions, hc_variants, reffasta)
+                });
+
+                s.spawn(move || {
+                    fact_error_query_locus_info(
+                        param,
+                        &args.output_dir,
+                        hc_regions,
+                        hc_variants,
+                        reffasta,
+                    )
+                });
+                s.spawn(move || fact_bam_basic(param, &args.output_dir, reffasta));
+
+                s.spawn(move || fact_baseq_stat(
+                    param,
+                    &args.output_dir,
+                    hc_regions,
+                    hc_variants,
+                    reffasta,
+                ));
+
+                s.spawn(move || fact_poly_info(
+                    param,
+                    &args.output_dir,
+                    hc_regions,
+                    hc_variants,
+                    &reffasta,
+                ));
+            });
         }
         cli::Subcommands::NonAlignedBam(_param) => {}
     }
