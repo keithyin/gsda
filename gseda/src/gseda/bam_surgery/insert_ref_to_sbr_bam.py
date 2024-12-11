@@ -4,10 +4,11 @@ import sys
 from tqdm import tqdm
 import argparse
 
-pre_dir = os.path.abspath(__file__).rsplit("/", maxsplit=2)[0]
+pre_dir = os.path.abspath(__file__).rsplit("/", maxsplit=3)[0]
+print(pre_dir)
 sys.path.append(pre_dir)
 
-import gseda.utils as gseda_utils
+import gseda.fact_table_ana.utils as gseda_utils
 
 
 def insert_ref_to_sbr_bam(sbr_bam: str, smc2ref_bam: str, ref_file: str):
