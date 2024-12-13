@@ -1,4 +1,4 @@
-use std::{fs, io::Write, thread};
+use std::{fs, io::Write, thread, time::Duration};
 
 use aligned_bam_etl::{
     fact_bam_basic::fact_bam_basic, fact_baseq_stat::fact_baseq_stat,
@@ -8,6 +8,7 @@ use aligned_bam_etl::{
 };
 use clap::Parser;
 use gskits::utils::command_line_str;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 mod aligned_bam_etl;
 mod cli;
@@ -41,6 +42,7 @@ fn main() {
             let hc_regions = bed_thread.join().unwrap();
             let hc_variants = vcf_thread.join().unwrap();
             let reffasta = FastaData::new(&param.ref_file);
+            let multi_pb = MultiProgress::new();
 
             thread::scope(|s| {
                 let args = &args;
@@ -48,13 +50,20 @@ fn main() {
                 let hc_variants = hc_variants.as_ref();
                 let reffasta = &reffasta;
 
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
                 s.spawn(move || {
-                    fact_record_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta)
-                });
-                s.spawn(move || {
-                    fact_ref_locus_info(param, &args.output_dir, hc_regions, hc_variants, reffasta)
+                    fact_record_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
                 });
 
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
+                s.spawn(move || {
+                    fact_ref_locus_info(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
+                });
+
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
                 s.spawn(move || {
                     fact_error_query_locus_info(
                         param,
@@ -62,27 +71,35 @@ fn main() {
                         hc_regions,
                         hc_variants,
                         reffasta,
+                        pb
                     )
                 });
-                s.spawn(move || fact_bam_basic(param, &args.output_dir, reffasta));
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
+                s.spawn(move || fact_bam_basic(param, &args.output_dir, reffasta, pb));
 
-                s.spawn(move || fact_baseq_stat(
-                    param,
-                    &args.output_dir,
-                    hc_regions,
-                    hc_variants,
-                    reffasta,
-                ));
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
+                s.spawn(move || {
+                    fact_baseq_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
+                });
 
-                s.spawn(move || fact_poly_info(
-                    param,
-                    &args.output_dir,
-                    hc_regions,
-                    hc_variants,
-                    &reffasta,
-                ));
+                let pb = ProgressBar::new_spinner();
+                let pb = multi_pb.add(pb);
+                s.spawn(move || {
+                    fact_poly_info(param, &args.output_dir, hc_regions, hc_variants, &reffasta, pb)
+                });
             });
         }
         cli::Subcommands::NonAlignedBam(_param) => {}
     }
+}
+
+pub fn set_spin_pb(pb: ProgressBar, message: String, interval: Duration) -> ProgressBar {
+    pb.set_style(
+        ProgressStyle::with_template("{msg} {spinner} {human_pos}  {per_sec} {elapsed}").unwrap(),
+    );
+    pb.enable_steady_tick(interval);
+    pb.set_message(message);
+    pb
 }

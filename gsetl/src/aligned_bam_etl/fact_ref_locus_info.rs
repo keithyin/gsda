@@ -7,11 +7,14 @@ use std::{
 };
 
 use gskits::{
-    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
+    gsbam::bam_record_ext::BamRecordExt,
+    pbar,
 };
+use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
-use crate::cli::AlignedBamParams;
+use crate::{cli::AlignedBamParams, set_spin_pb};
 
 use super::FastaData;
 
@@ -80,14 +83,20 @@ impl LocusStat {
     }
 
     fn diff_tot(&self) -> usize {
-        self.diff.values().copied().reduce(|acc, v| acc + v).unwrap_or(0)
+        self.diff
+            .values()
+            .copied()
+            .reduce(|acc, v| acc + v)
+            .unwrap_or(0)
     }
 
     fn ins_tot(&self) -> usize {
-        self.ins.values().copied().reduce(|acc, v| acc + v).unwrap_or(0)
-        
+        self.ins
+            .values()
+            .copied()
+            .reduce(|acc, v| acc + v)
+            .unwrap_or(0)
     }
-
 }
 
 impl Display for LocusStat {
@@ -118,6 +127,7 @@ pub fn fact_ref_locus_info(
     hc_regions: Option<&BedInfo>,
     hc_variants: Option<&VcfInfo>,
     fasta_data: &FastaData,
+    pbar: ProgressBar,
 ) {
     let bam_file = &args.bam;
 
@@ -134,7 +144,7 @@ pub fn fact_ref_locus_info(
     )
     .unwrap();
 
-    let pb = pbar::get_spin_pb(format!("fact_ref_locus_info"), pbar::DEFAULT_INTERVAL);
+    let pb = set_spin_pb(pbar, format!("fact_ref_locus_info"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
         bam_h
@@ -257,7 +267,11 @@ pub fn fact_ref_locus_info(
                     // insertion
                     unsafe {
                         let ins_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
-                        *ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).ins.entry(ins_base).or_insert(0) += 1;
+                        *ref_locus_stat
+                            .get_unchecked_mut(rpos_cur_or_pre)
+                            .ins
+                            .entry(ins_base)
+                            .or_insert(0) += 1;
                     }
                     continue;
                 }
@@ -269,10 +283,13 @@ pub fn fact_ref_locus_info(
                         ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).eq += 1;
                     } else {
                         let diff_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
-                        *ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).diff.entry(diff_base).or_insert(0) += 1;
+                        *ref_locus_stat
+                            .get_unchecked_mut(rpos_cur_or_pre)
+                            .diff
+                            .entry(diff_base)
+                            .or_insert(0) += 1;
                     }
                 }
-
             }
         }
 

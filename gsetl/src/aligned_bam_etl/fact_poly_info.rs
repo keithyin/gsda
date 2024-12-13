@@ -9,11 +9,13 @@ use gskits::{
     gsbam::bam_record_ext::BamRecordExt,
     pbar,
 };
+use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read, Record};
 
 use crate::{
     cli::AlignedBamParams,
     poly_n::{find_homopolymer_regions, position_relation, PosRelation},
+    set_spin_pb,
 };
 
 use super::FastaData;
@@ -70,7 +72,15 @@ impl Display for RefPolyLocusInfo {
         write!(
             f,
             "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}",
-            self.rstart, self.rend, self.qstart, self.qend, self.ref_base, self.ref_repeats, self.query_repeats, self.qseq, self.query_clean
+            self.rstart,
+            self.rend,
+            self.qstart,
+            self.qend,
+            self.ref_base,
+            self.ref_repeats,
+            self.query_repeats,
+            self.qseq,
+            self.query_clean
         )
     }
 }
@@ -82,6 +92,7 @@ pub fn fact_poly_info(
     _hc_regions: Option<&BedInfo>,
     _hc_variants: Option<&VcfInfo>,
     fasta_data: &FastaData,
+    pbar: ProgressBar,
 ) {
     let bam_file = &args.bam;
 
@@ -98,10 +109,7 @@ pub fn fact_poly_info(
     )
     .unwrap();
 
-    let pb = pbar::get_spin_pb(
-        format!("fact_poly_info"),
-        pbar::DEFAULT_INTERVAL,
-    );
+    let pb = set_spin_pb(pbar, format!("fact_poly_info"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
         bam_h
@@ -118,12 +126,15 @@ pub fn fact_poly_info(
             let qname = BamRecordExt::new(&record).get_qname();
             let poly_infos = poly_info_extractor(&record, &ref_poly_regsion);
             if let Some(poly_infos) = poly_infos {
-                poly_infos.into_iter()
-                .for_each(|poly_info| {
-                    writeln!(&mut o_file_buff_writer, "{}\t{}\t{}", refname, qname, poly_info).unwrap();
+                poly_infos.into_iter().for_each(|poly_info| {
+                    writeln!(
+                        &mut o_file_buff_writer,
+                        "{}\t{}\t{}",
+                        refname, qname, poly_info
+                    )
+                    .unwrap();
                 });
             }
-                
         }
     }
     pb.finish();
@@ -275,10 +286,11 @@ fn move_poly_idx(
 
 #[cfg(test)]
 mod test {
-    use crate::{aligned_bam_etl::fact_poly_info::RefPolyLocusInfo, poly_n::find_homopolymer_regions};
+    use crate::{
+        aligned_bam_etl::fact_poly_info::RefPolyLocusInfo, poly_n::find_homopolymer_regions,
+    };
 
     use super::poly_info_extractor;
-
 
     #[test]
     fn test_poly_info_extractor() {
@@ -299,10 +311,15 @@ mod test {
         );
         let ref_poly_region = find_homopolymer_regions(refseq);
         let res = poly_info_extractor(&record, &ref_poly_region).unwrap();
-        assert_eq!(res[0], RefPolyLocusInfo::new(1, 3, 1, 2, 'C', 2, "C".to_string()));
-        assert_eq!(res[1], RefPolyLocusInfo::new(3, 5, 2, 2, 'G', 2, "".to_string()));
+        assert_eq!(
+            res[0],
+            RefPolyLocusInfo::new(1, 3, 1, 2, 'C', 2, "C".to_string())
+        );
+        assert_eq!(
+            res[1],
+            RefPolyLocusInfo::new(3, 5, 2, 2, 'G', 2, "".to_string())
+        );
 
-        
         /*
            ref: ACCGGT
            qry: A-C-GT
@@ -320,9 +337,14 @@ mod test {
         );
         let ref_poly_region = find_homopolymer_regions(refseq);
         let res = poly_info_extractor(&record, &ref_poly_region).unwrap();
-        assert_eq!(res[0], RefPolyLocusInfo::new(1, 3, 1, 2, 'C', 2, "C".to_string()));
-        assert_eq!(res[1], RefPolyLocusInfo::new(3, 5, 2, 3, 'G', 2, "G".to_string()));
-
+        assert_eq!(
+            res[0],
+            RefPolyLocusInfo::new(1, 3, 1, 2, 'C', 2, "C".to_string())
+        );
+        assert_eq!(
+            res[1],
+            RefPolyLocusInfo::new(3, 5, 2, 3, 'G', 2, "G".to_string())
+        );
 
         /*
            ref: A--CCGGT
@@ -341,9 +363,14 @@ mod test {
         );
         let ref_poly_region = find_homopolymer_regions(refseq);
         let res = poly_info_extractor(&record, &ref_poly_region).unwrap();
-        assert_eq!(res[0], RefPolyLocusInfo::new(1, 3, 1, 5, 'C', 2, "CCCC".to_string()));
-        assert_eq!(res[1], RefPolyLocusInfo::new(3, 5, 5, 6, 'G', 2, "G".to_string()));
-
+        assert_eq!(
+            res[0],
+            RefPolyLocusInfo::new(1, 3, 1, 5, 'C', 2, "CCCC".to_string())
+        );
+        assert_eq!(
+            res[1],
+            RefPolyLocusInfo::new(3, 5, 5, 6, 'G', 2, "G".to_string())
+        );
 
         /*
            ref: A-TT
@@ -362,7 +389,10 @@ mod test {
         );
         let ref_poly_region = find_homopolymer_regions(refseq);
         let res = poly_info_extractor(&record, &ref_poly_region).unwrap();
-        assert_eq!(res[0], RefPolyLocusInfo::new(1, 3, 1, 4, 'T', 2, "TTT".to_string()));
+        assert_eq!(
+            res[0],
+            RefPolyLocusInfo::new(1, 3, 1, 4, 'T', 2, "TTT".to_string())
+        );
 
         /*
            ref: AAA-TT
@@ -381,8 +411,9 @@ mod test {
         );
         let ref_poly_region = find_homopolymer_regions(refseq);
         let res = poly_info_extractor(&record, &ref_poly_region).unwrap();
-        assert_eq!(res[0], RefPolyLocusInfo::new(3, 5, 1, 4, 'T', 2, "TTT".to_string()));
-
-
+        assert_eq!(
+            res[0],
+            RefPolyLocusInfo::new(3, 5, 1, 4, 'T', 2, "TTT".to_string())
+        );
     }
 }

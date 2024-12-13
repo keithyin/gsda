@@ -8,9 +8,10 @@ use std::{
 use gskits::{
     file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
 };
+use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
-use crate::cli::AlignedBamParams;
+use crate::{cli::AlignedBamParams, set_spin_pb};
 
 use super::FastaData;
 
@@ -65,6 +66,7 @@ pub fn fact_error_query_locus_info(
     hc_regions: Option<&BedInfo>,
     hc_variants: Option<&VcfInfo>,
     fasta_data: &FastaData,
+    pbar: ProgressBar
 ) {
     let bam_file = &args.bam;
 
@@ -81,7 +83,7 @@ pub fn fact_error_query_locus_info(
     )
     .unwrap();
 
-    let pb = pbar::get_spin_pb(format!("fact_error_query_locus_info"), pbar::DEFAULT_INTERVAL);
+    let pb = set_spin_pb(pbar, format!("fact_error_query_locus_info"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
         bam_h

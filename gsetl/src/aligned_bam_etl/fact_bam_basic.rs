@@ -8,9 +8,10 @@ use gskits::{
     gsbam::bam_record_ext::BamRecordExt,
     pbar,
 };
+use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
-use crate::cli::AlignedBamParams;
+use crate::{cli::AlignedBamParams, set_spin_pb};
 
 use super::FastaData;
 
@@ -103,6 +104,7 @@ pub fn fact_bam_basic(
     args: &AlignedBamParams,
     output_dir: &str,
     fasta_data: &FastaData,
+    pbar: ProgressBar
 ) {
     let bam_file = &args.bam;
 
@@ -114,7 +116,7 @@ pub fn fact_bam_basic(
     let mut o_file_buff_writer = BufWriter::new(o_file);
     writeln!(&mut o_file_buff_writer, "{}", BasicInfo::csv_header()).unwrap();
 
-    let pb = pbar::get_spin_pb(format!("fact_bam_basic"), pbar::DEFAULT_INTERVAL);
+    let pb = set_spin_pb(pbar, format!("fact_bam_basic"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
         bam_h

@@ -1,9 +1,10 @@
 use std::{collections::HashMap, fs, io::{ BufWriter, Write}, sync::Arc, thread};
 
 use gskits::{ file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar};
+use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, record::Cigar, Read};
 
-use crate::cli::AlignedBamParams;
+use crate::{cli::AlignedBamParams, set_spin_pb};
 
 use super::FastaData;
 
@@ -314,7 +315,7 @@ fn stat_record_core(record: RecordReplica, references: &HashMap<String, String>,
 }
 
 
-pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: Option<&BedInfo>, hc_variants: Option<&VcfInfo>, fasta_data: &FastaData) {
+pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: Option<&BedInfo>, hc_variants: Option<&VcfInfo>, fasta_data: &FastaData, pbar: ProgressBar) {
     thread::scope(|thread_scope| {
 
         let (record_sender, record_receiver) = crossbeam::channel::bounded(200);
@@ -360,8 +361,7 @@ pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: O
         let csv_filepath = format!("{}/fact_aligned_bam_record_stat.csv", output_dir);
         let csv_writer = fs::File::create(&csv_filepath).unwrap();
         let mut buf_csv_writer = BufWriter::new(csv_writer);
-
-        let pbar = pbar::get_spin_pb("fact_record_stat".to_string(), pbar::DEFAULT_INTERVAL);
+        let pbar = set_spin_pb(pbar, "fact_record_stat".to_string(), pbar::DEFAULT_INTERVAL);
 
         // writeln!(&mut buf_csv_writer, 
         //     "channel_id\treadLengthBp\tsubreadPasses\t\
