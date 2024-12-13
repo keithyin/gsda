@@ -42,8 +42,8 @@ def analysis(fact_poly_info_file: str):
     df_add_one = df.filter(pl.col("ref_hp_cnt_ADD_1") == pl.col("qRepeats"))
 
     all = (
-        df_eq.join(df_minus_one, on="key", suffix="_minus_one")
-        .join(df_add_one, on="key", suffix="_add_one")
+        df_eq.join(df_minus_one, on="key", suffix="_minus_one", how="left")
+        .join(df_add_one, on="key", suffix="_add_one", how="left")
         .select(
             [
                 "key",
@@ -86,6 +86,7 @@ def map(model: pl.DataFrame, base, cnts):
 
 def main(args):
     df = analysis(args.fact_poly_info_file)
+    return
 
     examples = [
         ["A", [3, 4, 4, 3, 3, 4, 4, 3, 4]],
@@ -113,6 +114,6 @@ def main(args):
 if __name__ == "__main__":
     polars_init.polars_env_init()
     cli_params = {
-        "fact_poly_info_file": "/data/ccs_data/ccs_eval2024q3/jinpu/analysis-poly/fact_poly_info.csv"
+        "fact_poly_info_file": "/data/adam/20241203_240901Y0005_Run0001/analysis/fact_poly_info.csv"
     }
     main(argparse.Namespace(**cli_params))
