@@ -3,6 +3,7 @@ import pathlib
 import os
 import logging
 import polars as pl
+import shutil
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,7 +84,7 @@ def stats(fact_bam_basic, fact_bam_record_stat, file_h):
     # print(query_coverage)
 
 
-def main(bam_file: str, ref_fa: str, outdir=None) -> str:
+def main(bam_file: str, ref_fa: str, force=False, outdir=None) -> str:
     """
         step1: do alignment
         step2: generate detailed metric info
@@ -101,6 +102,8 @@ def main(bam_file: str, ref_fa: str, outdir=None) -> str:
     Args:
         bam_file (str): bam file. only support adapter.bam
         ref_fa (str): ref genome fa file nam
+        force (boolean): if force==False, the outdir must not exists in advance. if force==True, the outdir will be removed if exists
+            the proceduer will create a empty outdir for the metric related files
         outdir:
             if outdir provided, read ${outdir}/metric/aggr_metric.csv for metric result
             if not, read ${bam_file_dir}/${bam_file_name}-metric/metric/aggr_metric.csv for metric result
@@ -112,12 +115,16 @@ def main(bam_file: str, ref_fa: str, outdir=None) -> str:
     bam_filename = extract_filename(bam_file)
     if outdir is None:
         outdir = os.path.join(bam_filedir, f"{bam_filename}-metric")
+    if force and os.path.exists(outdir):
+        shutil.rmtree(outdir)
+    if os.path.exists(outdir):
+        raise ValueError(f"{outdir} already exists. remove it by manually or force=True")
+    
+    os.makedirs(outdir)
 
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
     metric_outdir = os.path.join(outdir, "metric")
 
-    aligned_bam_file = do_alignment(bam_file, ref_fa, outdir=outdir, force=False)
+    aligned_bam_file = do_alignment(bam_file, ref_fa, outdir=outdir, force=force)
 
     fact_bam_basic, fact_bam_record_stat = generate_fact_table(
         aligned_bam_file, ref_fasta=ref_fa, outdir=metric_outdir
