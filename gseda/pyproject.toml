@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.0.5"
+version = "0.0.6"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
