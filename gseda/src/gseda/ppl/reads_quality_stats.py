@@ -83,12 +83,12 @@ def stats(fact_bam_basic, fact_bam_record_stat, file_h):
     # print(query_coverage)
 
 
-def main(bam_file: str, ref_fa: str, outdir=None):
+def main(bam_file: str, ref_fa: str, outdir=None) -> str:
     """
         step1: do alignment
         step2: generate detailed metric info
         step3: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
-            here is the demo.
+            here is a demo.
             ---------aggr_metric.csv
             name    value
             queryCoverage   0.937
@@ -99,11 +99,14 @@ def main(bam_file: str, ref_fa: str, outdir=None):
         gsetl: cargo install gsetl
 
     Args:
-        bam_file (str): bam file. only support adapter.bam and smc.bam now
+        bam_file (str): bam file. only support adapter.bam
         ref_fa (str): ref genome fa file nam
         outdir:
             if outdir provided, read ${outdir}/metric/aggr_metric.csv for metric result
             if not, read ${bam_file_dir}/${bam_file_name}-metric/metric/aggr_metric.csv for metric result
+    
+    Return:
+        aggr_metric_filename (str): the aggr metric file
     """
     bam_filedir = os.path.dirname(bam_file)
     bam_filename = extract_filename(bam_file)
@@ -125,6 +128,7 @@ def main(bam_file: str, ref_fa: str, outdir=None):
     with open(aggr_metric_filename, encoding="utf8", mode="w") as file_h:
         file_h.write(f"name\tvalue\n")
         stats(fact_bam_basic, fact_bam_record_stat, file_h=file_h)
+    return aggr_metric_filename
 
 
 def test_stat():
