@@ -61,6 +61,24 @@ pub struct AlignedBamParams {
         help = "only the part of reference are considered, default: all"
     )]
     pub ref_names: Vec<String>,
+
+    #[arg(long="factRecordStat", default_value_t=1, help="generate factRecordStat table or not")]
+    pub fact_record_stat: u8,
+
+    #[arg(long="factRefLocusInfo", default_value_t=1, help="generate factRefLocusInfo table or not")]
+    pub fact_ref_locus_info: u8,
+
+    #[arg(long="factBamBasic", default_value_t=1, help="generate factBamBasic table or not")]
+    pub fact_bam_basic: u8,
+
+    #[arg(long="factErrorQueryLocusInfo", default_value_t=1, help="generate factErrorQueryLocusInfo table or not")]
+    pub fact_error_query_locus_info: u8,
+
+    #[arg(long="factBaseQStat", default_value_t=1, help="generate factBaseQStat table or not")]
+    pub fact_baseq_stat: u8,
+
+    #[arg(long="factPolyInfo", default_value_t=1, help="generate factPolyInfo table or not")]
+    pub fact_poly_info: u8,
 }
 
 #[derive(Debug, Args, Clone)]

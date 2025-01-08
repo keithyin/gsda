@@ -50,45 +50,86 @@ fn main() {
                 let hc_variants = hc_variants.as_ref();
                 let reffasta = &reffasta;
 
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || {
-                    fact_record_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
-                });
+                if param.fact_record_stat == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || {
+                        fact_record_stat(
+                            param,
+                            &args.output_dir,
+                            hc_regions,
+                            hc_variants,
+                            reffasta,
+                            pb,
+                        )
+                    });
+                }
 
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || {
-                    fact_ref_locus_info(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
-                });
+                if param.fact_ref_locus_info == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || {
+                        fact_ref_locus_info(
+                            param,
+                            &args.output_dir,
+                            hc_regions,
+                            hc_variants,
+                            reffasta,
+                            pb,
+                        )
+                    });
+                }
 
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || {
-                    fact_error_query_locus_info(
-                        param,
-                        &args.output_dir,
-                        hc_regions,
-                        hc_variants,
-                        reffasta,
-                        pb
-                    )
-                });
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || fact_bam_basic(param, &args.output_dir, reffasta, pb));
+                if param.fact_error_query_locus_info == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || {
+                        fact_error_query_locus_info(
+                            param,
+                            &args.output_dir,
+                            hc_regions,
+                            hc_variants,
+                            reffasta,
+                            pb,
+                        )
+                    });
+                }
 
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || {
-                    fact_baseq_stat(param, &args.output_dir, hc_regions, hc_variants, reffasta, pb)
-                });
+                if param.fact_bam_basic == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || fact_bam_basic(param, &args.output_dir, reffasta, pb));
+                }
 
-                let pb = ProgressBar::new_spinner();
-                let pb = multi_pb.add(pb);
-                s.spawn(move || {
-                    fact_poly_info(param, &args.output_dir, hc_regions, hc_variants, &reffasta, pb)
-                });
+                if param.fact_baseq_stat == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || {
+                        fact_baseq_stat(
+                            param,
+                            &args.output_dir,
+                            hc_regions,
+                            hc_variants,
+                            reffasta,
+                            pb,
+                        )
+                    });
+                }
+
+                if param.fact_poly_info == 1 {
+                    let pb = ProgressBar::new_spinner();
+                    let pb = multi_pb.add(pb);
+                    s.spawn(move || {
+                        fact_poly_info(
+                            param,
+                            &args.output_dir,
+                            hc_regions,
+                            hc_variants,
+                            &reffasta,
+                            pb,
+                        )
+                    });
+                }
             });
         }
         cli::Subcommands::NonAlignedBam(_param) => {}
