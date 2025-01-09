@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.0.8"
+version = "0.0.13"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -13,8 +13,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pymsaviz==0.5.0",
-    "polars==1.15.0",
+    "pymsaviz==0.4.2",
+    "polars==1.8.2",
     "tqdm>=4.67",
     "pysam>=0.22",
     "seaborn>=0.13",

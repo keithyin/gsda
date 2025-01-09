@@ -13,7 +13,7 @@ use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
 use crate::{cli::AlignedBamParams, set_spin_pb};
 
-use super::FastaData;
+use super::{audit, FastaData};
 
 struct ErrorLocusInfo {
     qstart: usize,
@@ -95,7 +95,7 @@ pub fn fact_error_query_locus_info(
         for record in bam_h.records() {
             pb.inc(1);
             let record = record.unwrap();
-            if record.is_secondary() || record.is_unmapped() || record.is_supplementary() {
+            if !audit(&record, args) {
                 continue;
             }
             let record_ext = BamRecordExt::new(&record);

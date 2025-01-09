@@ -6,7 +6,7 @@ use rust_htslib::bam::{self, ext::BamRecordExtensions, record::Cigar, Read};
 
 use crate::{cli::AlignedBamParams, set_spin_pb};
 
-use super::FastaData;
+use super::{audit, FastaData};
 
 
 
@@ -327,7 +327,7 @@ pub fn fact_record_stat(args: &AlignedBamParams, output_dir: &str, hc_regions: O
             let header_view = bam::HeaderView::from_header(&header);
             for record in reader.records() {
                 let record = record.unwrap();
-                if record.is_supplementary() || record.is_unmapped() || record.is_secondary() {
+                if !audit(&record, args) {
                     continue;
                 }
                 

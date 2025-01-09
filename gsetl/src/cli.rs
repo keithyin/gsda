@@ -62,6 +62,11 @@ pub struct AlignedBamParams {
     )]
     pub ref_names: Vec<String>,
 
+    #[arg(long="useSeco")]
+    pub use_seco: bool,
+    #[arg(long="useSupp")]
+    pub use_supp: bool,
+
     #[arg(long="factRecordStat", default_value_t=1, help="generate factRecordStat table or not")]
     pub fact_record_stat: u8,
 

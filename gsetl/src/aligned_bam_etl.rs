@@ -3,9 +3,11 @@ use std::{collections::HashMap, fs, io::BufReader};
 use gskits::{
     fastx_reader::{fasta_reader::FastaFileReader, fastq_reader::FastqReader},
     file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
-    gsbam::bam_record_ext::{BamReader, BamRecordExt},
+    gsbam::bam_record_ext::{BamReader, BamRecord, BamRecordExt},
 };
 use rust_htslib::bam::Read;
+
+use crate::cli::AlignedBamParams;
 
 pub mod fact_record_stat;
 pub mod fact_ref_locus_info;
@@ -86,4 +88,21 @@ pub fn get_hcvariants(vcf_file: Option<&str>) -> Option<VcfInfo> {
     } else {
         None
     }
+}
+
+
+pub fn audit(record: &BamRecord, param: &AlignedBamParams) -> bool {
+    if record.is_unmapped() {
+        return false;
+    }
+
+    if !param.use_seco && record.is_secondary() {
+        return false;
+    }
+
+    if !param.use_supp && record.is_supplementary() {
+        return false;
+    }
+
+    return true;
 }
