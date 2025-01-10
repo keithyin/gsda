@@ -167,6 +167,29 @@ def test_stat():
         stats(fact_bam_basic, file_h=file_h)
 
 
+def sv_identification():
+    """structural variant identification
+    rule:
+        small ovlp between aligned segments
+        different segments align to the different reference regions
+    """
+    pass
+
+
+def adapter_remover_error_identification():
+    """adapter remover error identification
+
+    rule:
+        small ovlp between aligned segments
+        different segments align to the similar reference region
+
+        if gap < 10: treat as adapter_missing
+        if gap > 10: treat as adapter_lowq
+
+    """
+    pass
+
+
 if __name__ == "__main__":
     polars_env_init()
     bam_files = [
