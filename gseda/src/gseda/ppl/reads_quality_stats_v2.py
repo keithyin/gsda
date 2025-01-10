@@ -51,7 +51,7 @@ def generate_metric_file(
         os.remove(metric_filename)
 
     if os.path.exists(metric_filename):
-        logging.warn("use the existing metric file : %s", metric_filename)
+        logging.warning("use the existing metric file : %s", metric_filename)
         return metric_filename
 
     threads = cpu_count() if threads is None else threads
@@ -70,7 +70,7 @@ def generate_metric_file(
 
 def stats(metric_filename, filename):
     df = pl.read_csv(metric_filename, separator="\t").filter(pl.col("rname") != "")
-    # print(df.head(2))
+    print(df.head(2))
     print(
         df.filter(pl.col("segs") > 1)
         .head(2)
@@ -150,32 +150,81 @@ def stats(metric_filename, filename):
         ]
     )
 
-    aggr_metrics = df.select(
-        [
-            (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
-            (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias(
-                "queryCoverage2"
-            ),
-            (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
-            (
-                pl.col("match").sum()
-                / (
-                    pl.col("match")
-                    + pl.col("misMatch")
-                    + pl.col("ins")
-                    + pl.col("homoIns")
-                    + pl.col("del")
-                    + pl.col("homoDel")
-                ).sum()
-            ).alias("identity"),
-        ]
-    )
+    df = df.with_columns(row_align_span())
+    aggr_metrics = df.select(aggr_expressions())
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
     print(aggr_metrics)
 
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
+
+
+def aggr_expressions():
+
+    exprs = [
+        (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
+        (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage2"),
+        (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
+        (pl.col("match").sum() / pl.col("alignSpan").sum()).alias("identity"),
+        (pl.col("misMatch").sum() / pl.col("alignSpan").sum()).alias("mmRate"),
+        (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),
+        (pl.col("homoIns").sum() / pl.col("alignSpan").sum()).alias("HomoInsRate"),
+        (pl.col("del").sum() / pl.col("alignSpan").sum()).alias("NHDelRate"),
+        (pl.col("homoDel").sum() / pl.col("alignSpan").sum()).alias("HomoDelRate"),
+    ]
+
+    for base in "ACGT":
+        exprs.extend(
+            [
+                (
+                    pl.col(f"match-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"identity-{base}"),
+                (
+                    pl.col(f"misMatch-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"mmRate-{base}"),
+                (pl.col(f"ins-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
+                    f"NHInsRate-{base}"
+                ),
+                (
+                    pl.col(f"homoIns-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"HomoInsRate-{base}"),
+                (pl.col(f"del-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
+                    f"NHDelRate-{base}"
+                ),
+                (
+                    pl.col(f"homoDel-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"HomoDelRate-{base}"),
+            ]
+        )
+
+    return exprs
+
+
+def row_align_span():
+    exprs = [
+        (
+            pl.col("match")
+            + pl.col("misMatch")
+            + pl.col("ins")
+            + pl.col("homoIns")
+            + pl.col("del")
+            + pl.col("homoDel")
+        ).alias("alignSpan")
+    ]
+
+    for base in "ACGT":
+        exprs.append(
+            (
+                pl.col(f"match-{base}")
+                + pl.col(f"misMatch-{base}")
+                + pl.col(f"ins-{base}")
+                + pl.col(f"homoIns-{base}")
+                + pl.col(f"del-{base}")
+                + pl.col(f"homoDel-{base}")
+            ).alias(f"alignSpan-{base}")
+        )
+    return exprs
 
 
 def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> str:
