@@ -83,15 +83,80 @@ def stats(metric_filename, filename):
                 "queryCoverage",
                 "identity",
                 "oriAlignInfo",
-                "ovlp",
+                "qOvlp",
+                "qOvlpRatio",
+                "rOvlpRatio",
                 "mergedQrySpan",
             ]
         )
     )
 
+    print(
+        df.select(
+            [
+                pl.col("segs").filter(pl.col("segs") == 1).len().alias("segs1"),
+                pl.col("segs").filter(pl.col("segs") == 2).len().alias("segs2"),
+                pl.col("segs").len().alias("segsAll"),
+            ]
+        ).with_columns(
+            [
+                (pl.col("segs1") / pl.col("segsAll")).alias("seg1Ratio"),
+                (pl.col("segs2") / pl.col("segsAll")).alias("seg2Ratio"),
+            ]
+        )
+    )
+
+    print(
+        df.filter(pl.col("segs") == 2)
+        .select(
+            [
+                pl.col("qOvlpRatio")
+                .filter(pl.col("qOvlpRatio") < 0.01)
+                .len()
+                .alias("nonOvlpQuery"),
+                pl.col("qOvlpRatio")
+                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
+                .len()
+                .alias("nonOvlpQueryAndNonOvlpRef"),
+                pl.col("qOvlpRatio")
+                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.3))
+                .len()
+                .alias("nonOvlpQueryAndOvlpRef"),
+                pl.len().alias("seg2"),
+            ]
+        )
+        .with_columns(
+            [
+                (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
+                (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
+            ]
+        )
+    )
+
+    df = df.with_columns(
+        [
+            ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
+            .or_((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.3))
+            .alias("valid")
+        ]
+    )
+
+    df = df.with_columns(
+        [
+            pl.when(pl.col("valid"))
+            .then(pl.col("covlen"))
+            .otherwise(pl.col("primaryCovlen"))
+            .alias("miscCovlen")
+        ]
+    )
+
     aggr_metrics = df.select(
         [
             (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
+            (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias(
+                "queryCoverage2"
+            ),
+            (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
             (
                 pl.col("match").sum()
                 / (
@@ -167,12 +232,18 @@ def test_stat():
         stats(fact_bam_basic, file_h=file_h)
 
 
-def sv_identification():
+def sv_identification(ori_align_info: str):
     """structural variant identification
     rule:
         small ovlp between aligned segments
         different segments align to the different reference regions
     """
+    if ";" not in ori_align_info:
+        return False
+
+    align_regions = ori_align_info.split(";")
+    align_regions = [align_region[:-1] for align_region in align_regions]
+    # align_regions = [align_region.split(":")]
     pass
 
 
