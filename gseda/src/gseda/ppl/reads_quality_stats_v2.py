@@ -32,7 +32,7 @@ def extract_filename(filepath: str) -> str:
 def generate_metric_file(
     bam_file: str,
     ref_fasta: str,
-    outdir: str,
+    out_filename: str,
     force: bool = False,
     threads=None,
     no_supp=False,
@@ -42,31 +42,25 @@ def generate_metric_file(
     if no_supp and no_mar:
         raise ValueError("no_supp, no_mar can't be all true")
 
-    metric_filename = f"{outdir}/metric.csv"
-    if no_supp:
-        metric_filename = f"{outdir}/metric_noSupp.csv"
-    if no_mar:
-        metric_filename = f"{outdir}/metric_noMar.csv"
+    if force and os.path.exists(out_filename):
+        os.remove(out_filename)
 
-    if force and os.path.exists(metric_filename):
-        os.remove(metric_filename)
-
-    if os.path.exists(metric_filename):
-        logging.warning("use the existing metric file : %s", metric_filename)
-        return metric_filename
+    if os.path.exists(out_filename):
+        logging.warning("use the existing metric file : %s", out_filename)
+        return out_filename
 
     threads = cpu_count() if threads is None else threads
     cmd = f"""gsmm2-aligned-metric --threads {threads} \
             -q {bam_file} \
             -t {ref_fasta} \
-            --oupdir {outdir} \
+            --out {out_filename} \
             --kmer 11 \
             --wins 1 """
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
 
-    return metric_filename
+    return out_filename
 
 
 def stats(metric_filename, filename):
@@ -231,9 +225,8 @@ def row_align_span():
 
 def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> str:
     """
-        step1: do alignment
-        step2: generate detailed metric info
-        step3: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
+        step1: generate detailed metric info
+        step2: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
             here is a demo.
             ---------aggr_metric.csv
             name    value
@@ -241,37 +234,45 @@ def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> 
             ----------
 
     requirements:
-        mm2: cargo install mm2
-        gsetl: cargo install gsetl
+        mm2: cargo install mm2 (version >= 0.19.0)
 
     Args:
         bam_file (str): bam file. only support adapter.bam
         ref_fa (str): ref genome fa file nam
-        force (boolean): if force==False, the outdir must not exists in advance. if force==True, the outdir will be removed if exists
-            the proceduer will create a empty outdir for the metric related files
-        outdir:
-            if outdir provided, read ${outdir}/metric/aggr_metric.csv for metric result
-            if not, read ${bam_file_dir}/${bam_file_name}-metric/metric/aggr_metric.csv for metric result
+        threads (int|None): threads for generating detailed metric file
+        force (boolean): if force==False, use the existing metric file if exists
+        outdir: if None, ${bam_filedir}/${bam_file_stem}-metric as outdir
 
     Return:
-        aggr_metric_filename (str): the aggr metric file
+        (aggr_metric_filename, fact_metric_filename) (str, str)
     """
     bam_filedir = os.path.dirname(bam_file)
-    bam_filename = extract_filename(bam_file)
+    stem = extract_filename(bam_file)
     if outdir is None:
-        outdir = os.path.join(bam_filedir, f"{bam_filename}-metric")
-    if force and os.path.exists(outdir):
-        shutil.rmtree(outdir)
+        outdir = os.path.join(bam_filedir, f"{stem}-metric")
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    metric_filename = generate_metric_file(
-        bam_file, ref_fa, outdir=outdir, force=force, threads=threads
+    fact_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_fact.csv"
+    fact_metric_filename = generate_metric_file(
+        bam_file,
+        ref_fa,
+        out_filename=fact_metric_filename,
+        force=force,
+        threads=threads,
     )
-    aggr_metric_filename = f"{outdir}/aggr_metric.csv"
-    stats(metric_filename, filename=aggr_metric_filename)
-    return aggr_metric_filename
+    aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
+    if force and os.path.exists(aggr_metric_filename):
+        os.remove(aggr_metric_filename)
+
+    if not os.path.exists(aggr_metric_filename):
+        stats(fact_metric_filename, filename=aggr_metric_filename)
+    else:
+        logging.warning(
+            "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
+        )
+    return (aggr_metric_filename, fact_metric_filename)
 
 
 def test_stat():
