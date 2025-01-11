@@ -4,6 +4,7 @@ import os
 import logging
 import polars as pl
 import shutil
+import argparse
 from multiprocessing import cpu_count
 
 import os
@@ -83,6 +84,7 @@ def stats(metric_filename, filename):
                 "queryCoverage",
                 "identity",
                 "oriAlignInfo",
+                "oriQGaps",
                 "qOvlp",
                 "qOvlpRatio",
                 "rOvlpRatio",
@@ -312,15 +314,28 @@ def adapter_remover_error_identification():
 
 if __name__ == "__main__":
     polars_env_init()
-    bam_files = [
-        "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter.bam",
-        # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0002_adapter.bam",
-        # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0003_adapter.bam",
-    ]
-    ref = "/data/ccs_data/MG1655.fa"
 
-    for bam in bam_files:
-        main(bam_file=bam, ref_fa=ref, force=False)
+    parser = argparse.ArgumentParser(prog="parser")
+    parser.add_argument("--bams", nargs="+", type=str, required=True)
+    parser.add_argument("--refs", nargs="+", type=str, required=True)
+    parser.add_argument("-f", action="store_true", default=False)
+
+    args = parser.parse_args()
+
+    bam_files = args.bams
+    refs = args.refs
+    if len(refs) == 1:
+        refs = refs * len(bam_files)
+
+    # bam_files = [
+    #     "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter.bam",
+    #     # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0002_adapter.bam",
+    #     # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0003_adapter.bam",
+    # ]
+    # ref = "/data/ccs_data/MG1655.fa"
+
+    for bam, ref in zip(bam_files, refs):
+        main(bam_file=bam, ref_fa=ref, force=args.f)
     # test_stat()
 
     # print(merge_intervals([{"qstart": 11, "qend": 771}]))
