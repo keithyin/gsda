@@ -327,6 +327,8 @@ if __name__ == "__main__":
     if len(refs) == 1:
         refs = refs * len(bam_files)
 
+    assert len(bam_files) == len(refs)
+
     # bam_files = [
     #     "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter.bam",
     #     # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0002_adapter.bam",
