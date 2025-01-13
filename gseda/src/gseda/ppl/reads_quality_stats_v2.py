@@ -63,6 +63,77 @@ def generate_metric_file(
     return out_filename
 
 
+def analysis_segs(df):
+    print(
+        df.select(
+            [
+                pl.col("segs").filter(pl.col("segs") == 1).len().alias("segs1"),
+                pl.col("segs").filter(pl.col("segs") == 2).len().alias("segs2"),
+                pl.col("segs").len().alias("segsAll"),
+            ]
+        ).with_columns(
+            [
+                (pl.col("segs1") / pl.col("segsAll")).alias("seg1Ratio"),
+                (pl.col("segs2") / pl.col("segsAll")).alias("seg2Ratio"),
+            ]
+        )
+    )
+
+
+def analysis_segs2(df):
+    print(
+        df.filter(pl.col("segs") == 2)
+        .select(
+            [
+                pl.col("qOvlpRatio")
+                .filter(pl.col("qOvlpRatio") < 0.01)
+                .len()
+                .alias("nonOvlpQuery"),
+                pl.col("qOvlpRatio")
+                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
+                .len()
+                .alias("nonOvlpQueryAndNonOvlpRef"),
+                pl.col("qOvlpRatio")
+                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90))
+                .len()
+                .alias("nonOvlpQueryAndOvlpRef"),
+                pl.len().alias("seg2"),
+            ]
+        )
+        .with_columns(
+            [
+                (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
+                (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
+            ]
+        )
+    )
+
+
+def analysis_segs2_nocut(df):
+    print(
+        df.filter(pl.col("segs") == 2)
+        .filter(((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90)))
+        .with_columns(
+            [pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32).alias("gap")]
+        )
+        .select(
+            [
+                pl.len().alias("tot"),
+                (pl.col("gap") < 20).cast(pl.Int32).sum().alias("gap<20"),
+            ]
+        )
+        .with_columns([(pl.col("gap<20") / pl.col("tot")).alias("RatioOf(gap<20)")])
+        # .select([pl.len().alias("cnt")
+        #          ])
+        # .with_columns(
+        #     [
+        #         (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
+        #         (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
+        #     ]
+        # )
+    )
+
+
 def stats(metric_filename, filename):
     df = pl.read_csv(metric_filename, separator="\t").filter(pl.col("rname") != "")
     print(df.head(2))
@@ -86,53 +157,14 @@ def stats(metric_filename, filename):
             ]
         )
     )
-
-    print(
-        df.select(
-            [
-                pl.col("segs").filter(pl.col("segs") == 1).len().alias("segs1"),
-                pl.col("segs").filter(pl.col("segs") == 2).len().alias("segs2"),
-                pl.col("segs").len().alias("segsAll"),
-            ]
-        ).with_columns(
-            [
-                (pl.col("segs1") / pl.col("segsAll")).alias("seg1Ratio"),
-                (pl.col("segs2") / pl.col("segsAll")).alias("seg2Ratio"),
-            ]
-        )
-    )
-
-    print(
-        df.filter(pl.col("segs") == 2)
-        .select(
-            [
-                pl.col("qOvlpRatio")
-                .filter(pl.col("qOvlpRatio") < 0.01)
-                .len()
-                .alias("nonOvlpQuery"),
-                pl.col("qOvlpRatio")
-                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-                .len()
-                .alias("nonOvlpQueryAndNonOvlpRef"),
-                pl.col("qOvlpRatio")
-                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.3))
-                .len()
-                .alias("nonOvlpQueryAndOvlpRef"),
-                pl.len().alias("seg2"),
-            ]
-        )
-        .with_columns(
-            [
-                (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
-                (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
-            ]
-        )
-    )
+    analysis_segs(df)
+    analysis_segs2(df)
+    analysis_segs2_nocut(df)
 
     df = df.with_columns(
         [
             ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-            .or_((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.3))
+            .or_((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90))
             .alias("valid")
         ]
     )
@@ -266,12 +298,12 @@ def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> 
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
-    if not os.path.exists(aggr_metric_filename):
-        stats(fact_metric_filename, filename=aggr_metric_filename)
-    else:
-        logging.warning(
-            "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
-        )
+    # if not os.path.exists(aggr_metric_filename):
+    stats(fact_metric_filename, filename=aggr_metric_filename)
+    # else:
+    #     logging.warning(
+    #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
+    #     )
     return (aggr_metric_filename, fact_metric_filename)
 
 
