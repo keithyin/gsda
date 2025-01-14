@@ -324,26 +324,6 @@ def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> 
     return (aggr_metric_filename, fact_metric_filename)
 
 
-def main_cli():
-    polars_env_init()
-
-    parser = argparse.ArgumentParser(prog="parser")
-    parser.add_argument("--bams", nargs="+", type=str, required=True)
-    parser.add_argument("--refs", nargs="+", type=str, required=True)
-    parser.add_argument("-f", action="store_true", default=False, help="")
-    args = parser.parse_args()
-
-    bam_files = args.bams
-    refs = args.refs
-    if len(refs) == 1:
-        refs = refs * len(bam_files)
-
-    assert len(bam_files) == len(refs)
-
-    for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f)
-
-
 def test_stat():
     fact_bam_basic = "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter-metric/metric/fact_aligned_bam_bam_basic.csv"
     aggr_metric_filename = "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter-metric/metric/aggr_metric.csv"

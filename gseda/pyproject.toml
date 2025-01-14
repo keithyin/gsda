@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.0.15"
+version = "0.0.17"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -23,6 +23,10 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/keithyin/gsda"
 Issues = "https://github.com/keithyin/gsda/issues"
+
+[project.scripts]
+reads-quality-stats-cli = "gseda.ppl.reads_quality_stats_v2:main_cli"
+
 
 # 构建后端，默认为 Hatchling
 [build-system]
