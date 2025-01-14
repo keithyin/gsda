@@ -63,108 +63,122 @@ def generate_metric_file(
     return out_filename
 
 
-def analysis_segs(df):
-    print(
-        df.select(
+def analysis_segs(df: pl.DataFrame) -> pl.DataFrame:
+    return (
+        df.group_by(["segs"])
+        .agg([pl.len().alias("cnt")])
+        .with_columns(
             [
-                pl.col("segs").filter(pl.col("segs") == 1).len().alias("segs1"),
-                pl.col("segs").filter(pl.col("segs") == 2).len().alias("segs2"),
-                pl.col("segs").len().alias("segsAll"),
+                (pl.col("cnt") / pl.col("cnt").sum().over(pl.lit("1"))).alias("ratio"),
+                pl.col("cnt").sum().over(pl.lit("1")).alias("tot_cnt"),
             ]
-        ).with_columns(
+        )
+        .sort("segs")
+        .select(
             [
-                (pl.col("segs1") / pl.col("segsAll")).alias("seg1Ratio"),
-                (pl.col("segs2") / pl.col("segsAll")).alias("seg2Ratio"),
+                pl.format("[SegsRatio]segs={}", pl.col("segs")).alias("name"),
+                pl.col("ratio").alias("value"),
             ]
         )
     )
 
 
-def analysis_segs2(df):
-    print(
-        df.filter(pl.col("segs") == 2)
-        .select(
+def analysis_segs2(df: pl.DataFrame) -> pl.DataFrame:
+    return (
+        df.filter(pl.col("segs") == pl.lit(2))
+        .with_columns(
             [
-                pl.col("qOvlpRatio")
-                .filter(pl.col("qOvlpRatio") < 0.01)
-                .len()
-                .alias("nonOvlpQuery"),
-                pl.col("qOvlpRatio")
-                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-                .len()
-                .alias("nonOvlpQueryAndNonOvlpRef"),
-                pl.col("qOvlpRatio")
-                .filter((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90))
-                .len()
-                .alias("nonOvlpQueryAndOvlpRef"),
-                pl.len().alias("seg2"),
+                (pl.col("qOvlpRatio") < 0.01).alias("nonOvlpQuery"),
             ]
         )
         .with_columns(
             [
-                (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
-                (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
+                (pl.col("nonOvlpQuery").and_(pl.col("rOvlpRatio") > 0.90)).alias(
+                    "svCandidate"
+                ),
+                (pl.col("nonOvlpQuery").and_(pl.col("rOvlpRatio") < 0.01)).alias(
+                    "noCutCandidate"
+                ),
             ]
         )
-    )
-
-
-def analysis_segs2_nocut(df):
-    print(
-        df.filter(pl.col("segs") == 2)
-        .filter(((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90)))
         .with_columns(
             [pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32).alias("gap")]
         )
-        .select(
+        .with_columns([pl.col("gap").lt(pl.lit(20)).alias("gap<20")])
+        .with_columns(
             [
-                pl.len().alias("tot"),
-                (pl.col("gap") < 20).cast(pl.Int32).sum().alias("gap<20"),
+                pl.col("svCandidate").and_(pl.col("gap<20")).alias("sv"),
+                pl.col("noCutCandidate").and_(pl.col("gap<20")).alias("noCut"),
             ]
         )
-        .with_columns([(pl.col("gap<20") / pl.col("tot")).alias("RatioOf(gap<20)")])
-        # .select([pl.len().alias("cnt")
-        #          ])
-        # .with_columns(
-        #     [
-        #         (pl.col("nonOvlpQueryAndNonOvlpRef") / pl.col("seg2")).alias("svRatio"),
-        #         (pl.col("nonOvlpQueryAndOvlpRef") / pl.col("seg2")).alias("noCutRatio"),
-        #     ]
-        # )
+        .with_columns(
+            [
+                pl.when(pl.col("sv"))
+                .then(pl.lit("sv"))
+                .when(pl.col("noCut"))
+                .then(pl.lit("noCut"))
+                .when(pl.col("svCandidate"))
+                .then(pl.lit("svCandidate"))
+                .when(pl.col("noCutCandidate"))
+                .then(pl.lit("noCutCandidate"))
+                .otherwise(pl.lit("badCase"))
+                .alias("tag")
+            ]
+        )
+        .group_by(["tag"])
+        .agg([pl.len().alias("cnt")])
+        .select(
+            [
+                pl.col("tag"),
+                pl.col("cnt"),
+                pl.col("cnt").sum().over(pl.lit("1")).alias("tot_cnt"),
+            ]
+        )
+        .with_columns([(pl.col("cnt") / pl.col("tot_cnt")).alias("ratio")])
+        .sort(["tag"])
+        .select(
+            [
+                pl.format("[segs=2]{}", pl.col("tag")).alias("name"),
+                pl.col("ratio").alias("value"),
+            ]
+        )
     )
 
 
 def stats(metric_filename, filename):
     df = pl.read_csv(metric_filename, separator="\t").filter(pl.col("rname") != "")
-    print(df.head(2))
-    print(
-        df.filter(pl.col("segs") > 1)
-        .head(2)
-        .select(
-            [
-                "qname",
-                "rname",
-                "qlen",
-                "segs",
-                "queryCoverage",
-                "identity",
-                "oriAlignInfo",
-                "oriQGaps",
-                "qOvlp",
-                "qOvlpRatio",
-                "rOvlpRatio",
-                "mergedQrySpan",
-            ]
-        )
-    )
-    analysis_segs(df)
-    analysis_segs2(df)
-    analysis_segs2_nocut(df)
+    # print(df.head(2))
+    # print(
+    #     df.filter(pl.col("segs") > 1)
+    #     .head(2)
+    #     .select(
+    #         [
+    #             "qname",
+    #             "rname",
+    #             "qlen",
+    #             "segs",
+    #             "queryCoverage",
+    #             "identity",
+    #             "oriAlignInfo",
+    #             "oriQGaps",
+    #             "qOvlp",
+    #             "qOvlpRatio",
+    #             "rOvlpRatio",
+    #             "mergedQrySpan",
+    #         ]
+    #     )
+    # )
+    metric_segs = analysis_segs(df)
+    metric_segs2 = analysis_segs2(df)
 
     df = df.with_columns(
         [
             ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-            .or_((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") > 0.90))
+            .or_(
+                (pl.col("qOvlpRatio") < 0.01)
+                .and_(pl.col("rOvlpRatio") > 0.90)
+                .and_(pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32) < 20)
+            )
             .alias("valid")
         ]
     )
@@ -183,6 +197,9 @@ def stats(metric_filename, filename):
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
+
+    aggr_metrics = pl.concat([aggr_metrics, metric_segs, metric_segs2])
+
     print(aggr_metrics)
 
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
@@ -191,9 +208,9 @@ def stats(metric_filename, filename):
 def aggr_expressions():
 
     exprs = [
-        (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
-        (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage2"),
-        (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
+        (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
+        (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage2"),
+        (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
         (pl.col("match").sum() / pl.col("alignSpan").sum()).alias("identity"),
         (pl.col("misMatch").sum() / pl.col("alignSpan").sum()).alias("mmRate"),
         (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),
