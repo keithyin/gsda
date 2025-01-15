@@ -67,7 +67,7 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     df = (
         df.select(
             [
-                pl.when(pl.col("rname").eq(pl.lit("")))
+                pl.when(pl.col("rname").eq(pl.lit("")).or_(pl.col("rname").is_null()))
                 .then(pl.lit("notAligned"))
                 .otherwise(pl.lit("aligned"))
                 .alias("name")
@@ -330,7 +330,6 @@ def aggr_expressions():
 
     exprs = [
         pl.col("covlen").sum().cast(pl.Float64).alias("alignedBases"),
-        pl.col("identity").median().alias("identityMedian"),
         (pl.col("primaryCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage"),
         (pl.col("miscCovlen").sum() / pl.col("qlen").sum()).alias("queryCoverage2"),
         (pl.col("covlen").sum() / pl.col("qlen").sum()).alias("queryCoverage3"),
