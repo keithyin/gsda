@@ -82,18 +82,30 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
 
     metric_cnt = df.select(
         [pl.col("name"), pl.col("cnt").cast(pl.Float64).alias("value")]
-    )
+    ).sort(by=["name"])
 
     metric_ratio = df.select(
         [pl.format("{}Ratio", pl.col("name")), pl.col("ratio").alias("value")]
-    )
+    ).sort(by=["name"])
 
     return pl.concat([metric_cnt, metric_ratio])
 
 
 def analysis_segs(df: pl.DataFrame) -> pl.DataFrame:
     return (
-        df.group_by(["segs"])
+        df.with_columns(
+            [
+                pl.when(pl.col("segs") >= 20)
+                .then(pl.lit(20))
+                .otherwise(pl.col("segs"))
+                .alias("segs"),
+                pl.when(pl.col("segs") >= 20)
+                .then(pl.lit("≥20"))
+                .otherwise(pl.format("={}", pl.col("segs")))
+                .alias("tag"),
+            ]
+        )
+        .group_by(["segs", "tag"])
         .agg([pl.len().alias("cnt")])
         .with_columns(
             [
@@ -104,7 +116,7 @@ def analysis_segs(df: pl.DataFrame) -> pl.DataFrame:
         .sort("segs")
         .select(
             [
-                pl.format("[SegsRatio]segs={}", pl.col("segs")).alias("name"),
+                pl.format("[SegsRatio]segs{}", pl.col("tag")).alias("name"),
                 pl.col("ratio").alias("value"),
             ]
         )
@@ -226,7 +238,7 @@ def analysis_gaps(df: pl.DataFrame) -> pl.DataFrame:
         ]
     )
 
-    metric = (
+    top20_gap = (
         df.filter(pl.col("segs") > 1)
         .select(
             [
@@ -243,16 +255,30 @@ def analysis_gaps(df: pl.DataFrame) -> pl.DataFrame:
         .with_columns(
             [(pl.col("cnt") / pl.col("cnt").sum().over(pl.lit(1))).alias("ratio")]
         )
-        .filter(pl.col("ratio") > 0.01)
-        .sort("gap")
-        .select(
-            [
-                pl.format("[segs>1]gap={}", pl.col("gap")).alias("name"),
-                pl.col("ratio").alias("value"),
-            ]
-        )
+        .sort(["ratio"], descending=[True])
+        .head(20)
     )
-    return pl.concat([metric_ratio, metric])
+
+    top20_gap_metric = top20_gap.select(
+        [
+            pl.format("[segs>1]gap={}", pl.col("gap")).alias("name"),
+            pl.col("ratio").alias("value"),
+        ]
+    )
+
+    top20_tot = top20_gap.select([pl.col("ratio").sum().alias("value")]).select(
+        [pl.lit("[segs>1]gapTop20Ratio").alias("name"), pl.col("value")]
+    )
+
+    # .filter(pl.col("ratio") > 0.01)
+    # .sort("gap")
+    # .select(
+    #     [
+    #         pl.format("[segs>1]gap={}", pl.col("gap")).alias("name"),
+    #         pl.col("ratio").alias("value"),
+    #     ]
+    # )
+    return pl.concat([metric_ratio, top20_tot, top20_gap_metric])
 
 
 def stats(metric_filename, filename):
