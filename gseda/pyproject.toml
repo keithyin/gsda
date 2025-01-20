@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.0.20"
+version = "0.0.21"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -26,6 +26,8 @@ Issues = "https://github.com/keithyin/gsda/issues"
 
 [project.scripts]
 reads-quality-stats-cli = "gseda.ppl.reads_quality_stats_v2:main_cli"
+bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:bam_basic_stat"
+msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
 
 
 # 构建后端，默认为 Hatchling

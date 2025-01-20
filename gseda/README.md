@@ -17,3 +17,11 @@ how to pack: https://cloud.tencent.com/developer/article/2401343
 ## msa_view
 
 * show pileup msa alignment result
+
+
+# ChangeLog
+
+## 0.0.21
+
+* + bam-basic-stat-cli
+* + msa-view-cli

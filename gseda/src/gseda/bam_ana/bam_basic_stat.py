@@ -189,13 +189,13 @@ def stat_subreads(df: pl.DataFrame):
     print(res)
 
 
-if __name__ == "__main__":
+def bam_basic_stat():
     polars_env_init()
 
     parser = argparse.ArgumentParser(prog="bam basic stat")
     parser.add_argument("bams", nargs="+", type=str)
     parser.add_argument(
-        "--channel-tag", type=str, required=True, help="zm/ch", dest="channel_tag"
+        "--channel-tag", type=str, default="ch", help="zm/ch", dest="channel_tag"
     )
     parser.add_argument(
         "--min-rq",
@@ -222,3 +222,7 @@ if __name__ == "__main__":
             stat_channel_reads(df=df)
         else:
             stat_subreads(df=df)
+
+
+if __name__ == "__main__":
+    bam_basic_stat()

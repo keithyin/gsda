@@ -121,15 +121,15 @@ class ResultMatrix:
                 qpos -= 1
 
             # print(pileup_col.reference_pos)
-            if q_name == "read_99766/99766/subread/0_SE_97_1160":
-                print(
-                    pileup_col.reference_pos,
-                    qpos,
-                    query.alignment.query_sequence[
-                        qpos : (qpos + cur_query_max_offset + 1)
-                    ],
-                    query.alignment.is_reverse,
-                )
+            # if q_name == "read_99766/99766/subread/0_SE_97_1160":
+            #     print(
+            #         pileup_col.reference_pos,
+            #         qpos,
+            #         query.alignment.query_sequence[
+            #             qpos : (qpos + cur_query_max_offset + 1)
+            #         ],
+            #         query.alignment.is_reverse,
+            #     )
 
             for offset in range(cur_query_max_offset + 1):
                 if query.is_del and offset == 0:
@@ -299,7 +299,7 @@ def main(args):
     return res.first_query_is_rev
 
 
-if __name__ == "__main__":
+def main_cli():
     p = argparse.ArgumentParser(
         "mas_view",
         description="""
@@ -337,3 +337,7 @@ if __name__ == "__main__":
     )
     args = p.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    main_cli()
