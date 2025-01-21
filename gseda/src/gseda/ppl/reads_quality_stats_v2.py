@@ -452,6 +452,7 @@ def main(
         threads (int|None): threads for generating detailed metric file
         force (boolean): if force==False, use the existing metric file if exists
         outdir: if None, ${bam_filedir}/${bam_file_stem}-metric as outdir
+        copy_bam_file: copy bam file to outdir. Set this parameter to true when the file is on the NAS.
 
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
@@ -464,7 +465,7 @@ def main(
         new_bam_file = os.path.join(outdir, os.path.basename(bam_file))
         if os.path.exists(new_bam_file):
             raise ValueError(f"{new_bam_file} already exists")
-        shutil.copy2(bam_file, new_bam_file)
+        shutil.copy(bam_file, new_bam_file)
         bam_file = new_bam_file
 
     bam_filedir = os.path.dirname(bam_file)
