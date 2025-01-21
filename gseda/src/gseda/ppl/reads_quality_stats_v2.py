@@ -9,6 +9,19 @@ from multiprocessing import cpu_count
 
 import os
 
+import semver
+
+
+def mm2_version_check():
+    oup = subprocess.getoutput("gsmm2-aligned-metric -V")
+    oup = oup.strip()
+    version_str = oup.rsplit(" ", maxsplit=1)[1]
+    mm2_version = semver.Version.parse(version_str)
+    expected_version = "0.20.2"
+    assert mm2_version >= semver.Version.parse(
+        expected_version
+    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2' "
+
 
 def polars_env_init():
     os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
@@ -457,7 +470,7 @@ def main(
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
-
+    mm2_version_check()
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
         if not os.path.exists(outdir):
