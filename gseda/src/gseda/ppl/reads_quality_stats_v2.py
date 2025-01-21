@@ -426,7 +426,14 @@ def row_align_span():
     return exprs
 
 
-def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> str:
+def main(
+    bam_file: str,
+    ref_fa: str,
+    threads=None,
+    force=False,
+    outdir=None,
+    copy_bam_file=False,
+) -> str:
     """
         step1: generate detailed metric info
         step2: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
@@ -449,6 +456,17 @@ def main(bam_file: str, ref_fa: str, threads=None, force=False, outdir=None) -> 
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
+
+    if copy_bam_file:
+        assert outdir is not None, "must provide outdir when copy_bam_file=True"
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        new_bam_file = os.path.join(outdir, os.path.basename(bam_file))
+        if os.path.exists(new_bam_file):
+            raise ValueError(f"{new_bam_file} already exists")
+        shutil.copy2(bam_file, new_bam_file)
+        bam_file = new_bam_file
+
     bam_filedir = os.path.dirname(bam_file)
     stem = extract_filename(bam_file)
     if outdir is None:
