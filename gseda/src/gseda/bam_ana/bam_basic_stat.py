@@ -66,7 +66,17 @@ def stat_channel_reads(df: pl.DataFrame):
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
             .alias("num_bases"),
             pl.col("seq_len").mean().cast(pl.Int32).alias("seq_len_mean"),
-            pl.col("seq_len").median().cast(pl.Int32).alias("seq_len_median"),
+            pl.concat_str(
+                pl.col("seq_len").min().cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.05).cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.25).cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.5).cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.75).cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.95).cast(pl.Int32),
+                pl.quantile("seq_len", quantile=0.99).cast(pl.Int32),
+                pl.col("seq_len").max().cast(pl.Int32),
+                separator=", ",
+            ).alias("SeqLen0_5_25_50_75_95_99_100"),
         ]
     )
     print(res)

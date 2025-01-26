@@ -6,16 +6,23 @@ import polars as pl
 import shutil
 import argparse
 from multiprocessing import cpu_count
-
 import os
-
 import semver
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    datefmt="%Y/%m/%d %H:%M:%S",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 def mm2_version_check():
     oup = subprocess.getoutput("gsmm2-aligned-metric -V")
     oup = oup.strip()
     version_str = oup.rsplit(" ", maxsplit=1)[1]
+
+    logging.info(f"gsmm2-aligned-metric Version: {version_str}")
     mm2_version = semver.Version.parse(version_str)
     expected_version = "0.20.2"
     assert mm2_version >= semver.Version.parse(
@@ -28,13 +35,6 @@ def polars_env_init():
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
     os.environ["POLARS_FMT_MAX_ROWS"] = "300"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    datefmt="%Y/%m/%d %H:%M:%S",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
 
 
 def extract_filename(filepath: str) -> str:
@@ -470,7 +470,9 @@ def main(
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
+
     mm2_version_check()
+
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
         if not os.path.exists(outdir):
@@ -508,31 +510,6 @@ def main(
     #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
     #     )
     return (aggr_metric_filename, fact_metric_filename)
-
-
-def main_cli():
-    polars_env_init()
-
-    parser = argparse.ArgumentParser(prog="parser")
-    parser.add_argument("--bams", nargs="+", type=str, required=True)
-    parser.add_argument("--refs", nargs="+", type=str, required=True)
-    parser.add_argument(
-        "-f",
-        action="store_true",
-        default=False,
-        help="regenerate the metric file if exists",
-    )
-    args = parser.parse_args()
-
-    bam_files = args.bams
-    refs = args.refs
-    if len(refs) == 1:
-        refs = refs * len(bam_files)
-
-    assert len(bam_files) == len(refs)
-
-    for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f)
 
 
 def test_stat():
@@ -573,14 +550,18 @@ def adapter_remover_error_identification():
     pass
 
 
-if __name__ == "__main__":
+def main_cli():
     polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")
     parser.add_argument("--bams", nargs="+", type=str, required=True)
     parser.add_argument("--refs", nargs="+", type=str, required=True)
-    parser.add_argument("-f", action="store_true", default=False)
-
+    parser.add_argument(
+        "-f",
+        action="store_true",
+        default=False,
+        help="regenerate the metric file if exists",
+    )
     args = parser.parse_args()
 
     bam_files = args.bams
@@ -590,15 +571,9 @@ if __name__ == "__main__":
 
     assert len(bam_files) == len(refs)
 
-    # bam_files = [
-    #     "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0001_adapter.bam",
-    #     # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0002_adapter.bam",
-    #     # "/data/adapter-query-coverage-valid-data/20250107_240901Y0007_Run0003_adapter.bam",
-    # ]
-    # ref = "/data/ccs_data/MG1655.fa"
-
     for bam, ref in zip(bam_files, refs):
         main(bam_file=bam, ref_fa=ref, force=args.f)
-    # test_stat()
 
-    # print(merge_intervals([{"qstart": 11, "qend": 771}]))
+
+if __name__ == "__main__":
+    main_cli()
