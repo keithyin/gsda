@@ -21,6 +21,10 @@ how to pack: https://cloud.tencent.com/developer/article/2401343
 
 # ChangeLog
 
+## 0.0.25
+
+* + longIndel analysis
+
 ## 0.0.23
 
 * + mm2 version check

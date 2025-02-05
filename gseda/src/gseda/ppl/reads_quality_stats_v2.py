@@ -24,10 +24,10 @@ def mm2_version_check():
 
     logging.info(f"gsmm2-aligned-metric Version: {version_str}")
     mm2_version = semver.Version.parse(version_str)
-    expected_version = "0.20.2"
+    expected_version = "0.21.0"
     assert mm2_version >= semver.Version.parse(
         expected_version
-    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2' "
+    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@{expected_version}' "
 
 
 def polars_env_init():
@@ -294,8 +294,28 @@ def analysis_gaps(df: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([metric_ratio, top20_tot, top20_gap_metric])
 
 
+def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
+    metric = df.select(
+        [
+            pl.len().alias("cnt"),
+            pl.col("longIndel")
+            .filter(pl.col("longIndel").is_not_null())
+            .len()
+            .alias("longIndelCnt"),
+        ]
+    ).select(
+        [
+            pl.lit("longIndelRatio").alias("name"),
+            (pl.col("longIndelCnt") / pl.col("cnt")).alias("value"),
+        ]
+    )
+    return metric
+
+
 def stats(metric_filename, filename):
-    df = pl.read_csv(metric_filename, separator="\t")
+    df = pl.read_csv(
+        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
+    )
     metric_aligned_not_aligned = analysis_aligned(df=df)
     df = df.filter(pl.col("rname") != "")
     # print(df.head(2))
@@ -319,6 +339,7 @@ def stats(metric_filename, filename):
     #         ]
     #     )
     # )
+    metric_long_indel = analisys_long_indel(df=df)
     metric_segs = analysis_segs(df)
     metric_segs2 = analysis_segs2(df)
     metric_gaps = analysis_gaps(df=df)
@@ -353,6 +374,7 @@ def stats(metric_filename, filename):
     aggr_metrics = pl.concat(
         [
             metric_aligned_not_aligned,
+            metric_long_indel,
             aggr_metrics,
             metric_segs,
             metric_segs2,
