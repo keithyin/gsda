@@ -18,9 +18,11 @@ import polars_init
 
 
 def main(args):
+    polars_init.polars_env_init()
+
     # plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
 
-    df = pl.read_csv(args.data, separator="\t")
+    df = pl.read_csv(args.fact_table, separator="\t")
     df_shift = df.with_columns([pl.col("baseq")])
     df = df.with_columns(
         [
@@ -50,13 +52,24 @@ def main(args):
         perfect_line.to_pandas(), x="x", y="y", ax=axs, color="blue", linestyle="--"
     )
 
-    print(df.head(10))
-    figure.savefig(fname="baseq2empq.png")
+    print(df.head(60))
+    fname = "baseq2empq.png"
+    if args.o_prefix is not None:
+        fname = f"{args.o_prefix}-{fname}"
+    figure.savefig(fname=fname)
+    print(f"check image {fname}")
 
 
 if __name__ == "__main__":
-    polars_init.polars_env_init()
-    parser = argparse.ArgumentParser(prog="")
-    parser.add_argument("data", metavar="fact_baseq_stat")
+    parser = argparse.ArgumentParser(
+        prog="",
+        usage="""
+    gsmm2 align -q $query_file -t $ref_file -p outputbam_prefix --noMar
+    gsetl --outdir $outdir aligned-bam --bam $aligned_bam --ref-file $ref_file
+    python preq-baseq-and-emp-q.py $outdir/fact_baseq_stat.csv
+""",
+    )
+    parser.add_argument("fact_table", metavar="fact_baseq_stat")
+    parser.add_argument("--o-prefix", metavar="o-prefix", default=None, dest="o_prefix")
 
     main(parser.parse_args())

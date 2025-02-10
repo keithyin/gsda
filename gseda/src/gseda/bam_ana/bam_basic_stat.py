@@ -199,23 +199,8 @@ def stat_subreads(df: pl.DataFrame):
     print(res)
 
 
-def bam_basic_stat():
+def main(args):
     polars_env_init()
-
-    parser = argparse.ArgumentParser(prog="bam basic stat")
-    parser.add_argument("bams", nargs="+", type=str)
-    parser.add_argument(
-        "--channel-tag", type=str, default="ch", help="zm/ch", dest="channel_tag"
-    )
-    parser.add_argument(
-        "--min-rq",
-        type=float,
-        default=None,
-        help="only the rq ≥ min-rq will be considered",
-        dest="min_rq",
-    )
-    args = parser.parse_args()
-
     for bam_path in args.bams:
         print("")
         print("")
@@ -232,7 +217,25 @@ def bam_basic_stat():
             stat_channel_reads(df=df)
         else:
             stat_subreads(df=df)
+    pass
+
+
+def main_cli():
+    parser = argparse.ArgumentParser(prog="bam basic stat")
+    parser.add_argument("bams", nargs="+", type=str)
+    parser.add_argument(
+        "--channel-tag", type=str, default="ch", help="zm/ch", dest="channel_tag"
+    )
+    parser.add_argument(
+        "--min-rq",
+        type=float,
+        default=None,
+        help="only the rq ≥ min-rq will be considered",
+        dest="min_rq",
+    )
+    args = parser.parse_args()
+    main(args=args)
 
 
 if __name__ == "__main__":
-    bam_basic_stat()
+    main_cli()

@@ -1,4 +1,3 @@
-import pysam
 import polars as pl
 import argparse
 

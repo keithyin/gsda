@@ -160,6 +160,7 @@ def stat(aligned_bam_file: str, ref_file: str):
 
 
 def main(args):
+    """Deprected. use pred-baseq-and-emp-q.py instead"""
     df = stat(args.aln_bam, args.ref_file)
     df = df.with_columns(
         [

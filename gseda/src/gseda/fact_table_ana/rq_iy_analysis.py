@@ -49,7 +49,7 @@ def RecallExpr(phreq_threshold):
     ).alias(f"≥Q{phreq_threshold}Recall")
 
 
-def plot_rq_iy_scatter(df: pl.DataFrame):
+def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
     figure = plt.figure(figsize=(10, 10))
     axs = figure.add_subplot(1, 1, 1)
     plt.sca(axs)
@@ -83,10 +83,13 @@ def plot_rq_iy_scatter(df: pl.DataFrame):
     sns.lineplot(
         perfect_line.to_pandas(), x="x", y="y", ax=axs, color="blue", linestyle="--"
     )
-    figure.savefig(fname="rq_iy_scatter.png")
+    fname = "rq_iy_scatter.png"
+    if o_prefix is not None:
+        fname = f"{o_prefix}-{fname}"
+    figure.savefig(fname=fname)
 
 
-def stat(fname: str):
+def stat(fname: str, o_prefix):
     df = pl.read_csv(fname, separator="\t")
     df = df.with_columns(
         [
@@ -101,7 +104,7 @@ def stat(fname: str):
         ]
     ).with_columns([q2phreqExpr("rq", "phreq_rq"), q2phreqExpr("iy", "phreq_iy")])
 
-    plot_rq_iy_scatter(df=df)
+    plot_rq_iy_scatter(df=df, o_prefix=o_prefix)
 
     stat_res = df.select(
         (pl.col("rq") - pl.col("iy")).mean().alias("ME(pred-real)(rq-iy)"),
@@ -203,12 +206,14 @@ def stat(fname: str):
 
 
 def main(args):
-    stat(args.fact_table)
+    stat(args.fact_table, args.o_prefix)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("rq_iy_diff")
     parser.add_argument("fact_table", metavar="fact_aligned_bam_bam_basic")
+    parser.add_argument("--o-prefix", metavar="o-prefix", default=None, dest="o_prefix")
+
     args_ = parser.parse_args()
 
     set_polars_env()
