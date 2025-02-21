@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.0.26"
+version = "0.0.27"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -27,7 +27,7 @@ Issues = "https://github.com/keithyin/gsda/issues"
 
 [project.scripts]
 reads-quality-stats-cli = "gseda.ppl.reads_quality_stats_v2:main_cli"
-bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:mian_cli"
+bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
 msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
 phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
 
