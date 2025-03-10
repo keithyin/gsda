@@ -217,6 +217,8 @@ def main(args):
             stat_channel_reads(df=df)
         else:
             stat_subreads(df=df)
+            stat_channel_reads(df=df)
+            
     pass
 
 
