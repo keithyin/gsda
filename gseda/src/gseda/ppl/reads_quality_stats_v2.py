@@ -27,7 +27,7 @@ def mm2_version_check():
     expected_version = "0.21.0"
     assert mm2_version >= semver.Version.parse(
         expected_version
-    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@{expected_version}' "
+    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@={expected_version}' "
 
 
 def polars_env_init():
