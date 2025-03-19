@@ -16,20 +16,22 @@ pub struct Cli {
 
 impl Cli {
     pub fn build_output_dir(&self) {
-        if path::Path::new(&self.output_dir).exists() && !self.force {
-            panic!(
-                "output_dir: {} exists, use -f or change the output dir",
-                self.output_dir
-            );
-        }
+        // if path::Path::new(&self.output_dir).exists() && !self.force {
+        //     // panic!(
+        //     //     "output_dir: {} exists, use -f or change the output dir",
+        //     //     self.output_dir
+        //     // );
+        // }
 
-        if path::Path::new(&self.output_dir).exists() {
+        if path::Path::new(&self.output_dir).exists() && self.force {
             fs::remove_dir_all(&self.output_dir)
                 .expect(&format!("remove dir error {}", self.output_dir));
         }
 
-        fs::create_dir_all(&self.output_dir)
-            .expect(&format!("create dir error. {}", self.output_dir));
+        if !path::Path::new(&self.output_dir).exists() {
+            fs::create_dir_all(&self.output_dir)
+                .expect(&format!("create dir error. {}", self.output_dir));
+        }
     }
 }
 
@@ -44,7 +46,7 @@ pub struct AlignedBamParams {
     #[arg(long = "bam")]
     pub bam: String,
 
-    #[arg(long = "ref-file", help="fasta/fastq/bam")]
+    #[arg(long = "ref-file", help = "fasta/fastq/bam")]
     pub ref_file: String,
 
     #[arg(
@@ -62,27 +64,51 @@ pub struct AlignedBamParams {
     )]
     pub ref_names: Vec<String>,
 
-    #[arg(long="useSeco")]
+    #[arg(long = "useSeco")]
     pub use_seco: bool,
-    #[arg(long="useSupp")]
+    #[arg(long = "useSupp")]
     pub use_supp: bool,
 
-    #[arg(long="factRecordStat", default_value_t=1, help="generate factRecordStat table or not")]
+    #[arg(
+        long = "factRecordStat",
+        default_value_t = 1,
+        help = "generate factRecordStat table or not"
+    )]
     pub fact_record_stat: u8,
 
-    #[arg(long="factRefLocusInfo", default_value_t=1, help="generate factRefLocusInfo table or not")]
+    #[arg(
+        long = "factRefLocusInfo",
+        default_value_t = 1,
+        help = "generate factRefLocusInfo table or not"
+    )]
     pub fact_ref_locus_info: u8,
 
-    #[arg(long="factBamBasic", default_value_t=1, help="generate factBamBasic table or not")]
+    #[arg(
+        long = "factBamBasic",
+        default_value_t = 1,
+        help = "generate factBamBasic table or not"
+    )]
     pub fact_bam_basic: u8,
 
-    #[arg(long="factErrorQueryLocusInfo", default_value_t=1, help="generate factErrorQueryLocusInfo table or not")]
+    #[arg(
+        long = "factErrorQueryLocusInfo",
+        default_value_t = 1,
+        help = "generate factErrorQueryLocusInfo table or not"
+    )]
     pub fact_error_query_locus_info: u8,
 
-    #[arg(long="factBaseQStat", default_value_t=1, help="generate factBaseQStat table or not")]
+    #[arg(
+        long = "factBaseQStat",
+        default_value_t = 1,
+        help = "generate factBaseQStat table or not"
+    )]
     pub fact_baseq_stat: u8,
 
-    #[arg(long="factPolyInfo", default_value_t=1, help="generate factPolyInfo table or not")]
+    #[arg(
+        long = "factPolyInfo",
+        default_value_t = 1,
+        help = "generate factPolyInfo table or not"
+    )]
     pub fact_poly_info: u8,
 }
 
@@ -90,4 +116,10 @@ pub struct AlignedBamParams {
 pub struct NonAlignedBamParams {
     #[arg(long = "bam")]
     pub bam: String,
+
+    #[arg(short='o', help="output filepath")]
+    pub o_filepath: Option<String>,
+
+    #[arg(short = 't', help = "bam threads")]
+    pub bam_threads: Option<usize>,
 }

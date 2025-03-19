@@ -14,6 +14,7 @@ mod aligned_bam_etl;
 mod cli;
 mod non_aligned_bam_etl;
 mod poly_n;
+mod utils;
 
 fn main() {
     let args = cli::Cli::parse();
@@ -132,7 +133,10 @@ fn main() {
                 }
             });
         }
-        cli::Subcommands::NonAlignedBam(_param) => {}
+        cli::Subcommands::NonAlignedBam(param) => {
+            non_aligned_bam_etl::fact_bam_basic(&param, &args.output_dir);
+
+        }
     }
 }
 
