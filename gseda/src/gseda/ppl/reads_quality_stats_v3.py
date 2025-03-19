@@ -416,10 +416,13 @@ def aggr_expressions():
         pl.col("identity").median().alias("identity-p50"),
         pl.quantile("identity", 0.75).alias("identity-p75"),
         (pl.col("misMatch").sum() / pl.col("alignSpan").sum()).alias("mmRate"),
-        (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),
+        (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),        
         (pl.col("homoIns").sum() / pl.col("alignSpan").sum()).alias("HomoInsRate"),
+        ((pl.col("ins").sum() + pl.col("homoIns").sum())/ pl.col("alignSpan").sum()).alias("insRate"),
+        
         (pl.col("del").sum() / pl.col("alignSpan").sum()).alias("NHDelRate"),
         (pl.col("homoDel").sum() / pl.col("alignSpan").sum()).alias("HomoDelRate"),
+        ((pl.col("homoDel").sum() + pl.col("del").sum()) / pl.col("alignSpan").sum()).alias("delRate"),
     ]
 
     for base in "ACGT":
@@ -437,12 +440,21 @@ def aggr_expressions():
                 (
                     pl.col(f"homoIns-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoInsRate-{base}"),
+                
+                (
+                    (pl.col(f"homoIns-{base}").sum() + pl.col(f"ins-{base}").sum()) / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"insRate-{base}"),
+                
                 (pl.col(f"del-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
                     f"NHDelRate-{base}"
                 ),
                 (
                     pl.col(f"homoDel-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoDelRate-{base}"),
+                
+                (
+                    (pl.col(f"homoDel-{base}").sum()  + pl.col(f"del-{base}").sum()) / pl.col(f"alignSpan-{base}").sum()
+                ).alias(f"delRate-{base}"),
             ]
         )
 
@@ -486,12 +498,20 @@ def aligned_bam_analysis(bam_file: str, ref_fa: str, fact_metric_filename: str, 
     )
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
+        
+    if os.path.exists(aggr_metric_filename):
+        logging.info(f"{aggr_metric_filename} exists, use the exist file")
+        return
 
     # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
     
 
-def non_aligned_bam_analysis(bam_file: str, out_filepath: str, out_dir: str):
+def non_aligned_bam_analysis(bam_file: str, out_filepath: str, out_dir: str, force: bool):
+    if not force and os.path.exists(out_filepath):
+        logging.info(f"{out_filepath} exists, use the existed file")
+        return
+        
     cmd = f"gsetl --outdir {out_dir} non-aligned-bam --bam {bam_file} -o {out_filepath}"
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)    
@@ -560,7 +580,7 @@ def main(
     aligned_bam_thread.start()
     processes.append(aligned_bam_thread)
     
-    non_aligned_thread = threading.Thread(target=non_aligned_bam_analysis, args=(bam_file, no_aligned_aggr_filename, outdir))
+    non_aligned_thread = threading.Thread(target=non_aligned_bam_analysis, args=(bam_file, no_aligned_aggr_filename, outdir, force))
     non_aligned_thread.start()
     processes.append(non_aligned_thread)
     
@@ -577,35 +597,6 @@ def test_stat():
     with open(aggr_metric_filename, encoding="utf8", mode="w") as file_h:
         file_h.write(f"name\tvalue\n")
         stats(fact_bam_basic, file_h=file_h)
-
-
-def sv_identification(ori_align_info: str):
-    """structural variant identification
-    rule:
-        small ovlp between aligned segments
-        different segments align to the different reference regions
-    """
-    if ";" not in ori_align_info:
-        return False
-
-    align_regions = ori_align_info.split(";")
-    align_regions = [align_region[:-1] for align_region in align_regions]
-    # align_regions = [align_region.split(":")]
-    pass
-
-
-def adapter_remover_error_identification():
-    """adapter remover error identification
-
-    rule:
-        small ovlp between aligned segments
-        different segments align to the similar reference region
-
-        if gap < 10: treat as adapter_missing
-        if gap > 10: treat as adapter_lowq
-
-    """
-    pass
 
 
 def main_cli():
