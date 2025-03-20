@@ -134,7 +134,7 @@ fn main() {
             });
         }
         cli::Subcommands::NonAlignedBam(param) => {
-            non_aligned_bam_etl::fact_bam_basic(&param, &args.output_dir);
+            non_aligned_bam_etl::fact_bam_basic::fact_bam_basic(&param, &args.output_dir);
 
         }
     }

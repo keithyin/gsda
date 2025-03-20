@@ -1,6 +1,7 @@
 use std::{
     fmt::Display,
     fs::File,
+    hash::{DefaultHasher, Hash, Hasher},
     io::{BufWriter, Write},
     path,
 };
@@ -10,10 +11,13 @@ use gskits::{
     gsbam::bam_record_ext::BamRecordExt,
     pbar::{get_spin_pb, DEFAULT_INTERVAL},
 };
+use ndarray::{self, Array1};
 use polars::{df, prelude::*};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rust_htslib::bam::{Read, Reader, Record};
 
 use crate::{cli::NonAlignedBamParams, utils};
+pub mod fact_bam_basic;
 
 /// 最终是要生成一个 Run 的聚合数据。下面的是每个 base 的结果作为中间结果
 /// dw
@@ -133,8 +137,11 @@ fn speed(mut df: LazyFrame) {
     println!("{:?}", df.collect().unwrap());
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Stat {
+    rng: StdRng,
+    channel_sample_rate: f64,
+
     dw_mean: f64,
     dw_acgt_mean: [f64; 4],
 
@@ -146,7 +153,16 @@ struct Stat {
     cq_mean: f64,
     all_oe: Vec<f64>,
     oe_median: f64,
+    
+    all_read_length: Vec<f64>,
+    read_length_median: f64,
+
     speed: f64,
+
+    sampled_channel_dw: Vec<f64>,
+    sampled_channel_ar: Vec<f64>,
+
+    sampled_channel_read_length: Vec<usize>,
 
     dw_add_ar: f64,
 
@@ -156,16 +172,43 @@ struct Stat {
 }
 
 impl Stat {
+    pub fn new(rng: StdRng, channel_sample_rate: f64) -> Self {
+        Self {
+            rng: rng,
+            channel_sample_rate,
+            dw_mean: 0.0,
+            dw_acgt_mean: [0.0; 4],
+            ar_mean: 0.0,
+            ar_acgt_mean: [0.0; 4],
+            cr_mean: 0.0,
+            cq_mean: 0.0,
+            all_oe: vec![],
+            oe_median: 0.0,
+
+            all_read_length: vec![],
+            read_length_median: 0.0,
+
+            speed: 0.0,
+            sampled_channel_dw: vec![],
+            sampled_channel_ar: vec![],
+            sampled_channel_read_length: vec![],
+            dw_add_ar: 0.0,
+            acgt_cnt: [0; 4],
+            base_cnt: 0,
+            channel_cnt: 0,
+        }
+    }
+
     pub fn update(&mut self, rec: &Record) {
         let record_ext = BamRecordExt::new(rec);
         let bases = record_ext.get_seq();
         let dwell_times = record_ext
             .get_dw()
-            .map(|v| v.into_iter().map(|v| v as f64).collect::<Vec<_>>())
+            .map(|v| v.into_iter().map(|v| v as f64 * 2.0).collect::<Vec<_>>())
             .unwrap_or(vec![-1.0; bases.len()]);
         let arrival_time = record_ext
             .get_ar()
-            .map(|v| v.into_iter().map(|v| v as f64).collect::<Vec<_>>())
+            .map(|v| v.into_iter().map(|v| v as f64 * 2.0).collect::<Vec<_>>())
             .unwrap_or(vec![-1.0; bases.len()]);
 
         let capture_rates = record_ext
@@ -181,7 +224,17 @@ impl Stat {
             &arrival_time,
             &capture_rates,
         );
-        self.update_channel_info(cq, oe);
+
+        let dwell_times = Array1::from_vec(dwell_times);
+        let arrival_time = Array1::from_vec(arrival_time);
+
+        self.update_channel_info(
+            cq,
+            oe,
+            dwell_times.mean().unwrap_or(-1.0),
+            arrival_time.mean().unwrap_or(-1.0),
+            bases.len(),
+        );
     }
 
     fn update_base_level_info(&mut self, bases: &[u8], dws: &[f64], ars: &[f64], crs: &[f64]) {
@@ -228,10 +281,24 @@ impl Stat {
         self.acgt_cnt = acgt_cnt_cursor;
     }
 
-    fn update_channel_info(&mut self, cq: f64, oe: f64) {
+    fn update_channel_info(
+        &mut self,
+        cq: f64,
+        oe: f64,
+        channel_dw: f64,
+        channel_ar: f64,
+        read_length: usize,
+    ) {
         self.cq_mean =
             (self.channel_cnt as f64 * self.cq_mean + cq) / (self.channel_cnt as f64 + 1.0);
         self.all_oe.push(oe);
+        self.all_read_length.push(read_length as f64);
+
+        if self.rng.random_bool(self.channel_sample_rate) {
+            self.sampled_channel_dw.push(channel_dw);
+            self.sampled_channel_ar.push(channel_ar);
+            self.sampled_channel_read_length.push(read_length);
+        }
 
         self.channel_cnt += 1;
     }
@@ -239,9 +306,15 @@ impl Stat {
     pub fn finish(&mut self) {
         let med = utils::median(&mut self.all_oe).unwrap_or(-1.0);
         self.oe_median = med;
+
+        let med = utils::median(&mut self.all_read_length).unwrap_or(-1.0);
+        self.read_length_median = med;
+
+
         self.all_oe.clear();
         if self.dw_add_ar > 0.0 {
-            self.speed = self.base_cnt as f64 / (self.dw_add_ar as f64 * 0.002);
+            self.speed = self.base_cnt as f64 / (self.dw_add_ar as f64 * 0.001);
+            // 0.002 / 2
         }
     }
 
@@ -252,6 +325,8 @@ impl Stat {
         o_str.push_str(&format!("cq-mean\t{:.2}\n", self.cq_mean));
         o_str.push_str(&format!("cr-mean\t{:.2}\n", self.cr_mean));
         o_str.push_str(&format!("oe-median\t{:.2}\n", self.oe_median));
+        o_str.push_str(&format!("readlen-median\t{:.2}\n", self.read_length_median));
+
         o_str.push_str(&format!("speed\t{:.2}\n", self.speed));
 
         ["A", "C", "G", "T"]
@@ -276,9 +351,41 @@ impl Stat {
 
         o_str
     }
+
+    pub fn to_histgram_data(&self) -> String {
+        let mut o_str = "".to_string();
+        let read_length_str = self
+            .sampled_channel_read_length
+            .iter()
+            .map(|v| format!("{}", v))
+            .collect::<Vec<_>>()
+            .join(",");
+        o_str.push_str(&read_length_str);
+        o_str.push_str("\n");
+
+        let dw_str = self
+            .sampled_channel_dw
+            .iter()
+            .map(|v| format!("{:.2}", v))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        o_str.push_str(&dw_str);
+        o_str.push_str("\n");
+
+        let ar_str = self
+            .sampled_channel_ar
+            .iter()
+            .map(|v| format!("{:.2}", v))
+            .collect::<Vec<_>>()
+            .join(",");
+        o_str.push_str(&ar_str);
+        o_str.push_str("\n");
+        o_str
+    }
 }
 
-pub fn fact_bam_basic(param: &NonAlignedBamParams, output_dir: &str) {
+pub fn fact_bam_basic_v0(param: &NonAlignedBamParams, output_dir: &str) {
     let bam_file = &param.bam;
     let filestem = path::Path::new(bam_file)
         .file_stem()
@@ -287,17 +394,26 @@ pub fn fact_bam_basic(param: &NonAlignedBamParams, output_dir: &str) {
         .unwrap()
         .to_string();
 
+    let mut hasher = DefaultHasher::new();
+    filestem.hash(&mut hasher);
+    let seed = hasher.finish();
+    let rng = StdRng::from_seed([seed as u8; 32]);
+
     let oup_filepath = param
         .o_filepath
         .clone()
         .unwrap_or(format!("{output_dir}/{filestem}.non_aligned_aggr.csv"));
 
     let bam_threads = param.bam_threads.unwrap_or(num_cpus::get_physical());
+
+    let num_records = get_records_num(bam_file, bam_threads);
+    let channel_sample_rate = 5000.0 / num_records as f64;
+
     let mut reader = Reader::from_path(bam_file).unwrap();
     reader.set_threads(bam_threads).unwrap();
 
     let pb = get_spin_pb(format!("reading {bam_file}"), DEFAULT_INTERVAL);
-    let mut stat = Stat::default();
+    let mut stat = Stat::new(rng, channel_sample_rate);
     for record in reader.records() {
         let record = record.unwrap();
         pb.inc(1);
@@ -312,15 +428,31 @@ pub fn fact_bam_basic(param: &NonAlignedBamParams, output_dir: &str) {
 
     writeln!(&mut out_writer, "name\tvalue").unwrap();
     write!(&mut out_writer, "{}", stat.csv()).unwrap();
+
+    let hist_raw_data = format!("{}.hist_raw.txt", oup_filepath);
+    let hist_out_file = File::create(&hist_raw_data).unwrap();
+    let mut hist_writer = BufWriter::new(hist_out_file);
+    hist_writer.write_all(stat.to_histgram_data().as_bytes()).unwrap();
+
+}
+
+fn get_records_num(bam_file: &str, bam_threads: usize) -> usize {
+    let mut reader = Reader::from_path(bam_file).unwrap();
+    reader.set_threads(bam_threads).unwrap();
+    reader.records().count()
 }
 
 #[cfg(test)]
 mod test {
+    use rand::{rngs::StdRng, SeedableRng};
+
     use super::Stat;
 
     #[test]
     fn test_stat() {
-        let mut stat = Stat::default();
+        let rng = StdRng::from_seed([10 as u8; 32]);
+
+        let mut stat = Stat::new(rng, 0.1);
         let bases = b"ACGTACGT";
         let dws = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let ars = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];

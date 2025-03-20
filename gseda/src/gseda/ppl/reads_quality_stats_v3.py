@@ -9,7 +9,8 @@ from multiprocessing import cpu_count
 import os
 import semver
 import threading
-from multiprocessing import Process
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 logging.basicConfig(
@@ -326,7 +327,7 @@ def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
     return metric
 
 
-def stats(metric_filename, filename):
+def stats(metric_filename: str, filename: str):
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
     )
@@ -399,6 +400,10 @@ def stats(metric_filename, filename):
     print(aggr_metrics)
 
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
+    
+    sampled_identity = df.select([pl.col("identity")]).sample(n=10000, seed=2025).to_pandas()
+    identity_hist_filename = "{}.idenity_hist.png".format(filename.rsplit(".", maxsplit=1)[0])
+    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="IdentityHist")
 
 
 def aggr_expressions():
@@ -487,7 +492,6 @@ def row_align_span():
     return exprs
 
 
-
 def aligned_bam_analysis(bam_file: str, ref_fa: str, fact_metric_filename: str, aggr_metric_filename: str, force: bool, threads: int):
     fact_metric_filename = generate_metric_file(
         bam_file,
@@ -507,15 +511,46 @@ def aligned_bam_analysis(bam_file: str, ref_fa: str, fact_metric_filename: str, 
     stats(fact_metric_filename, filename=aggr_metric_filename)
     
 
-def non_aligned_bam_analysis(bam_file: str, out_filepath: str, out_dir: str, force: bool):
+def non_aligned_bam_analysis(bam_file: str, out_filepath: str, stem: str, out_dir: str, force: bool):
     if not force and os.path.exists(out_filepath):
         logging.info(f"{out_filepath} exists, use the existed file")
         return
         
     cmd = f"gsetl --outdir {out_dir} non-aligned-bam --bam {bam_file} -o {out_filepath}"
     logging.info("cmd: %s", cmd)
-    subprocess.check_call(cmd, shell=True)    
+    subprocess.check_call(cmd, shell=True)
+    
+    hist_raw_data_path = f"{out_filepath}.hist_raw.txt"
+    if os.path.exists(hist_raw_data_path):
+        data = open(hist_raw_data_path, mode="r", encoding="utf8").readlines()
+        read_length = list(map(int, data[0].strip().split(",")))
+        dw = list(map(float, data[1].strip().split(","))) 
+        ar = list(map(float, data[2].strip().split(",")))
+        
+        read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
+        plot_histgram(read_length, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
+        
+        dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
+        plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot")
+        
+        ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
+        plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot")
+        
+        pass
+        
+def plot_histgram(data, fname, xlabel, ylabel, title, bins=50):
+    plt.figure(figsize=(8, 6))
 
+    # 绘制直方图
+    sns.histplot(data, bins=bins, kde=True, color='skyblue')
+
+    # 添加标题与标签
+    plt.title(title, fontsize=16)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+
+    # 保存图片到文件
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
 
 def main(
     bam_file: str,
@@ -580,7 +615,7 @@ def main(
     aligned_bam_thread.start()
     processes.append(aligned_bam_thread)
     
-    non_aligned_thread = threading.Thread(target=non_aligned_bam_analysis, args=(bam_file, no_aligned_aggr_filename, outdir, force))
+    non_aligned_thread = threading.Thread(target=non_aligned_bam_analysis, args=(bam_file, no_aligned_aggr_filename, stem, outdir, force))
     non_aligned_thread.start()
     processes.append(non_aligned_thread)
     
