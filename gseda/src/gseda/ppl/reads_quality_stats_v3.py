@@ -46,7 +46,7 @@ def gsetl_version_check():
 
     logging.info(f"gsetl Version: {version_str}")
     gsetl_version = semver.Version.parse(version_str)
-    expected_version = "0.6.3"
+    expected_version = "0.7.1"
     assert gsetl_version >= semver.Version.parse(
         expected_version
     ), f"current gsetl version:{gsetl_version} < {expected_version}, try 'cargo uninstall gsetl; cargo install gsetl@={expected_version}' "
@@ -403,7 +403,7 @@ def stats(metric_filename: str, filename: str):
     
     sampled_identity = df.select([pl.col("identity")]).sample(n=10000, seed=2025).to_pandas()
     identity_hist_filename = "{}.idenity_hist.png".format(filename.rsplit(".", maxsplit=1)[0])
-    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="IdentityHist")
+    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="IdentityHist", xlim=(0.6, 1.0))
 
 
 def aggr_expressions():
@@ -513,25 +513,8 @@ def generate_non_aligned_metric_fact_file(bam_file: str, out_filepath: str, out_
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
     
-    # hist_raw_data_path = f"{out_filepath}.hist_raw.txt"
-    # if os.path.exists(hist_raw_data_path):
-    #     data = open(hist_raw_data_path, mode="r", encoding="utf8").readlines()
-    #     read_length = list(map(int, data[0].strip().split(",")))
-    #     dw = list(map(float, data[1].strip().split(","))) 
-    #     ar = list(map(float, data[2].strip().split(",")))
-        
-    #     read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
-    #     plot_histgram(read_length, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
-        
-    #     dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
-    #     plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot")
-        
-    #     ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
-    #     plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot")
-        
-    #     pass
     
-def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool):
+def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool, out_dir: str, stem: str):
     if os.path.exists(aggr_metric_filename) and not force:
         logging.info(f"{aggr_metric_filename} exists , use the existed file")
         return
@@ -557,13 +540,52 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
         (pl.col("ar_sum").sum() / pl.col("base_cnt").sum()).alias("ar-mean")
     ])
     
-    print(whole_aggr)
-    print(base_level_aggr)
+    whole_aggr = whole_aggr.transpose(
+        include_header=True, header_name="name", column_names=["value"]
+    )
     
+    metrics = [whole_aggr]
+    
+    for base in ["A", "C", "G", "T"]:
+        tmp = base_level_aggr.filter([pl.col("base") == pl.lit(base)])\
+                .select([pl.col("dw-mean").alias(f"dw-mean-{base}"), pl.col("ar-mean").alias(f"ar-mean-{base}")])
+        metrics.append(tmp.transpose(
+            include_header=True, header_name="name", column_names=["value"]))
+    
+        
+    
+    metrics = pl.concat(metrics)
+
+    print(metrics)
+
+    metrics.write_csv(aggr_metric_filename, include_header=True, separator="\t")
+    
+    # TODO draw plot
+    read_lengths = df.group_by(["qname"])\
+            .agg([pl.col("base_cnt").sum()])\
+            .select([pl.col("base_cnt")])\
+            .sample(n=10000, seed=2025).to_pandas()["base_cnt"]
+            
+    read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
+    plot_histgram(read_lengths, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
+    
+    dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
+    dw = df.group_by(["qname"])\
+            .agg([pl.col("base_cnt").sum(), pl.col("dw_sum").sum()])\
+            .select([(pl.col("dw_sum") / pl.col("base_cnt")).alias("dw")])\
+            .sample(n=10000, seed=2025).to_pandas()["dw"]
+    plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot", xlim=(0, 200))
+    
+    ar = df.group_by(["qname"])\
+            .agg([pl.col("base_cnt").sum(), pl.col("ar_sum").sum()])\
+            .select([(pl.col("ar_sum") / pl.col("base_cnt")).alias("ar")])\
+            .sample(n=10000, seed=2025).to_pandas()["ar"]
+    ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
+    plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot", xlim=(0, 1000))
     
     pass
         
-def plot_histgram(data, fname, xlabel, ylabel, title, bins=50):
+def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=50):
     plt.figure(figsize=(8, 6))
 
     # 绘制直方图
@@ -572,6 +594,8 @@ def plot_histgram(data, fname, xlabel, ylabel, title, bins=50):
     # 添加标题与标签
     plt.title(title, fontsize=16)
     plt.xlabel(xlabel, fontsize=14)
+    if xlim is not None:
+        plt.xlim(xlim)
     plt.ylabel(ylabel, fontsize=14)
 
     # 保存图片到文件
@@ -658,9 +682,7 @@ def main(
         p.join()
     
     aligned_metric_analysis(fact_metric_filename, aggr_metric_filename, force=force)
-    non_aligned_metric_analysis(no_aligned_fact_filename, no_aligned_aggr_filename, force)
-    
-    
+    non_aligned_metric_analysis(no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
     
     return (aggr_metric_filename, fact_metric_filename, no_aligned_fact_filename)
 
