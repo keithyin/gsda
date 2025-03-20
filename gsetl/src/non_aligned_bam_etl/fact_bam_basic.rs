@@ -50,7 +50,7 @@ pub fn fact_bam_basic(param: &NonAlignedBamParams, output_dir: &str) {
 }
 
 /// ch base base_cnt dw_sum ar_sum cr_mean cq oe
-fn dump_one_record(record: &Record, writer: &mut BufWriter<File>) {
+fn dump_one_record(record: &Record, writer: &mut dyn Write) {
     let record_ext = BamRecordExt::new(record);
     let bases = record_ext.get_seq();
     let dwell_times = record_ext
@@ -61,6 +61,7 @@ fn dump_one_record(record: &Record, writer: &mut BufWriter<File>) {
         .get_ar()
         .map(|v| v.into_iter().map(|v| v as f64).collect::<Vec<_>>())
         .unwrap_or(vec![-1.0; bases.len()]);
+    // println!("{:?}", arrival_time.iter().take(20).collect::<Vec<_>>());
 
     let capture_rates = record_ext
         .get_float_cr()
@@ -76,11 +77,12 @@ fn dump_one_record(record: &Record, writer: &mut BufWriter<File>) {
     let mut acgt_cr_mean = [0.0; 4];
     let mut acgt_cnt = [0; 4];
 
-    bases.as_bytes().iter().for_each(|&base| {
+    bases.as_bytes().iter().enumerate().for_each(|(pos, &base)| {
         let idx = SEQ_NT4_TABLE[base as usize] as usize;
-        let dw = dwell_times[idx];
-        let ar = arrival_time[idx];
-        let cr = capture_rates[idx];
+        // println!("base:{}, idx:{}", base as char, idx);
+        let dw = dwell_times[pos];
+        let ar = arrival_time[pos];        
+        let cr = capture_rates[pos];
         acgt_dw_sum[idx] += dw;
         acgt_ar_sum[idx] += ar;
         acgt_cnt[idx] += 1;
@@ -91,6 +93,7 @@ fn dump_one_record(record: &Record, writer: &mut BufWriter<File>) {
         .iter_mut()
         .zip(acgt_cnt.iter())
         .for_each(|(cr, &cnt)| *cr = if cnt == 0 { 0.0 } else { *cr / cnt as f64 });
+    // println!("{:?}", acgt_ar_sum);
 
     // ch base base_cnt dw_sum ar_sum cr_mean cq oe
     ["A", "C", "G", "T"]
@@ -111,7 +114,33 @@ fn dump_one_record(record: &Record, writer: &mut BufWriter<File>) {
 
 #[cfg(test)]
 mod test {
+    use std::io::BufWriter;
+
+    use gskits::gsbam::bam_record_ext::BamRecordExt;
+    use rust_htslib::bam::{Read, Reader};
+
+    use crate::non_aligned_bam_etl::fact_bam_basic::dump_one_record;
+
 
     #[test]
-    fn test_stat() {}
+    fn test_stat() {
+
+        let bam_file = "/data/ccs_data/data2025Q1/S_aureus_1h/20250207_Sync_Y0002_02_H01_Run0001_called.bam";
+        let mut reader = Reader::from_path(bam_file).unwrap();
+        reader.set_threads(10).unwrap();
+        for record in reader.records() {
+            let record = record.unwrap();
+            let record_ext = BamRecordExt::new(&record);
+            // println!("{}", record_ext.get_seq());
+
+            let mut buf = vec![];
+            let mut buf_writer = BufWriter::new(&mut buf);
+            dump_one_record(&record, &mut buf_writer);
+            drop(buf_writer);
+            println!("{}", String::from_utf8(buf).unwrap());
+            break;
+        }
+
+
+    }
 }

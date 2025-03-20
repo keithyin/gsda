@@ -57,7 +57,7 @@ def extract_filename(filepath: str) -> str:
     return p.stem
 
 
-def generate_metric_file(
+def generate_aligned_metric_fact_file(
     bam_file: str,
     ref_fasta: str,
     out_filename: str,
@@ -492,14 +492,7 @@ def row_align_span():
     return exprs
 
 
-def aligned_bam_analysis(bam_file: str, ref_fa: str, fact_metric_filename: str, aggr_metric_filename: str, force: bool, threads: int):
-    fact_metric_filename = generate_metric_file(
-        bam_file,
-        ref_fa,
-        out_filename=fact_metric_filename,
-        force=force,
-        threads=threads,
-    )
+def aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool):
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
         
@@ -511,7 +504,7 @@ def aligned_bam_analysis(bam_file: str, ref_fa: str, fact_metric_filename: str, 
     stats(fact_metric_filename, filename=aggr_metric_filename)
     
 
-def non_aligned_bam_analysis(bam_file: str, out_filepath: str, stem: str, out_dir: str, force: bool):
+def generate_non_aligned_metric_fact_file(bam_file: str, out_filepath: str, out_dir: str, force: bool):
     if not force and os.path.exists(out_filepath):
         logging.info(f"{out_filepath} exists, use the existed file")
         return
@@ -520,23 +513,55 @@ def non_aligned_bam_analysis(bam_file: str, out_filepath: str, stem: str, out_di
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
     
-    hist_raw_data_path = f"{out_filepath}.hist_raw.txt"
-    if os.path.exists(hist_raw_data_path):
-        data = open(hist_raw_data_path, mode="r", encoding="utf8").readlines()
-        read_length = list(map(int, data[0].strip().split(",")))
-        dw = list(map(float, data[1].strip().split(","))) 
-        ar = list(map(float, data[2].strip().split(",")))
+    # hist_raw_data_path = f"{out_filepath}.hist_raw.txt"
+    # if os.path.exists(hist_raw_data_path):
+    #     data = open(hist_raw_data_path, mode="r", encoding="utf8").readlines()
+    #     read_length = list(map(int, data[0].strip().split(",")))
+    #     dw = list(map(float, data[1].strip().split(","))) 
+    #     ar = list(map(float, data[2].strip().split(",")))
         
-        read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
-        plot_histgram(read_length, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
+    #     read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
+    #     plot_histgram(read_length, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
         
-        dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
-        plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot")
+    #     dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
+    #     plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot")
         
-        ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
-        plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot")
+    #     ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
+    #     plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot")
         
-        pass
+    #     pass
+    
+def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool):
+    if os.path.exists(aggr_metric_filename) and not force:
+        logging.info(f"{aggr_metric_filename} exists , use the existed file")
+        return
+    
+    df = pl.read_csv(fact_metric_filename, separator="\t")
+    
+    df = df.with_columns([
+        (pl.col("dw_sum")* pl.lit(2)).alias("dw_sum"),
+        (pl.col("ar_sum")* pl.lit(2)).alias("ar_sum"),
+        ])
+    
+    whole_aggr = df.select([
+        (pl.col("dw_sum").sum() / pl.col("base_cnt").sum()).alias("dw-mean"),
+        (pl.col("ar_sum").sum() / pl.col("base_cnt").sum()).alias("ar-mean"),
+        pl.col("cq").mean().alias("cq-mean"),
+        ((pl.col("base_cnt") * pl.col("cr_mean")).sum() / pl.col("base_cnt").sum()).alias("cr-mean"),
+        pl.col("oe").median().alias("oe-median"),
+        (pl.col("base_cnt").sum() / ((pl.col("dw_sum").sum() + pl.col("ar_sum").sum()) * pl.lit(0.001))).alias("speed")
+        ])
+    
+    base_level_aggr = df.group_by(["base"]).agg([
+        (pl.col("dw_sum").sum() / pl.col("base_cnt").sum()).alias("dw-mean"),
+        (pl.col("ar_sum").sum() / pl.col("base_cnt").sum()).alias("ar-mean")
+    ])
+    
+    print(whole_aggr)
+    print(base_level_aggr)
+    
+    
+    pass
         
 def plot_histgram(data, fname, xlabel, ylabel, title, bins=50):
     plt.figure(figsize=(8, 6))
@@ -607,22 +632,37 @@ def main(
 
     fact_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_fact.csv"
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
+    no_aligned_fact_filename = f"{outdir}/{stem}.non_aligned_fact.csv"
     no_aligned_aggr_filename = f"{outdir}/{stem}.non_aligned_aggr.csv"
     
-    processes = []
-    # aligned_bam_thread = threading.Thread(target=aligned_bam_analysis(bam_file, ref_fa, fact_metric_filename, aggr_metric_filename, force, threads))
-    aligned_bam_thread = threading.Thread(target=aligned_bam_analysis, args=(bam_file, ref_fa, fact_metric_filename, aggr_metric_filename, force, threads))
-    aligned_bam_thread.start()
-    processes.append(aligned_bam_thread)
+    """
+    fact_metric_filename = generate_metric_file(
+        bam_file,
+        ref_fa,
+        out_filename=fact_metric_filename,
+        force=force,
+        threads=threads,
+    )
+    """
     
-    non_aligned_thread = threading.Thread(target=non_aligned_bam_analysis, args=(bam_file, no_aligned_aggr_filename, stem, outdir, force))
-    non_aligned_thread.start()
-    processes.append(non_aligned_thread)
+    processes = []
+    aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(bam_file, ref_fa, fact_metric_filename, force, threads))
+    aligned_fact_thread.start()
+    processes.append(aligned_fact_thread)
+    
+    non_aligned_fact_thread = threading.Thread(target=generate_non_aligned_metric_fact_file, args=(bam_file, no_aligned_fact_filename, outdir, force))
+    non_aligned_fact_thread.start()
+    processes.append(non_aligned_fact_thread)
     
     for p in processes:
         p.join()
     
-    return (aggr_metric_filename, fact_metric_filename, no_aligned_aggr_filename)
+    aligned_metric_analysis(fact_metric_filename, aggr_metric_filename, force=force)
+    non_aligned_metric_analysis(no_aligned_fact_filename, no_aligned_aggr_filename, force)
+    
+    
+    
+    return (aggr_metric_filename, fact_metric_filename, no_aligned_fact_filename)
 
 
 def test_stat():
