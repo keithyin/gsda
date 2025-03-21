@@ -400,10 +400,12 @@ def stats(metric_filename: str, filename: str):
     print(aggr_metrics)
 
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
-    
-    sampled_identity = df.select([pl.col("identity")]).sample(n=10000, seed=2025).to_pandas()
+    identity_min = 0.6
+    identity_max = 1.0
+    sampled_identity = df.select([pl.col("identity").clip(lower_bound=identity_min, upper_bound=identity_max)]).sample(n=10000, seed=2025).to_pandas()
     identity_hist_filename = "{}.idenity_hist.png".format(filename.rsplit(".", maxsplit=1)[0])
-    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="IdentityHist", xlim=(0.6, 1.0))
+    
+    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="SampledIdentityHist", xlim=(identity_min, identity_max))
 
 
 def aggr_expressions():
@@ -497,8 +499,7 @@ def aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str
         os.remove(aggr_metric_filename)
         
     if os.path.exists(aggr_metric_filename):
-        logging.info(f"{aggr_metric_filename} exists, use the exist file")
-        return
+        logging.warning(f"{aggr_metric_filename} will be override")
 
     # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
@@ -516,9 +517,8 @@ def generate_non_aligned_metric_fact_file(bam_file: str, out_filepath: str, out_
     
 def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool, out_dir: str, stem: str):
     if os.path.exists(aggr_metric_filename) and not force:
-        logging.info(f"{aggr_metric_filename} exists , use the existed file")
-        return
-    
+        logging.warning(f"{aggr_metric_filename} will be override")
+        
     df = pl.read_csv(fact_metric_filename, separator="\t")
     
     df = df.with_columns([
@@ -567,29 +567,35 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
             .sample(n=10000, seed=2025).to_pandas()["base_cnt"]
             
     read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
-    plot_histgram(read_lengths, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="ReadLengthHistPlot")
+    plot_histgram(read_lengths, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="SampledReadLengthHist")
     
     dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
+    dw_min = 0
+    dw_max = 200
     dw = df.group_by(["qname"])\
             .agg([pl.col("base_cnt").sum(), pl.col("dw_sum").sum()])\
             .select([(pl.col("dw_sum") / pl.col("base_cnt")).alias("dw")])\
+            .select([pl.col("dw").clip(lower_bound=dw_min, upper_bound=dw_max)])\
             .sample(n=10000, seed=2025).to_pandas()["dw"]
-    plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="DwellTimeHistPlot", xlim=(0, 200))
+    plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="SampledDwellTimeHist", xlim=(dw_min, dw_max))
     
+    ar_min = 0
+    ar_max = 1000
     ar = df.group_by(["qname"])\
             .agg([pl.col("base_cnt").sum(), pl.col("ar_sum").sum()])\
             .select([(pl.col("ar_sum") / pl.col("base_cnt")).alias("ar")])\
+            .select([ pl.col("ar").clip(lower_bound=ar_min, upper_bound=ar_max)])\
             .sample(n=10000, seed=2025).to_pandas()["ar"]
     ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
-    plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="ArrivalTimeHistPlot", xlim=(0, 1000))
+    plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="SampledArrivalTimeHist", xlim=(ar_min, ar_max))
     
     pass
         
-def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=50):
+def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=100):
     plt.figure(figsize=(8, 6))
 
     # 绘制直方图
-    sns.histplot(data, bins=bins, kde=True, color='skyblue')
+    sns.histplot(data, bins=bins, kde=True, color='skyblue', binrange=xlim)
 
     # 添加标题与标签
     plt.title(title, fontsize=16)
