@@ -552,8 +552,6 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
         metrics.append(tmp.transpose(
             include_header=True, header_name="name", column_names=["value"]))
     
-        
-    
     metrics = pl.concat(metrics)
 
     print(metrics)
