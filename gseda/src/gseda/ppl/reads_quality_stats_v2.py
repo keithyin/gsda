@@ -24,7 +24,7 @@ def mm2_version_check():
 
     logging.info(f"gsmm2-aligned-metric Version: {version_str}")
     mm2_version = semver.Version.parse(version_str)
-    expected_version = "0.21.0"
+    expected_version = "0.24.0"
     assert mm2_version >= semver.Version.parse(
         expected_version
     ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@={expected_version}' "
@@ -50,6 +50,7 @@ def generate_metric_file(
     threads=None,
     no_supp=False,
     no_mar=False,
+    short_aln=False,
 ) -> str:
 
     if no_supp and no_mar:
@@ -69,6 +70,8 @@ def generate_metric_file(
             --out {out_filename} \
             --kmer 11 \
             --wins 1 """
+    if short_aln:
+        cmd += " --short-aln"
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
@@ -466,6 +469,7 @@ def main(
     ref_fa: str,
     threads=None,
     force=False,
+    short_aln=False,
     outdir=None,
     copy_bam_file=False,
 ) -> str:
@@ -520,6 +524,7 @@ def main(
         out_filename=fact_metric_filename,
         force=force,
         threads=threads,
+        short_aln= short_aln
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
@@ -578,6 +583,7 @@ def main_cli():
     parser = argparse.ArgumentParser(prog="parser")
     parser.add_argument("--bams", nargs="+", type=str, required=True)
     parser.add_argument("--refs", nargs="+", type=str, required=True)
+    parser.add_argument("--short-aln", type=int, default=0, help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
         "-f",
         action="store_true",
@@ -594,7 +600,7 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f)
+        main(bam_file=bam, ref_fa=ref, force=args.f, short_aln=args.short_aln == 1)
 
 
 if __name__ == "__main__":
