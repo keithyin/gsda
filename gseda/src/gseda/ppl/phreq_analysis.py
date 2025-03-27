@@ -16,6 +16,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-q", type=str, required=True, help="query file")
     parser.add_argument("-t", type=str, required=True, help="target file")
+    parser.add_argument("-f", type=bool, action="store_true", help="force to overwrite the output bam file")
+    parser.add_argument("--qname-suffix", type=str, default=None, help="only the qname endswith $qname_suffix will be considered", dest="qname_suffix")
 
     args = parser.parse_args()
 
@@ -27,10 +29,15 @@ def main():
     file_stem = Path(args.q).stem
 
     oup_bam_prefix = f"{args.q}.gsmm2-aligned"
-    ## 1. do alignment
-    cmd_str = f"gsmm2 align -q {args.q} -t {args.t} -p {oup_bam_prefix} --noMar"
-    subprocess.check_call(cmd_str, shell=True)
     oup_bam = f"{oup_bam_prefix}.bam"
+    if args.f and os.path.exists(oup_bam):
+        os.remove(oup_bam)
+    if not os.path.exists(oup_bam):
+        ## 1. do alignment
+        cmd_str = f"gsmm2 align -q {args.q} -t {args.t} -p {oup_bam_prefix} --noMar"
+        if args.qname_suffix:
+            cmd_str += f" --qname-suffix {args.qname_suffix}"
+        subprocess.check_call(cmd_str, shell=True)
 
     ## 2. gsetl extract fact table
     gsetl_outdir = f"{oup_bam}-gsetl"
