@@ -333,27 +333,6 @@ def stats(metric_filename: str, filename: str):
     )
     metric_aligned_not_aligned = analysis_aligned(df=df)
     df = df.filter(pl.col("rname") != "")
-    # print(df.head(2))
-    # print(
-    #     df.filter(pl.col("segs") > 1)
-    #     .head(2)
-    #     .select(
-    #         [
-    #             "qname",
-    #             "rname",
-    #             "qlen",
-    #             "segs",
-    #             "queryCoverage",
-    #             "identity",
-    #             "oriAlignInfo",
-    #             "oriQGaps",
-    #             "qOvlp",
-    #             "qOvlpRatio",
-    #             "rOvlpRatio",
-    #             "mergedQrySpan",
-    #         ]
-    #     )
-    # )
     metric_long_indel = analisys_long_indel(df=df)
     metric_segs = analysis_segs(df)
     metric_segs2 = analysis_segs2(df)
