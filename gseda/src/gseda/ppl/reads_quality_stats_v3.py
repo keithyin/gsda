@@ -402,7 +402,11 @@ def stats(metric_filename: str, filename: str):
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
     identity_min = 0.6
     identity_max = 1.0
-    sampled_identity = df.select([pl.col("identity").clip(lower_bound=identity_min, upper_bound=identity_max)]).sample(n=10000, seed=2025).to_pandas()
+    if df.shape[0] > 10000:
+        sampled_identity = df.select([pl.col("identity").clip(lower_bound=identity_min, upper_bound=identity_max)]).sample(n=10000, seed=2025).to_pandas()
+    else :
+        sampled_identity = df.to_pandas()
+        
     identity_hist_filename = "{}.idenity_hist.png".format(filename.rsplit(".", maxsplit=1)[0])
     
     plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="SampledIdentityHist", xlim=(identity_min, identity_max))
@@ -561,8 +565,11 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
     # TODO draw plot
     read_lengths = df.group_by(["qname"])\
             .agg([pl.col("base_cnt").sum()])\
-            .select([pl.col("base_cnt")])\
-            .sample(n=10000, seed=2025).to_pandas()["base_cnt"]
+            .select([pl.col("base_cnt")])
+    if read_lengths.shape[0] > 10000:
+        read_lengths = read_lengths.sample(n=10000, seed=2025).to_pandas()["base_cnt"]
+    else:
+        read_lengths = read_lengths.to_pandas()["base_cnt"]
             
     read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
     plot_histgram(read_lengths, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="SampledReadLengthHist")
@@ -573,8 +580,11 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
     dw = df.group_by(["qname"])\
             .agg([pl.col("base_cnt").sum(), pl.col("dw_sum").sum()])\
             .select([(pl.col("dw_sum") / pl.col("base_cnt")).alias("dw")])\
-            .select([pl.col("dw").clip(lower_bound=dw_min, upper_bound=dw_max)])\
-            .sample(n=10000, seed=2025).to_pandas()["dw"]
+            .select([pl.col("dw").clip(lower_bound=dw_min, upper_bound=dw_max)])
+    if dw.shape[0] > 10000:
+        dw = dw.sample(n=10000, seed=2025).to_pandas()["dw"]
+    else:
+        dw = dw.to_pandas()["dw"]
     plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="SampledDwellTimeHist", xlim=(dw_min, dw_max))
     
     ar_min = 0
@@ -582,8 +592,12 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
     ar = df.group_by(["qname"])\
             .agg([pl.col("base_cnt").sum(), pl.col("ar_sum").sum()])\
             .select([(pl.col("ar_sum") / pl.col("base_cnt")).alias("ar")])\
-            .select([ pl.col("ar").clip(lower_bound=ar_min, upper_bound=ar_max)])\
-            .sample(n=10000, seed=2025).to_pandas()["ar"]
+            .select([ pl.col("ar").clip(lower_bound=ar_min, upper_bound=ar_max)])
+    if ar.shape[0] > 10000:
+        ar = ar.sample(n=10000, seed=2025).to_pandas()["ar"]
+    else:
+        ar = ar.to_pandas()["ar"]
+        
     ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
     plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="SampledArrivalTimeHist", xlim=(ar_min, ar_max))
     

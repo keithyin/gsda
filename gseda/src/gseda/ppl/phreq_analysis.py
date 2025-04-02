@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-q", type=str, required=True, help="query file")
     parser.add_argument("-t", type=str, required=True, help="target file")
-    parser.add_argument("-f", type=bool, action="store_true", help="force to overwrite the output bam file")
+    parser.add_argument("-f", action="store_true", help="force to overwrite the output bam file")
     parser.add_argument("--qname-suffix", type=str, default=None, help="only the qname endswith $qname_suffix will be considered", dest="qname_suffix")
 
     args = parser.parse_args()
