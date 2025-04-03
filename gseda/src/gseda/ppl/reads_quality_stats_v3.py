@@ -329,7 +329,7 @@ def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
 
 def stats(metric_filename: str, filename: str):
     df = pl.read_csv(
-        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
+        metric_filename, separator="\t", infer_schema_length=3000, schema_overrides={"longIndel": pl.String}
     )
     metric_aligned_not_aligned = analysis_aligned(df=df)
     df = df.filter(pl.col("rname") != "")
@@ -502,7 +502,12 @@ def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename:
     if os.path.exists(aggr_metric_filename) and not force:
         logging.warning(f"{aggr_metric_filename} will be override")
         
-    df = pl.read_csv(fact_metric_filename, separator="\t")
+    df = pl.read_csv(
+        fact_metric_filename, separator="\t", 
+        infer_schema_length=3000,
+        schema_overrides={
+            "oe": pl.Float32
+        })
     
     df = df.with_columns([
         (pl.col("dw_sum")* pl.lit(2)).alias("dw_sum"),

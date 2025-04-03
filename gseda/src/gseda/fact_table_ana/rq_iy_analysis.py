@@ -4,6 +4,7 @@ import os
 import argparse
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def set_polars_env():
@@ -87,6 +88,33 @@ def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
     if o_prefix is not None:
         fname = f"{o_prefix}-{fname}"
     figure.savefig(fname=fname)
+    
+
+def plot_predQ20_but_lower_Q20(df: pl.DataFrame, o_prefix=None):
+    figure = plt.figure(figsize=(10, 10))
+    axs = figure.add_subplot(1, 1, 1)
+    plt.sca(axs)
+    plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
+
+    df = df.filter(pl.col("phreq_rq") >= pl.lit(20))\
+        .filter(pl.col("phreq_iy") < pl.lit(20))\
+        .select([pl.col("phreq_iy")])\
+        .to_pandas()
+    
+    axs.set_xlim((10, 20))
+    axs.set_xticks(np.linspace(10, 20, num=21))
+    
+    sns.histplot(df, x="phreq_iy", ax=axs, bins=100)
+
+    axs.set_xlabel("TrueQ", fontdict={"size": 16})
+    axs.set_ylabel("Count", fontdict={"size": 16})
+    plt.title("True Q-score distribution for predicted Q >= 20")
+    fname = "pred_lt_q20_but_lower_q20.png"
+    if o_prefix is not None:
+        fname = f"{o_prefix}-{fname}"
+    figure.savefig(fname=fname)
+    
+    pass
 
 
 def stat(fname: str, o_prefix):
@@ -105,6 +133,7 @@ def stat(fname: str, o_prefix):
     ).with_columns([q2phreqExpr("rq", "phreq_rq"), q2phreqExpr("iy", "phreq_iy")])
 
     plot_rq_iy_scatter(df=df, o_prefix=o_prefix)
+    plot_predQ20_but_lower_Q20(df=df, o_prefix=o_prefix)
 
     stat_res = df.select(
         (pl.col("rq") - pl.col("iy")).mean().alias("ME(pred-real)(rq-iy)"),
@@ -159,36 +188,19 @@ def stat(fname: str, o_prefix):
                 pl.quantile("phreq_iy", quantile=0.80).alias("percent_80"),
                 pl.quantile("phreq_iy", quantile=0.95).alias("percent_95"),
                 pl.col("phreq_iy").max().alias("max"),
-            ]
-        )
-        .with_columns(
-            [
-                (pl.col("avg") - pl.col("std")).alias("low_68"),
-                (pl.col("avg") + pl.col("std")).alias("high_68"),
-                (pl.col("avg") - 2 * pl.col("std")).alias("low_95"),
-                (pl.col("avg") + 2 * pl.col("std")).alias("high_95"),
+                pl.len().alias("cnt")
             ]
         )
         .with_columns(
             [
                 q2phreqExpr("avg"),
                 q2phreqExpr("median"),
-                q2phreqExpr("low_68"),
-                q2phreqExpr("high_68"),
-                q2phreqExpr("low_95"),
-                q2phreqExpr("high_95"),
             ]
         )
         .select(
             pl.col("phreq_rq"),
             pl.col("avg"),
             pl.col("median"),
-            pl.concat_str(
-                pl.col("low_68").round(2), pl.col("high_68").round(2), separator="~"
-            ).alias("ConfRegion65"),
-            pl.concat_str(
-                pl.col("low_95").round(2), pl.col("high_95").round(2), separator="~"
-            ).alias("ConfRegion95"),
             pl.concat_str(
                 pl.col("min").round(2),
                 pl.col("percent_5").round(2),
@@ -199,6 +211,7 @@ def stat(fname: str, o_prefix):
                 pl.col("max").round(2),
                 separator=", ",
             ).alias("Percent_0_5_20_50_80_95_100"),
+            pl.col("cnt")
         )
         .sort(["phreq_rq"], descending=[False])
     )
