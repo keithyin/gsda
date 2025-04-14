@@ -4,7 +4,6 @@ import polars as pl
 import os
 import argparse
 
-
 def polars_env_init():
     os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
@@ -37,7 +36,13 @@ def read_bam_info(
         filename=bam_file, mode="rb", check_sq=False, threads=40
     ) as reader:
         for record in tqdm(reader.fetch(until_eof=True), desc=f"reading {bam_file}"):
-            rq = float(record.get_tag("rq"))
+            
+            rq = 0
+            if record.has_tag("rq"):
+                rq = float(record.get_tag("rq"))
+            else:
+                rq = 1 - 10 ** (float(record.get_tag("cq")) / -10)
+                
             if min_rq is not None and rq < min_rq:
                 continue
 
