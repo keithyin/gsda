@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "0.5.0"
+version = "1.0.0"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -19,7 +19,8 @@ dependencies = [
     "pysam>=0.22",
     "seaborn>=0.13",
     "semver==3.0.2",
-    "pyarrow==17.0.0"
+    "pyarrow==17.0.0",
+    "mappy"
 ]
 
 [project.urls]
@@ -33,6 +34,8 @@ reads-quality-stats-v3-cli = "gseda.ppl.reads_quality_stats_v3:main_cli"
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
 msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
 phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
+
+wga-cli = "gseda.ppl.whole_genome_alignment:main_cli"
 
 
 # 构建后端，默认为 Hatchling
