@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.2.0"
+version = "1.2.1"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -34,10 +34,8 @@ reads-quality-stats-v3-cli = "gseda.ppl.reads_quality_stats_v3:main_cli"
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
 msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
 phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
-
 wga-cli = "gseda.ppl.whole_genome_alignment:main_cli"
-
-bam2fq = ""
+bam2fx = "gseda.bam_fiter.bam2fx:main_cli"
 
 
 # 构建后端，默认为 Hatchling
