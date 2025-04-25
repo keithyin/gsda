@@ -170,6 +170,10 @@ def len_dist(channel_level_info: pl.DataFrame) -> pl.DataFrame:
             .sum()
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
             .alias("num_bases"),
+            pl.col("full_len_bases")
+            .sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("full_len_bases"),
             pl.concat_str(
                 pl.col("oriPasses").min(),
                 pl.quantile("oriPasses", quantile=0.05).cast(pl.Int32),
@@ -214,16 +218,26 @@ def stat_subreads(df: pl.DataFrame):
         [
             pl.col("is_full_len").sum().alias("oriPasses"),
             pl.col("seq_len").sum().alias("num_bases"),
-            pl.col("seq_len").median().alias("seq_len_median"),
-            pl.col("seq_len").mean().alias("seq_len_mean"),
+            pl.col("seq_len")
+            .filter(pl.col("is_full_len") == 1)
+            .sum()
+            .alias("full_len_bases"),
+            pl.col("seq_len")
+            .filter(pl.col("is_full_len") == 1)
+            .median()
+            .alias("seq_len_median"),
+            pl.col("seq_len")
+            .filter(pl.col("is_full_len") == 1)
+            .mean()
+            .alias("seq_len_mean"),
         ]
     )
     print("------------------------Adapter.bam----------------------------")
-    
+
     res = len_dist(channel_level_info=channel_level_info)
     print("------------------------Passes>=0----------------------------")
     print(res)
-    
+
     res = len_dist(
         channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 1)
     )
