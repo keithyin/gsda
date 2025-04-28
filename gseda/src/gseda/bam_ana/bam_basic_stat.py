@@ -131,9 +131,15 @@ def stat_channel_reads(df: pl.DataFrame):
             [
                 pl.len().alias("numChannels"),
                 pl.col("phreq").min().alias("minQv"),
-                pl.quantile("phreq", quantile=0.05).alias("Qv_5"),
-                pl.quantile("phreq", quantile=0.25).alias("Qv_25"),
-                pl.quantile("phreq", quantile=0.50).alias("Qv_50"),
+                pl.quantile("phreq", quantile=0.05)
+                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .alias("Qv_5"),
+                pl.quantile("phreq", quantile=0.25)
+                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .alias("Qv_25"),
+                pl.quantile("phreq", quantile=0.50)
+                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .alias("Qv_50"),
                 pl.col("phreq").max().alias("maxQv"),
                 (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
                 .alias("≥Q8")
@@ -152,6 +158,7 @@ def stat_channel_reads(df: pl.DataFrame):
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 pl.col("seq_len").mean().cast(pl.Int32).alias("seq_len_mean"),
                 pl.col("seq_len").median().cast(pl.Int32).alias("seq_len_median"),
+                pl.col("seq_len").max().cast(pl.Int32).alias("seq_len_max"),
             ]
         )
         .sort(by=["np"], descending=[False])
