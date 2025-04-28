@@ -130,17 +130,23 @@ def stat_channel_reads(df: pl.DataFrame):
         .agg(
             [
                 pl.len().alias("numChannels"),
-                pl.col("phreq").min().alias("minQv"),
+                pl.col("phreq")
+                .min()
+                .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
+                .alias("minQv"),
                 pl.quantile("phreq", quantile=0.05)
-                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
                 .alias("Qv_5"),
                 pl.quantile("phreq", quantile=0.25)
-                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
                 .alias("Qv_25"),
                 pl.quantile("phreq", quantile=0.50)
-                .map_elements(lambda x: f"{x: .2}", return_dtype=pl.String)
+                .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
                 .alias("Qv_50"),
-                pl.col("phreq").max().alias("maxQv"),
+                pl.col("phreq")
+                .max()
+                .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
+                .alias("maxQv"),
                 (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
                 .alias("≥Q8")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
@@ -158,6 +164,9 @@ def stat_channel_reads(df: pl.DataFrame):
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 pl.col("seq_len").mean().cast(pl.Int32).alias("seq_len_mean"),
                 pl.col("seq_len").median().cast(pl.Int32).alias("seq_len_median"),
+                pl.quantile("seq_len", quantile=0.99)
+                .cast(dtype=pl.Int32)
+                .alias("seq_len_99"),
                 pl.col("seq_len").max().cast(pl.Int32).alias("seq_len_max"),
             ]
         )
