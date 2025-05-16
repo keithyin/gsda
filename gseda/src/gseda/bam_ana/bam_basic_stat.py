@@ -170,6 +170,9 @@ def stat_channel_reads(df: pl.DataFrame):
                 pl.col("seq_len").max().cast(pl.Int32).alias("seq_len_max"),
             ]
         )
+        .with_columns([pl.col("numChannels").sum().alias("TotChannels")])
+        .with_columns([(pl.col("numChannels") / pl.col("TotChannels")).alias("ratio")])
+        .drop(["TotChannels"])
         .sort(by=["np"], descending=[False])
     )
 
