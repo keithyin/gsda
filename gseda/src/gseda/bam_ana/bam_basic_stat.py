@@ -171,7 +171,7 @@ def stat_channel_reads(df: pl.DataFrame):
             ]
         )
         .with_columns([pl.col("numChannels").sum().alias("TotChannels")])
-        .with_columns([(pl.col("numChannels") / pl.col("TotChannels")).alias("ratio")])
+        .with_columns([(pl.col("numChannels") / pl.col("TotChannels")).map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String).alias("ratio")])
         .drop(["TotChannels"])
         .sort(by=["np"], descending=[False])
     )
