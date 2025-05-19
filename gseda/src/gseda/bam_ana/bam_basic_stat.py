@@ -103,10 +103,38 @@ def stat_channel_reads(df: pl.DataFrame):
     # q
     res = df.select(
         [
+            pl.col("phreq")
+            .ge(pl.lit(8))
+            .sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("≥Q8"),
+            
+            pl.col("phreq").ge(pl.lit(10)).sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("≥Q10"),
+            pl.col("phreq").ge(pl.lit(15)).sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("≥Q15"),
+            
+            pl.col("phreq").ge(pl.lit(20)).sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("≥Q20"),
+            pl.col("phreq").ge(pl.lit(30)).sum()
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
+            .alias("≥Q30"),
+        ]
+    )
+    print(res)
+
+    #
+    res = df.select(
+        [
             (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
             .alias("≥Q8")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
-            (pl.col("phreq").ge(pl.lit(10)).sum() / pl.len())
+            pl.col("phreq")
+            .ge(pl.lit(10))
+            .sum()
             .alias("≥Q10")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(15)).sum() / pl.len())
@@ -122,7 +150,6 @@ def stat_channel_reads(df: pl.DataFrame):
             pl.col("phreq").median().alias("MedianQValue"),
         ]
     )
-    print(res)
 
     # np
     res = (
@@ -171,7 +198,13 @@ def stat_channel_reads(df: pl.DataFrame):
             ]
         )
         .with_columns([pl.col("numChannels").sum().alias("TotChannels")])
-        .with_columns([(pl.col("numChannels") / pl.col("TotChannels")).map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String).alias("ratio")])
+        .with_columns(
+            [
+                (pl.col("numChannels") / pl.col("TotChannels"))
+                .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String)
+                .alias("ratio")
+            ]
+        )
         .drop(["TotChannels"])
         .sort(by=["np"], descending=[False])
     )
