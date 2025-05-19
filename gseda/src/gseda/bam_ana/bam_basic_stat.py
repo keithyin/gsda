@@ -108,33 +108,36 @@ def stat_channel_reads(df: pl.DataFrame):
             .sum()
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
             .alias("≥Q8"),
-            
-            pl.col("phreq").ge(pl.lit(10)).sum()
-            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
-            .alias("≥Q10"),
-            pl.col("phreq").ge(pl.lit(15)).sum()
-            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
-            .alias("≥Q15"),
-            
-            pl.col("phreq").ge(pl.lit(20)).sum()
-            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
-            .alias("≥Q20"),
-            pl.col("phreq").ge(pl.lit(30)).sum()
-            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
-            .alias("≥Q30"),
+            pl.col("phreq")
+            .ge(pl.lit(10))
+            .sum()
+            .alias("≥Q10")
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
+            pl.col("phreq")
+            .ge(pl.lit(15))
+            .sum()
+            .alias("≥Q15")
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
+            pl.col("phreq")
+            .ge(pl.lit(20))
+            .sum()
+            .alias("≥Q20")
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
+            pl.col("phreq")
+            .ge(pl.lit(30))
+            .sum()
+            .alias("≥Q30")
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
         ]
     )
     print(res)
 
-    #
     res = df.select(
         [
             (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
             .alias("≥Q8")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
-            pl.col("phreq")
-            .ge(pl.lit(10))
-            .sum()
+            (pl.col("phreq").ge(pl.lit(10)).sum() / pl.len())
             .alias("≥Q10")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(15)).sum() / pl.len())
@@ -150,6 +153,7 @@ def stat_channel_reads(df: pl.DataFrame):
             pl.col("phreq").median().alias("MedianQValue"),
         ]
     )
+    print(res)
 
     # np
     res = (
