@@ -5,7 +5,6 @@
 from typing import List, Mapping
 import pysam
 from tqdm import tqdm
-import numpy as np
 import pathlib
 
 
@@ -27,6 +26,10 @@ def merge_smc_bams(bams: List[str], o_bam_name: str) -> Mapping[str, str]:
             for record in tqdm(
                 in_bam.fetch(until_eof=True), desc=f"dumping {bam_path}"
             ):
+                rq = record.get_tag("rq")
+                if rq < 0.968:
+                    continue
+
                 qname = record.query_name.rsplit("/", maxsplit=1)[0]
                 new_qname = len(old2new)
                 old2new[qname] = f"{new_qname}"
@@ -60,7 +63,7 @@ def reset_dw_ar_of_adapter_bam(called_bam: str, adapter_bam: str, new_adapter_ba
         adapter_bam, mode="rb", check_sq=False, threads=40
     ) as in_bam:
         with pysam.AlignmentFile(
-            new_adapter_bam, mode="wb", check_sq=False, threads=40
+            new_adapter_bam, mode="wb", check_sq=False, threads=40, header=in_bam.header
         ) as out_bam:
             for record in tqdm(
                 in_bam.fetch(until_eof=True), desc=f"dumping {adapter_bam}"
@@ -70,6 +73,7 @@ def reset_dw_ar_of_adapter_bam(called_bam: str, adapter_bam: str, new_adapter_ba
                 start, end = record.get_tag("be")
                 record.set_tag("dw", dw_ar.dw[start:end])
                 record.set_tag("ar", dw_ar.ar[start:end])
+                out_bam.write(record)
 
 
 def dump_merged_adapter_bam(
@@ -96,6 +100,8 @@ def dump_merged_adapter_bam(
                 sbr_idx = record.query_name.rsplit("/", maxsplit=1)[-1]
                 ch = record.get_tag("ch")
                 key = f"{run_name}/{ch}"
+                if key not in old2new:
+                    continue
                 new_ch = old2new[key]
                 record.query_name = f"{new_ch}/{sbr_idx}"
                 record.set_tag("ch", int(new_ch))
@@ -106,20 +112,40 @@ def dump_merged_adapter_bam(
 
 def main():
     called_bams = [
+        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_called.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_called.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_called.bam",
         "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_called.bam",
         "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_called.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_called.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_called.bam",
+        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_called.bam",
     ]
 
     sbr_bams = [
+        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_adapter.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_adapter.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_adapter.bam",
         "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_adapter.bam",
         "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_adapter.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_adapter.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_adapter.bam",
+        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_adapter.bam",
     ]
 
     smc_bams = [
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001-rerun.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002-rerun.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_adapter.smc_all_reads.bam",
+        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_adapter.smc_all_reads.bam",
     ]
-    old2new = merge_smc_bams(smc_bams, "/data/ccs_data/little-mouse/merged-smc.bam")
+    old2new = merge_smc_bams(smc_bams, "/data/ccs_data/little-mouse/mouse-smc.bam")
+
+    print(list(old2new)[:10])
 
     sbr_new_bams = []
     for called_bam_path, sbr_bam_path in zip(called_bams, sbr_bams):
@@ -128,7 +154,9 @@ def main():
         reset_dw_ar_of_adapter_bam(called_bam_path, sbr_bam_path, new_sbr_bam_path)
         sbr_new_bams.append(new_sbr_bam_path)
 
-    dump_merged_adapter_bam(sbr_new_bams, old2new, "/data/ccs_data/little-mouse/merged-adapter.bam")
+    dump_merged_adapter_bam(
+        sbr_new_bams, old2new, "/data/ccs_data/little-mouse/mouse-adapter.bam"
+    )
 
 
 if __name__ == "__main__":
