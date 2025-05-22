@@ -110,6 +110,40 @@ def dump_merged_adapter_bam(
     out_bam.close()
 
 
+def dump_merged_called_bam(
+    bam_paths: List[str], old2new: Mapping[str, str], out_bam_path: str
+):
+    out_bam = pysam.AlignmentFile(
+        out_bam_path,
+        mode="wb",
+        check_sq=False,
+        threads=40,
+        header={
+            "HD": {"VN": "1.5", "SO": "unknown"},
+        },
+    )
+
+    for bam_path in bam_paths:
+        with pysam.AlignmentFile(
+            bam_path, mode="rb", check_sq=False, threads=40
+        ) as in_bam:
+            run_name = in_bam.header["RG"][0]["rn"]
+            for record in tqdm(
+                in_bam.fetch(until_eof=True), desc=f"dumping {bam_path}"
+            ):
+                ch = record.query_name.split("_", maxsplit=1)[1]
+                key = f"{run_name}/{ch}"
+                if key not in old2new:
+                    continue
+                new_ch = old2new[key]
+                record.query_name = f"read_{new_ch}"
+                record.set_tag("ch", int(new_ch))
+                out_bam.write(record)
+
+    out_bam.close()
+    pass
+
+
 def main():
     called_bams = [
         "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_called.bam",
@@ -156,6 +190,10 @@ def main():
 
     dump_merged_adapter_bam(
         sbr_new_bams, old2new, "/data/ccs_data/little-mouse/mouse-adapter.bam"
+    )
+
+    dump_merged_called_bam(
+        called_bams, old2new, "/data/ccs_data/little-mouse/mouse-called.bam"
     )
 
 

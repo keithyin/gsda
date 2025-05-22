@@ -4,6 +4,7 @@ import polars as pl
 import os
 import argparse
 from typing import Tuple
+import numpy as np
 
 
 def polars_env_init():
@@ -56,14 +57,17 @@ def read_bam_info(
             if record.has_tag("cx"):
                 cx = record.get_tag("cx")
                 is_sbr = True
-
-            ch = int(record.get_tag(channel_tag))
+            if not record.has_tag(channel_tag):
+                ch = int(record.query_name.split("_")[1])
+            else:
+                ch = int(record.get_tag(channel_tag))
             channels.append(ch)
             seq_lens.append(record.query_length)
             rqs.append(rq)
             cxs.append(cx)
-
-            np = int(record.get_tag("np"))
+            np = 1
+            if record.has_tag("np"):
+                np = int(record.get_tag("np"))
             np = 25 if np >= 25 else np
 
             nps.append(np)
@@ -74,6 +78,16 @@ def read_bam_info(
 
     df = df.with_columns([q2phreq_expr("rq", "phreq")])
     return (df, is_sbr)
+
+
+def compute_n50(lengths: np.ndarray):
+    lengths[::-1].sort()
+    total = lengths.sum()
+    half_total = total / 2
+
+    cumsum = np.cumsum(lengths)
+    n50_index = np.searchsorted(cumsum, half_total)
+    return lengths[n50_index]
 
 
 def stat_channel_reads(df: pl.DataFrame):
@@ -98,6 +112,10 @@ def stat_channel_reads(df: pl.DataFrame):
             ).alias("SeqLen0_5_25_50_75_95_99_100"),
         ]
     )
+
+    lengths = df.select([pl.col("seq_len")]).to_pandas()["seq_len"].to_numpy()
+    print("N50:{}".format(compute_n50(lengths)))
+
     print(res)
 
     # q
