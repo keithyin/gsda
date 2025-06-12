@@ -32,6 +32,8 @@ Issues = "https://github.com/keithyin/gsda/issues"
 reads-quality-stats-cli = "gseda.ppl.reads_quality_stats_v2:main_cli"
 reads-quality-stats-v3-cli = "gseda.ppl.reads_quality_stats_v3:main_cli"
 reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
+reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
+
 
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
 fastx-basic-stat-cli = "gseda.fastx_ana.fastx_basic_stat:main_cli"
