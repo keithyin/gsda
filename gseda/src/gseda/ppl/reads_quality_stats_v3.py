@@ -12,7 +12,7 @@ import threading
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-
+# deprecated ...
 logging.basicConfig(
     level=logging.INFO,
     datefmt="%Y/%m/%d %H:%M:%S",

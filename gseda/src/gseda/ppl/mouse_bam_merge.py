@@ -146,54 +146,36 @@ def dump_merged_called_bam(
 
 def main():
     called_bams = [
-        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_called.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_called.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_called.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_called.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_called.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_called.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_called.bam",
-        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_called.bam",
+        "/data/ccs_data/wga/20250605_250302Y0004_Run0001_called.bam",
+        "/data/ccs_data/wga/20250606_250302Y0002_Run0004_called.bam",
     ]
 
     sbr_bams = [
-        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_adapter.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_adapter.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_adapter.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_adapter.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_adapter.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_adapter.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_adapter.bam",
-        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_adapter.bam",
+        "/data/ccs_data/wga/20250605_250302Y0004_Run0001_adapter.bam",
+        "/data/ccs_data/wga/20250606_250302Y0002_Run0004_adapter.bam",
     ]
 
     smc_bams = [
-        "/data/ccs_data/little-mouse/20250514_240601Y0005_Run0003_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0002_Run0004_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250514_250302Y0003_Run0003_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0001_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250515_240601Y0005_Run0002_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0001_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250516_240601Y0005_Run0002_adapter.smc_all_reads.bam",
-        "/data/ccs_data/little-mouse/20250516_250302Y0003_Run0002_adapter.smc_all_reads.bam",
+        "/data/ccs_data/wga/20250605_250302Y0004_Run0001.smc_all_reads.bam",
+        "/data/ccs_data/wga/20250606_250302Y0002_Run0004.smc_all_reads.bam",
     ]
-    old2new = merge_smc_bams(smc_bams, "/data/ccs_data/little-mouse/mouse-smc.bam")
+    old2new = merge_smc_bams(smc_bams, "/data/ccs_data/wga/wga-smc.bam")
 
     print(list(old2new)[:10])
 
     sbr_new_bams = []
-    for called_bam_path, sbr_bam_path in zip(called_bams, sbr_bams):
-        sbr_p = pathlib.Path(sbr_bam_path)
-        new_sbr_bam_path = "{}/{}.new.bam".format(sbr_p.parent, sbr_p.stem)
-        reset_dw_ar_of_adapter_bam(called_bam_path, sbr_bam_path, new_sbr_bam_path)
-        sbr_new_bams.append(new_sbr_bam_path)
+    # for called_bam_path, sbr_bam_path in zip(called_bams, sbr_bams):
+    #     sbr_p = pathlib.Path(sbr_bam_path)
+    #     new_sbr_bam_path = "{}/{}.new.bam".format(sbr_p.parent, sbr_p.stem)
+    #     reset_dw_ar_of_adapter_bam(called_bam_path, sbr_bam_path, new_sbr_bam_path)
+    #     sbr_new_bams.append(new_sbr_bam_path)
 
-    dump_merged_adapter_bam(
-        sbr_new_bams, old2new, "/data/ccs_data/little-mouse/mouse-adapter.bam"
-    )
+    # dump_merged_adapter_bam(
+    #     sbr_new_bams, old2new, "/data/ccs_data/wga//wga-adapter.bam"
+    # )
 
     dump_merged_called_bam(
-        called_bams, old2new, "/data/ccs_data/little-mouse/mouse-called.bam"
+        called_bams, old2new, "/data/ccs_data/wga/wga-called.bam"
     )
 
 
