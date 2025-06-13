@@ -8,6 +8,12 @@ import argparse
 from multiprocessing import cpu_count
 import os
 import semver
+import env_prepare
+import sys
+
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+print(cur_dir)
+sys.path.append(cur_dir)
 
 
 logging.basicConfig(
@@ -496,8 +502,9 @@ def main(
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
-
-    mm2_version_check()
+    env_prepare.check_and_install(
+        "gsmm2-aligned-metric", semver.Version.parse("0.24.0"), "cargo install mm2")
+    # mm2_version_check()
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
