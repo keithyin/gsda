@@ -62,7 +62,11 @@ def generate_metric_file(
             -t {ref_fasta} \
             --out {out_filename} \
             --kmer 11 \
-            --wins 1 """
+            --wins 1 \
+            -m 2 \
+            -M 5 \
+            -o 2,24 \
+            -e 1,0"""
     if short_aln:
         cmd += " --short-aln"
 
