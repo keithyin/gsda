@@ -15,6 +15,7 @@ cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
 
+import env_prepare
 
 logging.basicConfig(
     level=logging.INFO,
