@@ -57,7 +57,7 @@ def generate_metric_file(
         return out_filename
 
     threads = cpu_count() if threads is None else threads
-    cmd = f"""gsmm2-hp-tr-metric --threads {threads} \
+    cmd = f"""gsmm2-metric --mode hp-tr --threads {threads} \
             -q {bam_file} \
             -t {ref_fasta} \
             --out {out_filename} \
@@ -142,7 +142,7 @@ def main(
     """
 
     env_prepare.check_and_install(
-        "gsmm2-hp-tr-metric", semver.Version.parse("0.25.4"), "cargo install mm2")
+        "gsmm2-metric", semver.Version.parse("0.1.0"), "cargo install gsmm2-metric")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -191,35 +191,6 @@ def test_stat():
     with open(aggr_metric_filename, encoding="utf8", mode="w") as file_h:
         file_h.write(f"name\tvalue\n")
         stats(fact_bam_basic, file_h=file_h)
-
-
-def sv_identification(ori_align_info: str):
-    """structural variant identification
-    rule:
-        small ovlp between aligned segments
-        different segments align to the different reference regions
-    """
-    if ";" not in ori_align_info:
-        return False
-
-    align_regions = ori_align_info.split(";")
-    align_regions = [align_region[:-1] for align_region in align_regions]
-    # align_regions = [align_region.split(":")]
-    pass
-
-
-def adapter_remover_error_identification():
-    """adapter remover error identification
-
-    rule:
-        small ovlp between aligned segments
-        different segments align to the similar reference region
-
-        if gap < 10: treat as adapter_missing
-        if gap > 10: treat as adapter_lowq
-
-    """
-    pass
 
 
 def main_cli():
