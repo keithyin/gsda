@@ -11,8 +11,7 @@ logging.basicConfig(
 
 def install_bin(cmd):
     logging.info(f"run command: {cmd}")
-    inner_status, inner_output = subprocess.getstatusoutput(cmd)
-    assert inner_status == 0, f"run command error. {cmd}, error msg:{inner_output}"
+    subprocess.check_call(cmd, shell=True)
 
 
 def check_version(bin_name: str, expected_version):
