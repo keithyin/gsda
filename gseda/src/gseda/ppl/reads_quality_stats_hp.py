@@ -1,3 +1,4 @@
+import env_prepare
 import subprocess
 import pathlib
 import os
@@ -14,7 +15,6 @@ cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
 
-import env_prepare
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,12 +57,12 @@ def generate_metric_file(
         return out_filename
 
     threads = cpu_count() if threads is None else threads
-    cmd = f"""gsmm2-metric --mode hp-tr-v2 --threads {threads} \
+    cmd = f"""gsmm2-metric --mode hp-v2 --threads {threads} \
             -q {bam_file} \
             -t {ref_fasta} \
             --out {out_filename} \
             --kmer 11 \
-            --wins 1 """
+            --wins 1"""
     if short_aln:
         cmd += " --short-aln"
 
@@ -81,26 +81,20 @@ def stats(metric_filename, filename):
     df = df.filter(pl.col("rname") != "")
 
     df = (df
-          .group_by(["motif"])
+          .group_by(["motif", "called", "tag"])
           .agg([
-              pl.col("eq").sum(),
-              pl.col("diff").sum(),
-              pl.col("ins").sum(),
-              pl.col("del").sum()])
+              pl.col("num").sum()])
           .with_columns([
-              (pl.col("eq") + pl.col("diff") + pl.col("ins") +
-               pl.col("del")).alias("aligned_span")
-          ])
-          .with_columns([
-              (pl.col("eq") / pl.col("aligned_span")).alias("eq_rate"),
-              (pl.col("diff") / pl.col("aligned_span")).alias("diff_rate"),
-              (pl.col("ins") / pl.col("aligned_span")).alias("ins_rate"),
-              (pl.col("del") / pl.col("aligned_span")).alias("del_rate"),
+              (pl.col("num") /
+               pl.col("num").sum().over(["motif", "tag"])).alias("ratio")
           ])
           .with_columns([
               pl.col("motif").str.extract(pattern, 1).alias("key_text"),
               pl.col("motif").str.extract(pattern, 2).cast(pl.Int64).alias("key_cnt")])
-          .sort([pl.col("key_text").str.len_chars(), pl.col("key_text"), pl.col("key_cnt")], descending=[False, False, False])
+          .sort(
+              [pl.col("key_text").str.len_chars(), pl.col("key_text"),
+               pl.col("key_cnt"), pl.col("tag"), pl.col("called")],
+              descending=[False, False, False, False, False])
           .drop(["key_text", "key_cnt"])
           )
     print(df)
@@ -162,7 +156,7 @@ def main(
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    fact_metric_filename = f"{outdir}/{stem}.gsmm2-hp-tr-fact.csv"
+    fact_metric_filename = f"{outdir}/{stem}.gsmm2-hp-fact.csv"
     fact_metric_filename = generate_metric_file(
         bam_file,
         ref_fa,
@@ -171,7 +165,7 @@ def main(
         threads=threads,
         short_aln=short_aln
     )
-    aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-tr-aggr.csv"
+    aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
