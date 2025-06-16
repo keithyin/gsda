@@ -142,7 +142,7 @@ def main(
     """
 
     env_prepare.check_and_install(
-        "gsmm2-metric", semver.Version.parse("0.4.0"), "cargo install gsmm2-metric")
+        "gsmm2-metric", semver.Version.parse("0.4.1"), "cargo install gsmm2-metric")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
