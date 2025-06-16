@@ -1,3 +1,4 @@
+import env_prepare
 import subprocess
 import pathlib
 import os
@@ -14,7 +15,6 @@ cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
 
-import env_prepare
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +44,8 @@ def generate_metric_file(
     no_supp=False,
     no_mar=False,
     short_aln=False,
+    np_range=None,
+    rq_range=None,
 ) -> str:
 
     if no_supp and no_mar:
@@ -65,6 +67,11 @@ def generate_metric_file(
             --wins 1 """
     if short_aln:
         cmd += " --short-aln"
+
+    if np_range is not None:
+        cmd += f" --np-range {np_range}"
+    if rq_range is not None:
+        cmd += f" --rq-range {rq_range}"
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
@@ -116,6 +123,8 @@ def main(
     short_aln=False,
     outdir=None,
     copy_bam_file=False,
+    np_range=None,
+    rq_range=None,
 ) -> str:
     """
         step1: generate detailed metric info
@@ -169,7 +178,9 @@ def main(
         out_filename=fact_metric_filename,
         force=force,
         threads=threads,
-        short_aln=short_aln
+        short_aln=short_aln,
+        np_range=np_range,
+        rq_range=rq_range,
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-tr-aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
@@ -199,6 +210,8 @@ def main_cli():
     parser = argparse.ArgumentParser(prog="parser")
     parser.add_argument("--bams", nargs="+", type=str, required=True)
     parser.add_argument("--refs", nargs="+", type=str, required=True)
+    parser.add_argument("--np-range", type=str, default=None, dest="np_range")
+    parser.add_argument("--rq-range", type=str, default=None, dest="rq_range")
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
@@ -218,7 +231,7 @@ def main_cli():
 
     for bam, ref in zip(bam_files, refs):
         main(bam_file=bam, ref_fa=ref, force=args.f,
-             short_aln=args.short_aln == 1)
+             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
 
 
 if __name__ == "__main__":
