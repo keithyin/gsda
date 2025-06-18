@@ -1,6 +1,7 @@
 import semver
 import subprocess
 import logging
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,3 +36,10 @@ def check_and_install(bin_name: str, expected_version: semver.Version, install_c
     install_bin(install_cmd)
     assert check_version(
         bin_name, expected_version), f"check {bin_name} version failed"
+
+
+def polars_env_init():
+    os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
+    os.environ["POLARS_FMT_MAX_COLS"] = "100"
+    os.environ["POLARS_FMT_MAX_ROWS"] = "300"
+    os.environ["POLARS_FMT_STR_LEN"] = "100"

@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.13.2"
+version = "1.14.0"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -21,7 +21,8 @@ dependencies = [
     "semver==3.0.2",
     "pyarrow==17.0.0",
     "mappy",
-    "numba==0.58.0"
+    "numba==0.58.0",
+    "numpy==1.24.4"
 ]
 
 [project.urls]
@@ -34,7 +35,7 @@ reads-quality-stats-v3-cli = "gseda.ppl.reads_quality_stats_v3:main_cli"
 reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
 reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
 reads-quality-hp-cli = "gseda.ppl.reads_quality_stats_hp:main_cli"
-
+sequencing-report-cli = "gseda.ppl.sequencing_report:main_cli"
 
 
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
