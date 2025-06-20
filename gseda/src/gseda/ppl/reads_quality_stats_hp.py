@@ -26,7 +26,7 @@ logging.basicConfig(
 def polars_env_init():
     os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
-    os.environ["POLARS_FMT_MAX_ROWS"] = "300"
+    os.environ["POLARS_FMT_MAX_ROWS"] = "10000"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
 
 
@@ -44,8 +44,8 @@ def generate_metric_file(
     no_supp=False,
     no_mar=False,
     short_aln=False,
-    np_range = None,
-    rq_range = None
+    np_range=None,
+    rq_range=None
 ) -> str:
 
     if no_supp and no_mar:
@@ -84,24 +84,35 @@ def stats(metric_filename, filename):
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
     )
-    df = df.filter(pl.col("rname") != "")
+    df = (
+        df.filter(pl.col("rname") != "")
+        .with_columns([
+            pl.col("motif").str.extract(pattern, 1).alias("true_base"),
+            pl.col("motif").str.extract(pattern, 2).cast(pl.Int64).alias("true_cnt")]
+        ).with_columns([
+            pl.min_horizontal(pl.col("called"), pl.col(
+                "true_cnt") + pl.lit(5)).alias("called")
+        ]).with_columns([
+            pl.max_horizontal(pl.col("called"), pl.col(
+                "true_cnt") - pl.lit(5)).alias("called")
+        ])
+    )
 
     df = (df
-          .group_by(["motif", "called", "tag"])
+          .group_by(["motif", "true_base", "true_cnt", "called", "tag"])
           .agg([
               pl.col("num").sum()])
           .with_columns([
               (pl.col("num") /
-               pl.col("num").sum().over(["motif", "tag"])).alias("ratio")
+               pl.col("num").sum().over(["motif", "tag"])).alias("ratio_within_motif_tag"),
+
+              (pl.col("num") /
+               pl.col("num").sum().over(["motif"])).alias("ratio_within_motif"),
           ])
-          .with_columns([
-              pl.col("motif").str.extract(pattern, 1).alias("key_text"),
-              pl.col("motif").str.extract(pattern, 2).cast(pl.Int64).alias("key_cnt")])
           .sort(
-              [pl.col("key_text").str.len_chars(), pl.col("key_text"),
-               pl.col("key_cnt"), pl.col("tag"), pl.col("called")],
+              [pl.col("true_base").str.len_chars(), pl.col("true_base"),
+               pl.col("true_cnt"), pl.col("tag"), pl.col("called")],
               descending=[False, False, False, False, False])
-          .drop(["key_text", "key_cnt"])
           )
     print(df)
 
@@ -117,7 +128,9 @@ def main(
     outdir=None,
     copy_bam_file=False,
     np_range=None,
-    rq_range = None,
+    rq_range=None,
+
+
 ) -> str:
     """
         step1: generate detailed metric info

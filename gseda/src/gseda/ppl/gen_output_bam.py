@@ -50,10 +50,12 @@ def filter_called_bam(smc_bam, called_bam, output_bam):
 
     with pysam.AlignmentFile(filename=called_bam, mode="rb", check_sq=False, threads=os.cpu_count() // 2) as in_bam:
         with pysam.AlignmentFile(filename=output_bam, mode="wb", check_sq=False, threads=os.cpu_count() // 2, header=in_bam.header) as out_bam:
+            cnt = 0
             for read in tqdm(in_bam.fetch(until_eof=True), desc=f"dumping {called_bam} to {output_bam}"):
                 if read.query_name in smc_read_names:
+                    cnt += 1 
                     out_bam.write(read)
-
+            logging.info(f"dump {cnt} records")
 
 def main(smc_bam: str, called_bam: str, output_bam: str):
     filter_called_bam(smc_bam=smc_bam, called_bam=called_bam,
