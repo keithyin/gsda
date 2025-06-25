@@ -170,6 +170,9 @@ def stats(metric_filename, filename, basic_metric=None):
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
     )
+    
+    print(df.select([(pl.col("covlen").sum() / pl.col("qlen").sum()).alias("GlobalQueryCoverage")]))
+    
     metric_aligned_not_aligned = analysis_aligned(df=df)
     df = df.filter(pl.col("rname") != "")
     # print(df.head(2))
