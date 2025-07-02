@@ -41,7 +41,7 @@ def main():
 
     ## 2. gsetl extract fact table
     gsetl_outdir = f"{oup_bam}-gsetl"
-    cmd_str = f"gsetl -f --outdir {gsetl_outdir} aligned-bam --bam {oup_bam} --ref-file {args.t}"
+    cmd_str = f"gsetl -f --outdir {gsetl_outdir} aligned-bam --bam {oup_bam} --ref-file {args.t} --factPolyInfo 0"
     subprocess.check_call(cmd_str, shell=True)
 
     ## 3. do analysis

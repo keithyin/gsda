@@ -102,7 +102,7 @@ def process_and_plot(data_list: List[Tuple[str, pl.DataFrame]], output_dir: str 
 
 
 def main():
-    files = files = list(glob.glob("/data/ccs_data/sa/*called-metric/*gsmm2-hp-aggr.csv"))
+    files = files = list(glob.glob("/data/metric-data/*smc_all_reads-metric/*gsmm2-hp-aggr.csv"))
     file_and_datas = read_datas(files)
     file_and_datas = [(v[0], filter_data(v[1])) for v in file_and_datas]
     file_and_datas = sorted(file_and_datas, key=lambda x: x[0])

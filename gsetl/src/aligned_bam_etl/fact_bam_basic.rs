@@ -125,7 +125,7 @@ pub fn fact_bam_basic(
 
         for record in bam_h.records() {
             pb.inc(1);
-            let record = record.unwrap();
+            let record = record.expect("fact_bam_basic. read record error");
 
             if !audit(&record, args) {
                 continue;

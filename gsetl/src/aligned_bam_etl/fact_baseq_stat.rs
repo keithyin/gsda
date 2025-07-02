@@ -6,7 +6,9 @@ use std::{
 };
 
 use gskits::{
-    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
+    gsbam::bam_record_ext::BamRecordExt,
+    pbar,
 };
 use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
@@ -58,7 +60,7 @@ pub fn fact_baseq_stat(
     hc_regions: Option<&BedInfo>,
     hc_variants: Option<&VcfInfo>,
     fasta_data: &FastaData,
-    pbar: ProgressBar
+    pbar: ProgressBar,
 ) {
     let bam_file = &args.bam;
 
@@ -88,7 +90,8 @@ pub fn fact_baseq_stat(
 
         for record in bam_h.records() {
             pb.inc(1);
-            let record = record.unwrap();
+            let record = record.expect("fact_baseq_stat. read record error");
+
             if !audit(&record, args) {
                 continue;
             }
@@ -153,14 +156,17 @@ pub fn fact_baseq_stat(
                     stat.del += 1;
                     continue;
                 }
-                if rpos.is_none() { // ins 需要加到 下一个 baseq 上
+                if rpos.is_none() {
+                    // ins 需要加到 下一个 baseq 上
                     let next_qpos = qpos_cursor.unwrap() + 1;
                     if next_qpos >= query_end {
                         continue;
                     }
 
                     let next_baseq = qual[next_qpos as usize];
-                    let stat = baseq2stat.entry(next_baseq).or_insert(BaseQStat::new(next_baseq));
+                    let stat = baseq2stat
+                        .entry(next_baseq)
+                        .or_insert(BaseQStat::new(next_baseq));
                     stat.ins += 1;
                     continue;
                 }
@@ -176,7 +182,6 @@ pub fn fact_baseq_stat(
                         stat.diff += 1;
                     }
                 }
-                
             }
         }
         let mut baseq2stat = baseq2stat.into_iter().collect::<Vec<_>>();
