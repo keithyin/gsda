@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.14.1"
+version = "1.15.0"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -36,6 +36,7 @@ reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
 reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
 reads-quality-hp-cli = "gseda.ppl.reads_quality_stats_hp:main_cli"
 sequencing-report-cli = "gseda.ppl.sequencing_report:main_cli"
+sequencing-report-overall-cli = "gseda.ppl.sequencing_report_overall:main_cli"
 
 
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"

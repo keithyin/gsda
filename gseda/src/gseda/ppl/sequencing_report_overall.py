@@ -1,3 +1,4 @@
+import gen_output_bam
 import env_prepare
 import subprocess
 import pathlib
@@ -41,7 +42,7 @@ def extract_filename(filepath: str) -> str:
     return p.stem
 
 
-def bam_basic_ana(bam_file: str):
+def bam_basic_ana(bam_file: str, type: str):
     num_passes = []
     rq_values = []
     read_lengths = []
@@ -68,30 +69,34 @@ def bam_basic_ana(bam_file: str):
     })
 
     basic_metric = df.select([
-        pl.len().cast(pl.Float64).alias("reads_num"),
-        pl.col("read_len").sum().cast(pl.Float64).alias("tot_bases"),
-        pl.lit(n50).cast(pl.Float64).alias("n50"),
+        pl.len().cast(pl.Float64).alias(f"ReadsNum({type})"),
+        pl.col("read_len").sum().cast(pl.Float64).alias(f"TotBases({type})"),
+        pl.lit(n50).cast(pl.Float64).alias(f"N50({type})"),
 
-        pl.col("read_len").mean().cast(pl.Float64).alias("read_len_avg"),
-        pl.col("read_len").min().cast(pl.Float64).alias("read_len_min"),
-        pl.quantile("read_len", 0.25).cast(pl.Float64).alias("read_len_p25"),
-        pl.quantile("read_len", 0.5).cast(pl.Float64).alias("read_len_p50"),
-        pl.quantile("read_len", 0.75).cast(pl.Float64).alias("read_len_p75"),
-        pl.col("read_len").max().cast(pl.Float64).alias("read_len_max"),
+        pl.col("read_len").mean().cast(
+            pl.Float64).alias(f"ReadLenAvg({type})"),
+        pl.col("read_len").min().cast(pl.Float64).alias(f"ReadLenMin({type})"),
+        pl.quantile("read_len", 0.25).cast(
+            pl.Float64).alias(f"ReadLenP25({type})"),
+        pl.quantile("read_len", 0.5).cast(
+            pl.Float64).alias(f"ReadLenP50({type})"),
+        pl.quantile("read_len", 0.75).cast(
+            pl.Float64).alias(f"ReadLenP75({type})"),
+        pl.col("read_len").max().cast(pl.Float64).alias(f"ReadLenMax({type})"),
 
         pl.col("rq").filter(pl.col("rq") >= pl.lit(8)
-                            ).count().cast(pl.Float64).alias("≥Q8"),
+                            ).count().cast(pl.Float64).alias(f"≥Q8({type})"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(10)
-                            ).count().cast(pl.Float64).alias("≥Q10"),
+                            ).count().cast(pl.Float64).alias(f"≥Q10({type})"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(15)
-                            ).count().cast(pl.Float64).alias("≥Q15"),
+                            ).count().cast(pl.Float64).alias(f"≥Q15({type})"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(20)
-                            ).count().cast(pl.Float64).alias("≥Q20"),
+                            ).count().cast(pl.Float64).alias(f"≥Q20({type})"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(30)
-                            ).count().cast(pl.Float64).alias("≥Q30"),
+                            ).count().cast(pl.Float64).alias(f"≥Q30({type})"),
 
         (pl.col("np").filter((pl.col("np") == pl.lit(4)).and_(pl.col("rq") >= pl.lit(20))).count(
-        ) / pl.col("np").filter(pl.col("np") == pl.lit(4)).count()).cast(pl.Float64).alias("4xQ20")
+        ) / pl.col("np").filter(pl.col("np") == pl.lit(4)).count()).cast(pl.Float64).alias(f"4xQ20({type})")
     ])
 
     basic_metric = basic_metric.transpose(
@@ -208,29 +213,17 @@ def align_stats(metric_filename, filename):
         include_header=True, header_name="name", column_names=["value"]
     )
 
-    df = df.with_columns(
-        [
-            ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-            .or_(
-                (pl.col("qOvlpRatio") < 0.01)
-                .and_(pl.col("rOvlpRatio") > 0.90)
-                .and_(pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32) < 20)
-            )
-            .alias("valid")
-        ]
-    )
-
-    df = df.with_columns(
-        [
-            pl.when(pl.col("valid"))
-            .then(pl.col("covlen"))
-            .otherwise(pl.col("primaryCovlen"))
-            .alias("miscCovlen")
-        ]
-    )
-
     df = df.with_columns(row_align_span())
     aggr_metrics = df.select(aggr_expressions())
+    aggr_metrics = aggr_metrics.select(
+        [
+            pl.col("alignedRatio"),
+            pl.col("queryCoverage3"),
+            pl.col("identity"),
+            pl.col("identity-p50"),
+        ]
+    )
+
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
@@ -327,7 +320,9 @@ def row_align_span():
 
 
 def main(
-    bam_file: str,
+    called_bam: str,
+    adatper_bam: str,
+    smc_bam: str,
     ref_fa: str,
     threads=None,
     force=False,
@@ -383,23 +378,27 @@ def main(
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    fact_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_fact.csv"
+    output_bam_path = f"{outdir}/{stem}.output.bam"
+    gen_output_bam.filter_called_bam(smc_bam, called_bam, output_bam_path)
+
+    fact_metric_filename = f"{outdir}/{stem}.output.gsmm2_aligned_metric_fact.csv"
     if not disable_align_stat:
         fact_metric_filename = generate_metric_file(
-            bam_file,
+            output_bam_path,
             ref_fa,
             out_filename=fact_metric_filename,
             force=force,
             threads=threads,
             short_aln=short_aln
         )
-    aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
+    aggr_metric_filename = f"{outdir}/{stem}.output.gsmm2_aligned_metric_aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
     all_metrics = []
     if not disable_basic_stat:
-        all_metrics.append(bam_basic_ana(bam_file=bam_file))
+        all_metrics.append(bam_basic_ana(bam_file=called_bam, type="called"))
+        all_metrics.append(bam_basic_ana(bam_file=smc_bam, type="smc"))
 
     if not disable_align_stat:
         all_metrics.append(
@@ -418,8 +417,14 @@ def main_cli():
     env_prepare.polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")
-    parser.add_argument("--bams", nargs="+", type=str, required=True)
-    parser.add_argument("--refs", nargs="+", type=str, default=[])
+    parser.add_argument("--called", type=str, required=True, help="called bam")
+    parser.add_argument("--adapter", type=str,
+                        required=True, help="adapter bam")
+    parser.add_argument("--smc", type=str, required=True, help="smc bam")
+
+    parser.add_argument("--refs", type=str, default=None,
+                        help="reference fasta")
+
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
 
@@ -437,24 +442,20 @@ def main_cli():
 
     args = parser.parse_args()
 
-    bam_files = args.bams
-    refs = args.refs
+    called_bam = args.called
+    adapter_bam = args.adapter
+    smc_bam = args.smc
 
-    if not args.disable_align_stat:
-        assert len(refs) > 0
-    else:
-        refs = [""]
-        
-    if len(refs) == 1:
-        refs = refs * len(bam_files)
+    ref = args.ref
 
-    assert len(bam_files) == len(refs)
-
-    for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f,
-             short_aln=args.short_aln == 1,
-             disable_basic_stat=args.disable_basic_stat,
-             disable_align_stat=args.disable_align_stat)
+    main(
+        called_bam=called_bam,
+        adatper_bam=adapter_bam,
+        smc_bam=smc_bam,
+        ref_fa=ref, force=args.f,
+        short_aln=args.short_aln == 1,
+        disable_basic_stat=args.disable_basic_stat,
+        disable_align_stat=args.disable_align_stat)
 
 
 if __name__ == "__main__":
