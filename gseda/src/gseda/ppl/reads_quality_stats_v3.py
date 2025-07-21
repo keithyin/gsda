@@ -11,6 +11,7 @@ import semver
 import threading
 import matplotlib.pyplot as plt
 import seaborn as sns
+from glob import glob
 
 # deprecated ...
 logging.basicConfig(
@@ -19,12 +20,13 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+
 def polars_env_init():
     os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
     os.environ["POLARS_FMT_MAX_ROWS"] = "300"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
-    
+
 
 def mm2_version_check():
     oup = subprocess.getoutput("gsmm2-aligned-metric -V")
@@ -95,7 +97,8 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     df = (
         df.select(
             [
-                pl.when(pl.col("rname").eq(pl.lit("")).or_(pl.col("rname").is_null()))
+                pl.when(pl.col("rname").eq(pl.lit("")).or_(
+                    pl.col("rname").is_null()))
                 .then(pl.lit("notAligned"))
                 .otherwise(pl.lit("aligned"))
                 .alias("name")
@@ -178,7 +181,8 @@ def analysis_segs2(
             ]
         )
         .with_columns(
-            [pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32).alias("gap")]
+            [pl.col("oriQGaps").str.split(",").list.get(
+                1).cast(pl.Int32).alias("gap")]
         )
         .with_columns([pl.col("gap").lt(pl.lit(20)).alias("gap<20")])
         .with_columns(
@@ -204,7 +208,8 @@ def analysis_segs2(
         .with_columns(
             [
                 pl.when(
-                    pl.col("tag").eq(pl.lit("badCase")).and_(pl.col("identity") < 0.85)
+                    pl.col("tag").eq(pl.lit("badCase")).and_(
+                        pl.col("identity") < 0.85)
                 )
                 .then(pl.lit("badCase-lowIdentity"))
                 .otherwise(pl.col("tag"))
@@ -382,13 +387,16 @@ def stats(metric_filename: str, filename: str):
     identity_min = 0.6
     identity_max = 1.0
     if df.shape[0] > 10000:
-        sampled_identity = df.select([pl.col("identity").clip(lower_bound=identity_min, upper_bound=identity_max)]).sample(n=10000, seed=2025).to_pandas()
-    else :
+        sampled_identity = df.select([pl.col("identity").clip(
+            lower_bound=identity_min, upper_bound=identity_max)]).sample(n=10000, seed=2025).to_pandas()
+    else:
         sampled_identity = df.to_pandas()
-        
-    identity_hist_filename = "{}.idenity_hist.png".format(filename.rsplit(".", maxsplit=1)[0])
-    
-    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity", ylabel="Count", title="SampledIdentityHist", xlim=(identity_min, identity_max))
+
+    identity_hist_filename = "{}.idenity_hist.png".format(
+        filename.rsplit(".", maxsplit=1)[0])
+
+    plot_histgram(sampled_identity["identity"], fname=identity_hist_filename, xlabel="Identity",
+                  ylabel="Count", title="SampledIdentityHist", xlim=(identity_min, identity_max))
 
 
 def aggr_expressions():
@@ -406,44 +414,52 @@ def aggr_expressions():
         pl.col("identity").median().alias("identity-p50"),
         pl.quantile("identity", 0.75).alias("identity-p75"),
         (pl.col("misMatch").sum() / pl.col("alignSpan").sum()).alias("mmRate"),
-        (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),        
+        (pl.col("ins").sum() / pl.col("alignSpan").sum()).alias("NHInsRate"),
         (pl.col("homoIns").sum() / pl.col("alignSpan").sum()).alias("HomoInsRate"),
-        ((pl.col("ins").sum() + pl.col("homoIns").sum())/ pl.col("alignSpan").sum()).alias("insRate"),
-        
+        ((pl.col("ins").sum() + pl.col("homoIns").sum()) /
+         pl.col("alignSpan").sum()).alias("insRate"),
+
         (pl.col("del").sum() / pl.col("alignSpan").sum()).alias("NHDelRate"),
         (pl.col("homoDel").sum() / pl.col("alignSpan").sum()).alias("HomoDelRate"),
-        ((pl.col("homoDel").sum() + pl.col("del").sum()) / pl.col("alignSpan").sum()).alias("delRate"),
+        ((pl.col("homoDel").sum() + pl.col("del").sum()) /
+         pl.col("alignSpan").sum()).alias("delRate"),
     ]
 
     for base in "ACGT":
         exprs.extend(
             [
                 (
-                    pl.col(f"match-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"match-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"identity-{base}"),
                 (
-                    pl.col(f"misMatch-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"misMatch-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"mmRate-{base}"),
                 (pl.col(f"ins-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
                     f"NHInsRate-{base}"
                 ),
                 (
-                    pl.col(f"homoIns-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"homoIns-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoInsRate-{base}"),
-                
+
                 (
-                    (pl.col(f"homoIns-{base}").sum() + pl.col(f"ins-{base}").sum()) / pl.col(f"alignSpan-{base}").sum()
+                    (pl.col(f"homoIns-{base}").sum() + pl.col(f"ins-{base}").sum()
+                     ) / pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"insRate-{base}"),
-                
+
                 (pl.col(f"del-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
                     f"NHDelRate-{base}"
                 ),
                 (
-                    pl.col(f"homoDel-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"homoDel-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoDelRate-{base}"),
-                
+
                 (
-                    (pl.col(f"homoDel-{base}").sum()  + pl.col(f"del-{base}").sum()) / pl.col(f"alignSpan-{base}").sum()
+                    (pl.col(f"homoDel-{base}").sum() + pl.col(f"del-{base}").sum()
+                     ) / pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"delRate-{base}"),
             ]
         )
@@ -480,113 +496,121 @@ def row_align_span():
 def aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool):
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
-        
+
     if os.path.exists(aggr_metric_filename):
         logging.warning(f"{aggr_metric_filename} will be override")
 
     # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
-    
+
 
 def generate_non_aligned_metric_fact_file(bam_file: str, out_filepath: str, out_dir: str, force: bool):
     if not force and os.path.exists(out_filepath):
         logging.info(f"{out_filepath} exists, use the existed file")
         return
-        
+
     cmd = f"gsetl --outdir {out_dir} non-aligned-bam --bam {bam_file} -o {out_filepath}"
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
-    
-    
+
+
 def non_aligned_metric_analysis(fact_metric_filename: str, aggr_metric_filename: str, force: bool, out_dir: str, stem: str):
     if os.path.exists(aggr_metric_filename) and not force:
         logging.warning(f"{aggr_metric_filename} will be override")
-        
+
     df = pl.read_csv(
-        fact_metric_filename, separator="\t", 
+        fact_metric_filename, separator="\t",
         infer_schema_length=3000,
         schema_overrides={
             "oe": pl.Float32
         })
-    
+
     df = df.with_columns([
-        (pl.col("dw_sum")* pl.lit(2)).alias("dw_sum"),
-        (pl.col("ar_sum")* pl.lit(2)).alias("ar_sum"),
-        ])
-    
+        (pl.col("dw_sum") * pl.lit(2)).alias("dw_sum"),
+        (pl.col("ar_sum") * pl.lit(2)).alias("ar_sum"),
+    ])
+
     whole_aggr = df.select([
         (pl.col("dw_sum").sum() / pl.col("base_cnt").sum()).alias("dw-mean"),
         (pl.col("ar_sum").sum() / pl.col("base_cnt").sum()).alias("ar-mean"),
         pl.col("cq").mean().alias("cq-mean"),
-        ((pl.col("base_cnt") * pl.col("cr_mean")).sum() / pl.col("base_cnt").sum()).alias("cr-mean"),
+        ((pl.col("base_cnt") * pl.col("cr_mean")).sum() /
+         pl.col("base_cnt").sum()).alias("cr-mean"),
         pl.col("oe").median().alias("oe-median"),
-        (pl.col("base_cnt").sum() / ((pl.col("dw_sum").sum() + pl.col("ar_sum").sum()) * pl.lit(0.001))).alias("speed")
-        ])
-    
+        (pl.col("base_cnt").sum() / ((pl.col("dw_sum").sum() +
+         pl.col("ar_sum").sum()) * pl.lit(0.001))).alias("speed")
+    ])
+
     base_level_aggr = df.group_by(["base"]).agg([
         (pl.col("dw_sum").sum() / pl.col("base_cnt").sum()).alias("dw-mean"),
         (pl.col("ar_sum").sum() / pl.col("base_cnt").sum()).alias("ar-mean")
     ])
-    
+
     whole_aggr = whole_aggr.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
-    
+
     metrics = [whole_aggr]
-    
+
     for base in ["A", "C", "G", "T"]:
         tmp = base_level_aggr.filter([pl.col("base") == pl.lit(base)])\
-                .select([pl.col("dw-mean").alias(f"dw-mean-{base}"), pl.col("ar-mean").alias(f"ar-mean-{base}")])
+            .select([pl.col("dw-mean").alias(f"dw-mean-{base}"), pl.col("ar-mean").alias(f"ar-mean-{base}")])
         metrics.append(tmp.transpose(
             include_header=True, header_name="name", column_names=["value"]))
-    
+
     metrics = pl.concat(metrics)
 
     print(metrics)
 
-    metrics.write_csv(aggr_metric_filename, include_header=True, separator="\t")
-    
+    metrics.write_csv(aggr_metric_filename,
+                      include_header=True, separator="\t")
+
     # TODO draw plot
     read_lengths = df.group_by(["qname"])\
-            .agg([pl.col("base_cnt").sum()])\
-            .select([pl.col("base_cnt")])
+        .agg([pl.col("base_cnt").sum()])\
+        .select([pl.col("base_cnt")])
     if read_lengths.shape[0] > 10000:
-        read_lengths = read_lengths.sample(n=10000, seed=2025).to_pandas()["base_cnt"]
+        read_lengths = read_lengths.sample(
+            n=10000, seed=2025).to_pandas()["base_cnt"]
     else:
         read_lengths = read_lengths.to_pandas()["base_cnt"]
-            
+
     read_length_hist_fname = f"{out_dir}/{stem}.readlength_hist.png"
-    plot_histgram(read_lengths, read_length_hist_fname, xlabel="ReadLength", ylabel="Count", title="SampledReadLengthHist")
-    
+    plot_histgram(read_lengths, read_length_hist_fname,
+                  xlabel="ReadLength", ylabel="Count", title="SampledReadLengthHist")
+
     dw_hist_fname = f"{out_dir}/{stem}.dw_hist.png"
     dw_min = 0
     dw_max = 200
     dw = df.group_by(["qname"])\
-            .agg([pl.col("base_cnt").sum(), pl.col("dw_sum").sum()])\
-            .select([(pl.col("dw_sum") / pl.col("base_cnt")).alias("dw")])\
-            .select([pl.col("dw").clip(lower_bound=dw_min, upper_bound=dw_max)])
+        .agg([pl.col("base_cnt").sum(), pl.col("dw_sum").sum()])\
+        .select([(pl.col("dw_sum") / pl.col("base_cnt")).alias("dw")])\
+        .select([pl.col("dw").clip(lower_bound=dw_min, upper_bound=dw_max)])
     if dw.shape[0] > 10000:
         dw = dw.sample(n=10000, seed=2025).to_pandas()["dw"]
     else:
         dw = dw.to_pandas()["dw"]
-    plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count", title="SampledDwellTimeHist", xlim=(dw_min, dw_max))
-    
+    plot_histgram(dw, dw_hist_fname, xlabel="DwellTime", ylabel="Count",
+                  title="SampledDwellTimeHist", xlim=(dw_min, dw_max))
+
     ar_min = 0
     ar_max = 1000
     ar = df.group_by(["qname"])\
-            .agg([pl.col("base_cnt").sum(), pl.col("ar_sum").sum()])\
-            .select([(pl.col("ar_sum") / pl.col("base_cnt")).alias("ar")])\
-            .select([ pl.col("ar").clip(lower_bound=ar_min, upper_bound=ar_max)])
+        .agg([pl.col("base_cnt").sum(), pl.col("ar_sum").sum()])\
+        .select([(pl.col("ar_sum") / pl.col("base_cnt")).alias("ar")])\
+        .select([pl.col("ar").clip(lower_bound=ar_min, upper_bound=ar_max)])
     if ar.shape[0] > 10000:
         ar = ar.sample(n=10000, seed=2025).to_pandas()["ar"]
     else:
         ar = ar.to_pandas()["ar"]
-        
+
     ar_hist_fname = f"{out_dir}/{stem}.ar_hist.png"
-    plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count", title="SampledArrivalTimeHist", xlim=(ar_min, ar_max))
-    
+    plot_histgram(ar, ar_hist_fname, xlabel="ArrivalTime", ylabel="Count",
+                  title="SampledArrivalTimeHist", xlim=(ar_min, ar_max))
+
     pass
-        
+
+
 def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=100):
     plt.figure(figsize=(8, 6))
 
@@ -602,6 +626,7 @@ def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=100):
 
     # 保存图片到文件
     plt.savefig(fname, dpi=300, bbox_inches='tight')
+
 
 def main(
     bam_file: str,
@@ -660,7 +685,7 @@ def main(
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
     no_aligned_fact_filename = f"{outdir}/{stem}.non_aligned_fact.csv"
     no_aligned_aggr_filename = f"{outdir}/{stem}.non_aligned_aggr.csv"
-    
+
     """
     fact_metric_filename = generate_metric_file(
         bam_file,
@@ -670,22 +695,27 @@ def main(
         threads=threads,
     )
     """
-    
+
     processes = []
-    aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(bam_file, ref_fa, fact_metric_filename, force, threads))
-    aligned_fact_thread.start()
-    processes.append(aligned_fact_thread)
-    
-    non_aligned_fact_thread = threading.Thread(target=generate_non_aligned_metric_fact_file, args=(bam_file, no_aligned_fact_filename, outdir, force))
+    if ref_fa != "":
+        aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(
+            bam_file, ref_fa, fact_metric_filename, force, threads))
+        aligned_fact_thread.start()
+        processes.append(aligned_fact_thread)
+
+    non_aligned_fact_thread = threading.Thread(target=generate_non_aligned_metric_fact_file, args=(
+        bam_file, no_aligned_fact_filename, outdir, force))
     non_aligned_fact_thread.start()
     processes.append(non_aligned_fact_thread)
-    
+
     for p in processes:
         p.join()
-    
-    aligned_metric_analysis(fact_metric_filename, aggr_metric_filename, force=force)
-    non_aligned_metric_analysis(no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
-    
+    if ref_fa != "":
+        aligned_metric_analysis(fact_metric_filename,
+                                aggr_metric_filename, force=force)
+    non_aligned_metric_analysis(
+        no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
+
     return (aggr_metric_filename, fact_metric_filename, no_aligned_fact_filename)
 
 
@@ -698,15 +728,28 @@ def test_stat():
         stats(fact_bam_basic, file_h=file_h)
 
 
+def expand_bam_files(bam_files):
+    final_bam_files = []
+    for bam_file in bam_files:
+        if "*" in bam_file:
+            final_bam_files.extend(glob(bam_file))
+        else:
+            final_bam_files.append(bam_file)
+    return final_bam_files
+
+
 def main_cli():
     """
     aligned bam analysis & origin bam analysis
+    在 metric 中使用
     """
     polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")
-    parser.add_argument("--bams", nargs="+", type=str, required=True)
-    parser.add_argument("--refs", nargs="+", type=str, required=True)
+    parser.add_argument("--bams", nargs="+", type=str,
+                        required=True, help="wildcard '*' is supported")
+    parser.add_argument("--refs", nargs="+", type=str,
+                        help="if not provided. the alignment related metric will not output")
     parser.add_argument(
         "-f",
         action="store_true",
@@ -716,7 +759,13 @@ def main_cli():
     args = parser.parse_args()
 
     bam_files = args.bams
+    bam_files = expand_bam_files(bam_files)
+
     refs = args.refs
+
+    if refs is None or len(refs) == 0:
+        refs = [""] * len(bam_files)
+
     if len(refs) == 1:
         refs = refs * len(bam_files)
 
