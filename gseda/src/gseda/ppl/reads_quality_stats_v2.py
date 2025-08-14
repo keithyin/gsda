@@ -1,3 +1,4 @@
+import env_prepare
 import subprocess
 import pathlib
 import os
@@ -13,8 +14,6 @@ import sys
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
-
-import env_prepare
 
 
 logging.basicConfig(
@@ -90,7 +89,8 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     df = (
         df.select(
             [
-                pl.when(pl.col("rname").eq(pl.lit("")).or_(pl.col("rname").is_null()))
+                pl.when(pl.col("rname").eq(pl.lit("")).or_(
+                    pl.col("rname").is_null()))
                 .then(pl.lit("notAligned"))
                 .otherwise(pl.lit("aligned"))
                 .alias("name")
@@ -173,7 +173,8 @@ def analysis_segs2(
             ]
         )
         .with_columns(
-            [pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32).alias("gap")]
+            [pl.col("oriQGaps").str.split(",").list.get(
+                1).cast(pl.Int32).alias("gap")]
         )
         .with_columns([pl.col("gap").lt(pl.lit(20)).alias("gap<20")])
         .with_columns(
@@ -199,7 +200,8 @@ def analysis_segs2(
         .with_columns(
             [
                 pl.when(
-                    pl.col("tag").eq(pl.lit("badCase")).and_(pl.col("identity") < 0.85)
+                    pl.col("tag").eq(pl.lit("badCase")).and_(
+                        pl.col("identity") < 0.85)
                 )
                 .then(pl.lit("badCase-lowIdentity"))
                 .otherwise(pl.col("tag"))
@@ -323,6 +325,16 @@ def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def stats(metric_filename, filename):
+    
+    # check if it is a empty metric file
+    with open(metric_filename, mode="r", encoding="utf8") as metric_inp:
+        idx = 0
+        for (idx, _) in enumerate(metric_inp):
+            pass
+        if idx < 2:
+            logging.warning(f"empty metric file: {metric_filename}")
+            return
+    
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
     )
@@ -394,6 +406,8 @@ def stats(metric_filename, filename):
 
     print(aggr_metrics)
 
+    if os.path.exists(filename):
+        os.remove(filename)
     aggr_metrics.write_csv(filename, include_header=True, separator="\t")
 
 
@@ -422,22 +436,26 @@ def aggr_expressions():
         exprs.extend(
             [
                 (
-                    pl.col(f"match-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"match-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"identity-{base}"),
                 (
-                    pl.col(f"misMatch-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"misMatch-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"mmRate-{base}"),
                 (pl.col(f"ins-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
                     f"NHInsRate-{base}"
                 ),
                 (
-                    pl.col(f"homoIns-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"homoIns-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoInsRate-{base}"),
                 (pl.col(f"del-{base}").sum() / pl.col(f"alignSpan-{base}").sum()).alias(
                     f"NHDelRate-{base}"
                 ),
                 (
-                    pl.col(f"homoDel-{base}").sum() / pl.col(f"alignSpan-{base}").sum()
+                    pl.col(f"homoDel-{base}").sum() /
+                    pl.col(f"alignSpan-{base}").sum()
                 ).alias(f"HomoDelRate-{base}"),
             ]
         )
@@ -532,11 +550,12 @@ def main(
         out_filename=fact_metric_filename,
         force=force,
         threads=threads,
-        short_aln= short_aln
+        short_aln=short_aln
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
+    
 
     # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
@@ -591,7 +610,8 @@ def main_cli():
     parser = argparse.ArgumentParser(prog="parser")
     parser.add_argument("--bams", nargs="+", type=str, required=True)
     parser.add_argument("--refs", nargs="+", type=str, required=True)
-    parser.add_argument("--short-aln", type=int, default=0, help="for query or target in [30, 200]", dest="short_aln")
+    parser.add_argument("--short-aln", type=int, default=0,
+                        help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
         "-f",
         action="store_true",
@@ -608,7 +628,8 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f, short_aln=args.short_aln == 1)
+        main(bam_file=bam, ref_fa=ref, force=args.f,
+             short_aln=args.short_aln == 1)
 
 
 if __name__ == "__main__":

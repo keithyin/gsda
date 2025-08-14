@@ -25,8 +25,18 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+def is_empty_bam(bam_file: str):
+    with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=os.cpu_count()) as in_bam:
+        idx = 0
+        for (idx, _) in enumerate(in_bam.fetch(until_eof=True)):
+            if idx > 1:
+                break
+        return idx < 1
+
 
 def compute_n50(lengths: np.ndarray):
+    if len(lengths) == 0:
+        return 0
     lengths[::-1].sort()
     total = lengths.sum()
     half_total = total / 2
@@ -360,7 +370,8 @@ def main(
 
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
-    """
+    """    
+    
     env_prepare.check_and_install(
         "gsmm2-aligned-metric", semver.Version.parse("0.24.0"), "cargo install mm2")
     # mm2_version_check()
@@ -397,6 +408,32 @@ def main(
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
+    default_aggr_data = """\
+name\tvalue
+reads_num\t0
+tot_bases\t0
+n50\t0
+read_len_avg\t0
+read_len_p50\t0
+≥Q8\t0
+≥Q10\t0
+≥Q15\t0
+≥Q20\t0
+≥Q30\t0
+4xQ20\t0
+alignedRatio\t0
+queryCoverage3\t0
+identity\t0
+identity-p50\t0
+identity≥0.83\t0
+identity≥0.90\t0
+"""
+    with open(aggr_metric_filename, mode="w", encoding="utf8") as out:
+        out.write(default_aggr_data)
+
+    if is_empty_bam(bam_file=bam_file):
+        return (aggr_metric_filename, fact_metric_filename)
+
     all_metrics = []
     if not disable_basic_stat:
         all_metrics.append(bam_basic_ana(bam_file=bam_file))
@@ -408,6 +445,9 @@ def main(
     if len(all_metrics) > 0:
         all_metrics = pl.concat(all_metrics)
         print(all_metrics)
+        if os.path.exists(aggr_metric_filename):
+            os.remove(aggr_metric_filename)
+            
         all_metrics.write_csv(aggr_metric_filename,
                               include_header=True, separator="\t")
 
