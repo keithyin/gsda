@@ -176,7 +176,7 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([metric_cnt, metric_ratio])
 
 
-def align_stats(metric_filename, filename):
+def align_stats(metric_filename):
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
     )

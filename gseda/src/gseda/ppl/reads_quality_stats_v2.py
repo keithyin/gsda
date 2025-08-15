@@ -57,6 +57,8 @@ def generate_metric_file(
     no_supp=False,
     no_mar=False,
     short_aln=False,
+    np_range=None,
+    rq_range=None
 ) -> str:
 
     if no_supp and no_mar:
@@ -76,6 +78,12 @@ def generate_metric_file(
             --out {out_filename} \
             --kmer 11 \
             --wins 1 """
+    if np_range is not None:
+        cmd += f" --np-range {np_range}"
+        
+    if rq_range is not None:
+        cmd += f" --rq-range {rq_range}"
+    
     if short_aln:
         cmd += " --short-aln"
 
@@ -497,6 +505,8 @@ def main(
     short_aln=False,
     outdir=None,
     copy_bam_file=False,
+    np_range=None,
+    rq_range=None
 ) -> str:
     """
         step1: generate detailed metric info
@@ -550,7 +560,9 @@ def main(
         out_filename=fact_metric_filename,
         force=force,
         threads=threads,
-        short_aln=short_aln
+        short_aln=short_aln,
+        np_range=np_range,
+        rq_range=rq_range
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
@@ -618,6 +630,9 @@ def main_cli():
         default=False,
         help="regenerate the metric file if exists",
     )
+    parser.add_argument("--np-range", type=str, default=None, dest="np_range", help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
+    parser.add_argument("--rq-range", type=str, default=None, dest="rq_range", help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
+    
     args = parser.parse_args()
 
     bam_files = args.bams
@@ -629,7 +644,7 @@ def main_cli():
 
     for bam, ref in zip(bam_files, refs):
         main(bam_file=bam, ref_fa=ref, force=args.f,
-             short_aln=args.short_aln == 1)
+             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
 
 
 if __name__ == "__main__":
