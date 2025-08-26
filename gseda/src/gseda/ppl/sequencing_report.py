@@ -176,6 +176,24 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([metric_cnt, metric_ratio])
 
 
+def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
+    metric = df.select(
+        [
+            pl.len().alias("cnt"),
+            pl.col("longIndel")
+            .filter(pl.col("longIndel").is_not_null())
+            .len()
+            .alias("longIndelCnt"),
+        ]
+    ).select(
+        [
+            pl.lit("longIndelRatio").alias("name"),
+            (pl.col("longIndelCnt") / pl.col("cnt")).alias("value"),
+        ]
+    )
+    return metric
+
+
 def align_stats(metric_filename):
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
@@ -185,28 +203,8 @@ def align_stats(metric_filename):
         [(pl.col("covlen").sum() / pl.col("qlen").sum()).alias("GlobalQueryCoverage")]))
 
     metric_aligned_not_aligned = analysis_aligned(df=df)
+    metric_long_indel = analisys_long_indel(df=df)
     df = df.filter(pl.col("rname") != "")
-    # print(df.head(2))
-    # print(
-    #     df.filter(pl.col("segs") > 1)
-    #     .head(2)
-    #     .select(
-    #         [
-    #             "qname",
-    #             "rname",
-    #             "qlen",
-    #             "segs",
-    #             "queryCoverage",
-    #             "identity",
-    #             "oriAlignInfo",
-    #             "oriQGaps",
-    #             "qOvlp",
-    #             "qOvlpRatio",
-    #             "rOvlpRatio",
-    #             "mergedQrySpan",
-    #         ]
-    #     )
-    # )
 
     identity_metric = df.select([
         (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.83)
@@ -244,12 +242,14 @@ def align_stats(metric_filename):
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
+    
 
     all_metrics = []
 
     all_metrics.append(metric_aligned_not_aligned)
     all_metrics.append(aggr_metrics)
     all_metrics.append(identity_metric)
+    all_metrics.append(metric_long_indel)
 
     all_metrics = pl.concat(
         all_metrics

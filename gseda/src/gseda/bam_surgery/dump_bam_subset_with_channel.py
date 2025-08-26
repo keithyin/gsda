@@ -42,7 +42,7 @@ def dump_subreads_by_channel_id(subreads_bam, channel_ids, output_bam):
 
 def main():
     """
-    主函数：从 smc.bam 中提取符合条件的 channel_id，并从 subreads.bam 中 dump 相应的记录
+    主函数：从 smc.bam 中提取符合条件的 channel_id 并从 subreads.bam 中 dump 相应的记录
     :param smc_bam: smc.bam 文件路径
     :param subreads_bam: subreads.bam 文件路径
     :param output_bam: 输出的新的 BAM 文件路径
