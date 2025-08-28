@@ -7,12 +7,12 @@ import shutil
 import argparse
 from multiprocessing import cpu_count
 import os
-import semver
 import sys
 import pysam
 from tqdm import tqdm
 import numpy as np
 import math
+import semver
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
@@ -65,7 +65,6 @@ def bam_basic_ana(bam_file: str):
                 rq = record.get_tag('cq')
             else:
                 rq = -10 * math.log10(1-record.get_tag("rq"))
-
             num_passes.append(num_pass)
             rq_values.append(rq)
             read_lengths.append(len(record.query_sequence))
@@ -242,7 +241,6 @@ def align_stats(metric_filename):
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
-    
 
     all_metrics = []
 
@@ -337,15 +335,15 @@ def row_align_span():
 
 
 def main(
-    bam_file: str,
-    ref_fa: str,
+    bam_file: str = None,
+    ref_fa: str = None,
     threads=None,
     force=False,
     short_aln=False,
     outdir=None,
     copy_bam_file=False,
     disable_basic_stat=False,
-    disable_align_stat=False
+    disable_align_stat = False
 ) -> str:
     """
         step1: generate detailed metric info
@@ -370,11 +368,11 @@ def main(
 
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
-    """    
-    
+    """
+
+
     env_prepare.check_and_install(
         "gsmm2-aligned-metric", semver.Version.parse("0.24.0"), "cargo install mm2")
-    # mm2_version_check()
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -447,9 +445,9 @@ identity≥0.90\t0
         print(all_metrics)
         if os.path.exists(aggr_metric_filename):
             os.remove(aggr_metric_filename)
-            
+
         all_metrics.write_csv(aggr_metric_filename,
-                              include_header=True, separator="\t")
+                                include_header=True, separator="\t")
 
     return (aggr_metric_filename, fact_metric_filename)
 
@@ -484,7 +482,7 @@ def main_cli():
         assert len(refs) > 0
     else:
         refs = [""]
-        
+
     if len(refs) == 1:
         refs = refs * len(bam_files)
 

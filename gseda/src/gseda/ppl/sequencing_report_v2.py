@@ -1,5 +1,3 @@
-import gen_output_bam
-import env_prepare
 import subprocess
 import pathlib
 import os
@@ -9,15 +7,17 @@ import shutil
 import argparse
 from multiprocessing import cpu_count
 import os
-import semver
 import sys
 import pysam
 from tqdm import tqdm
 import numpy as np
 import math
+import semver
+from typing import List
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
+import env_prepare  # noqa: E402
 
 
 logging.basicConfig(
@@ -27,8 +27,18 @@ logging.basicConfig(
 )
 
 
+def is_empty_bam(bam_file: str):
+    with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=os.cpu_count()) as in_bam:
+        idx = 0
+        for (idx, _) in enumerate(in_bam.fetch(until_eof=True)):
+            if idx > 1:
+                break
+        return idx < 1
+
+
 def compute_n50(lengths: np.ndarray):
-    lengths[::-1].sort()
+    if len(lengths) == 0:
+        return 0
     total = lengths.sum()
     half_total = total / 2
 
@@ -42,10 +52,47 @@ def extract_filename(filepath: str) -> str:
     return p.stem
 
 
-def bam_basic_ana(bam_file: str, type: str):
+def dump_default_aggr(aggr_metric_filename: str):
+    default_aggr_data = """\
+name\tvalue
+reads_num\t0
+tot_bases\t0
+n50\t0
+read_len_avg\t0
+read_len_p50\t0
+≥Q8\t0
+≥Q10\t0
+≥Q15\t0
+≥Q20\t0
+≥Q30\t0
+4xQ20\t0
+alignedRatio\t0
+queryCoverage3\t0
+identity\t0
+identity-p50\t0
+identity≥0.83\t0
+identity≥0.90\t0
+    """
+    with open(aggr_metric_filename, mode="w", encoding="utf8") as out:
+        out.write(default_aggr_data)
+
+
+def dump_bam_basic(bam_file: str, output_dir: str) -> str:
+    """dump bam basic
+
+    Args:
+        bam_file (str): path
+        output_dir (str): outdir
+
+    Returns:
+        str: outputfile path. if the bam_file is empty. None will be returned
+    """
     num_passes = []
     rq_values = []
     read_lengths = []
+    qnames = []
+    stem = extract_filename(bam_file)
+    output_csv = f"{output_dir}/{stem}.basic.csv"
     with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=os.cpu_count()) as in_bam:
         for record in tqdm(in_bam.fetch(until_eof=True), desc=f"bam_basic_ana, reading {bam_file}"):
             num_pass = 0
@@ -56,47 +103,62 @@ def bam_basic_ana(bam_file: str, type: str):
                 rq = record.get_tag('cq')
             else:
                 rq = -10 * math.log10(1-record.get_tag("rq"))
-
+            qnames.append(record.query_name)
             num_passes.append(num_pass)
             rq_values.append(rq)
             read_lengths.append(len(record.query_sequence))
 
-    n50 = compute_n50(np.array(read_lengths))
+    if len(qnames) == 0:
+        return None
+
     df = pl.DataFrame({
+        "qname": qnames,
         "np": num_passes,
         "rq": rq_values,
         "read_len": read_lengths,
     })
+    df.write_csv(output_csv, separator="\t", include_header=True)
+    return output_csv
 
+
+def bam_basic_ana(basic_csvs: List[str]):
+    basic_dataframes = []
+    for basic_csv in basic_csvs:
+        if basic_csv is None:
+            continue
+        basic_dataframes.append(pl.read_csv(basic_csv, separator="\t"))
+    if len(basic_dataframes) == 0:
+        return None
+
+    df = pl.concat(basic_dataframes)
+    assert isinstance(df, pl.DataFrame)
+    n50 = compute_n50(df.select([pl.col("read_len")]).sort(
+        "read_len", descending=True).to_numpy()[:, 0])
     basic_metric = df.select([
-        pl.len().cast(pl.Float64).alias(f"ReadsNum({type})"),
-        pl.col("read_len").sum().cast(pl.Float64).alias(f"TotBases({type})"),
-        pl.lit(n50).cast(pl.Float64).alias(f"N50({type})"),
+        pl.len().cast(pl.Float64).alias("reads_num"),
+        pl.col("read_len").sum().cast(pl.Float64).alias("tot_bases"),
+        pl.lit(n50).cast(pl.Float64).alias("n50"),
 
-        pl.col("read_len").mean().cast(
-            pl.Float64).alias(f"ReadLenAvg({type})"),
-        pl.col("read_len").min().cast(pl.Float64).alias(f"ReadLenMin({type})"),
-        pl.quantile("read_len", 0.25).cast(
-            pl.Float64).alias(f"ReadLenP25({type})"),
-        pl.quantile("read_len", 0.5).cast(
-            pl.Float64).alias(f"ReadLenP50({type})"),
-        pl.quantile("read_len", 0.75).cast(
-            pl.Float64).alias(f"ReadLenP75({type})"),
-        pl.col("read_len").max().cast(pl.Float64).alias(f"ReadLenMax({type})"),
+        pl.col("read_len").mean().cast(pl.Float64).alias("read_len_avg"),
+        pl.col("read_len").min().cast(pl.Float64).alias("read_len_min"),
+        pl.quantile("read_len", 0.25).cast(pl.Float64).alias("read_len_p25"),
+        pl.quantile("read_len", 0.5).cast(pl.Float64).alias("read_len_p50"),
+        pl.quantile("read_len", 0.75).cast(pl.Float64).alias("read_len_p75"),
+        pl.col("read_len").max().cast(pl.Float64).alias("read_len_max"),
 
         pl.col("rq").filter(pl.col("rq") >= pl.lit(8)
-                            ).count().cast(pl.Float64).alias(f"≥Q8({type})"),
+                            ).count().cast(pl.Float64).alias("≥Q8"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(10)
-                            ).count().cast(pl.Float64).alias(f"≥Q10({type})"),
+                            ).count().cast(pl.Float64).alias("≥Q10"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(15)
-                            ).count().cast(pl.Float64).alias(f"≥Q15({type})"),
+                            ).count().cast(pl.Float64).alias("≥Q15"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(20)
-                            ).count().cast(pl.Float64).alias(f"≥Q20({type})"),
+                            ).count().cast(pl.Float64).alias("≥Q20"),
         pl.col("rq").filter(pl.col("rq") >= pl.lit(30)
-                            ).count().cast(pl.Float64).alias(f"≥Q30({type})"),
+                            ).count().cast(pl.Float64).alias("≥Q30"),
 
         (pl.col("np").filter((pl.col("np") == pl.lit(4)).and_(pl.col("rq") >= pl.lit(20))).count(
-        ) / pl.col("np").filter(pl.col("np") == pl.lit(4)).count()).cast(pl.Float64).alias(f"4xQ20({type})")
+        ) / pl.col("np").filter(pl.col("np") == pl.lit(4)).count()).cast(pl.Float64).alias("4xQ20")
     ])
 
     basic_metric = basic_metric.transpose(
@@ -171,37 +233,49 @@ def analysis_aligned(df: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([metric_cnt, metric_ratio])
 
 
-def align_stats(metric_filename, filename):
-    df = pl.read_csv(
-        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
+def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
+    metric = df.select(
+        [
+            pl.len().alias("cnt"),
+            pl.col("longIndel")
+            .filter(pl.col("longIndel").is_not_null())
+            .len()
+            .alias("longIndelCnt"),
+        ]
+    ).select(
+        [
+            pl.lit("longIndelRatio").alias("name"),
+            (pl.col("longIndelCnt") / pl.col("cnt")).alias("value"),
+        ]
+    )
+    return metric
+
+
+def align_stats(metric_filenames: List[str]):
+
+    all_dfs = []
+    for metric_fname in metric_filenames:
+        if metric_fname is None:
+            continue
+
+        all_dfs.append(pl.read_csv(
+            metric_fname, separator="\t", schema_overrides={"longIndel": pl.String}
+        ))
+
+    if len(all_dfs) == 0:
+        return None
+
+    df = pl.concat(all_dfs)
+
+    global_query_coverage_metric = df.select(
+        [(pl.col("covlen").sum() / pl.col("qlen").sum()).alias("GlobalQueryCoverage")])
+    global_query_coverage_metric = global_query_coverage_metric.transpose(
+        include_header=True, header_name="name", column_names=["value"]
     )
 
-    print(df.select(
-        [(pl.col("covlen").sum() / pl.col("qlen").sum()).alias("GlobalQueryCoverage")]))
-
     metric_aligned_not_aligned = analysis_aligned(df=df)
+    metric_long_indel = analisys_long_indel(df=df)
     df = df.filter(pl.col("rname") != "")
-    # print(df.head(2))
-    # print(
-    #     df.filter(pl.col("segs") > 1)
-    #     .head(2)
-    #     .select(
-    #         [
-    #             "qname",
-    #             "rname",
-    #             "qlen",
-    #             "segs",
-    #             "queryCoverage",
-    #             "identity",
-    #             "oriAlignInfo",
-    #             "oriQGaps",
-    #             "qOvlp",
-    #             "qOvlpRatio",
-    #             "rOvlpRatio",
-    #             "mergedQrySpan",
-    #         ]
-    #     )
-    # )
 
     identity_metric = df.select([
         (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.83)
@@ -213,17 +287,29 @@ def align_stats(metric_filename, filename):
         include_header=True, header_name="name", column_names=["value"]
     )
 
-    df = df.with_columns(row_align_span())
-    aggr_metrics = df.select(aggr_expressions())
-    aggr_metrics = aggr_metrics.select(
+    df = df.with_columns(
         [
-            pl.col("alignedRatio"),
-            pl.col("queryCoverage3"),
-            pl.col("identity"),
-            pl.col("identity-p50"),
+            ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
+            .or_(
+                (pl.col("qOvlpRatio") < 0.01)
+                .and_(pl.col("rOvlpRatio") > 0.90)
+                .and_(pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32) < 20)
+            )
+            .alias("valid")
         ]
     )
 
+    df = df.with_columns(
+        [
+            pl.when(pl.col("valid"))
+            .then(pl.col("covlen"))
+            .otherwise(pl.col("primaryCovlen"))
+            .alias("miscCovlen")
+        ]
+    )
+
+    df = df.with_columns(row_align_span())
+    aggr_metrics = df.select(aggr_expressions())
     aggr_metrics = aggr_metrics.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
@@ -233,6 +319,8 @@ def align_stats(metric_filename, filename):
     all_metrics.append(metric_aligned_not_aligned)
     all_metrics.append(aggr_metrics)
     all_metrics.append(identity_metric)
+    all_metrics.append(metric_long_indel)
+    all_metrics.append(global_query_coverage_metric)
 
     all_metrics = pl.concat(
         all_metrics
@@ -319,18 +407,42 @@ def row_align_span():
     return exprs
 
 
+def merge_partition(
+    output_csv_path: str,
+    fact_csvs: List[str] = None,
+    basic_csvs: List[str] = None,
+):
+
+    all_metrics = []
+    if basic_csvs is not None:
+        inner = bam_basic_ana(basic_csvs=basic_csvs)
+        if inner is not None:
+            all_metrics.append(inner)
+
+    if fact_csvs is not None:
+        inner = align_stats(fact_csvs)
+        if inner is not None:
+            all_metrics.append(inner)
+
+    if len(all_metrics) > 0:
+        all_metrics = pl.concat(all_metrics)
+        print(all_metrics)
+        all_metrics.write_csv(output_csv_path,
+                              include_header=True, separator="\t")
+
+    return output_csv_path
+
+
 def main(
-    called_bam: str,
-    adatper_bam: str,
-    smc_bam: str,
-    ref_fa: str,
+    bam_file: str = None,
+    ref_fa: str = None,
     threads=None,
     force=False,
     short_aln=False,
     outdir=None,
     copy_bam_file=False,
     disable_basic_stat=False,
-    disable_align_stat=False
+    disable_align_stat=False,
 ) -> str:
     """
         step1: generate detailed metric info
@@ -356,9 +468,9 @@ def main(
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
+
     env_prepare.check_and_install(
         "gsmm2-aligned-metric", semver.Version.parse("0.24.0"), "cargo install mm2")
-    # mm2_version_check()
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -378,52 +490,60 @@ def main(
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    output_bam_path = f"{outdir}/{stem}.output.bam"
-    gen_output_bam.filter_called_bam(smc_bam, called_bam, output_bam_path)
+    aggr_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_aggr.csv"
+    if is_empty_bam(bam_file=bam_file):
+        dump_default_aggr(aggr_metric_filename)
+        return (aggr_metric_filename, None, None)
 
-    fact_metric_filename = f"{outdir}/{stem}.output.gsmm2_aligned_metric_fact.csv"
+    basic_metric_filename = None
+    if not disable_basic_stat:
+        basic_metric_filename = dump_bam_basic(
+            bam_file=bam_file, output_dir=outdir)
+
+    fact_metric_filename = None
     if not disable_align_stat:
+        fact_metric_filename = f"{outdir}/{stem}.gsmm2_aligned_metric_fact.csv"
         fact_metric_filename = generate_metric_file(
-            output_bam_path,
+            bam_file,
             ref_fa,
             out_filename=fact_metric_filename,
             force=force,
             threads=threads,
             short_aln=short_aln
         )
-    aggr_metric_filename = f"{outdir}/{stem}.output.gsmm2_aligned_metric_aggr.csv"
-    if force and os.path.exists(aggr_metric_filename):
-        os.remove(aggr_metric_filename)
 
     all_metrics = []
-    if not disable_basic_stat:
-        all_metrics.append(bam_basic_ana(bam_file=called_bam, type="called"))
-        all_metrics.append(bam_basic_ana(bam_file=smc_bam, type="smc"))
+    if basic_metric_filename is not None:
+        all_metrics.append(bam_basic_ana(
+            basic_csvs=[basic_metric_filename]))
 
-    if not disable_align_stat:
-        all_metrics.append(
-            align_stats(fact_metric_filename))
+    if fact_metric_filename is not None:
+        inner = align_stats([fact_metric_filename])
+        if inner is not None:
+            all_metrics.append(inner)
 
     if len(all_metrics) > 0:
         all_metrics = pl.concat(all_metrics)
         print(all_metrics)
+        if os.path.exists(aggr_metric_filename):
+            os.remove(aggr_metric_filename)
+
         all_metrics.write_csv(aggr_metric_filename,
                               include_header=True, separator="\t")
 
-    return (aggr_metric_filename, fact_metric_filename)
+    return (aggr_metric_filename, fact_metric_filename, basic_metric_filename)
 
 
 def main_cli():
     env_prepare.polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")
-    parser.add_argument("--called", type=str, required=True, help="called bam")
-    parser.add_argument("--adapter", type=str,
-                        required=True, help="adapter bam")
-    parser.add_argument("--smc", type=str, required=True, help="smc bam")
-
-    parser.add_argument("--refs", type=str, default=None,
-                        help="reference fasta")
+    parser.add_argument("--bams", nargs="+", type=str, default=None)
+    parser.add_argument("--refs", nargs="+", type=str, default=None)
+    parser.add_argument("--fact-csvs", nargs="+", type=str,
+                        default=None, dest="fact_csvs")
+    parser.add_argument("--basic-csvs", nargs="+", type=str,
+                        default=None, dest="basic_csvs")
 
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
@@ -442,20 +562,40 @@ def main_cli():
 
     args = parser.parse_args()
 
-    called_bam = args.called
-    adapter_bam = args.adapter
-    smc_bam = args.smc
+    bam_files = args.bams
+    refs = args.refs
+    fact_csvs = args.fact_csvs
+    basic_csvs = args.basic_csvs
 
-    ref = args.ref
+    if fact_csvs is not None or basic_csvs is not None:
+        output_dir = None
+        stem = None
+        if fact_csvs:
+            output_dir = os.path.dirname(fact_csvs[0])
+            stem = extract_filename(fact_csvs[0])
+        else:
+            output_dir = os.path.dirname(basic_csvs[0])
+            stem = extract_filename(basic_csvs[0])
+        out_csv_path = f"{output_dir}/{stem}.all.csv"
+        merge_partition(out_csv_path, fact_csvs=fact_csvs,
+                        basic_csvs=basic_csvs)
+    else:
 
-    main(
-        called_bam=called_bam,
-        adatper_bam=adapter_bam,
-        smc_bam=smc_bam,
-        ref_fa=ref, force=args.f,
-        short_aln=args.short_aln == 1,
-        disable_basic_stat=args.disable_basic_stat,
-        disable_align_stat=args.disable_align_stat)
+        if not args.disable_align_stat and refs is not None:
+            assert len(refs) > 0
+        else:
+            refs = [""]
+
+        if len(refs) == 1:
+            refs = refs * len(bam_files)
+
+        assert len(bam_files) == len(refs)
+
+        for bam, ref in zip(bam_files, refs):
+            print(main(bam_file=bam, ref_fa=ref, force=args.f,
+                       short_aln=args.short_aln == 1,
+                       disable_basic_stat=args.disable_basic_stat,
+                       disable_align_stat=args.disable_align_stat))
 
 
 if __name__ == "__main__":
