@@ -39,6 +39,7 @@ impl Cli {
 pub enum Subcommands {
     AlignedBam(AlignedBamParams),
     NonAlignedBam(NonAlignedBamParams),
+    NonAlignedBamSeqNStats(NonAlignedBamSeqNStatsParams),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -117,9 +118,24 @@ pub struct NonAlignedBamParams {
     #[arg(long = "bam")]
     pub bam: String,
 
-    #[arg(short='o', help="output filepath")]
+    #[arg(short = 'o', help = "output filepath")]
     pub o_filepath: Option<String>,
 
     #[arg(short = 't', help = "bam threads")]
     pub bam_threads: Option<usize>,
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct NonAlignedBamSeqNStatsParams {
+    #[arg(long = "bam")]
+    pub bam: String,
+
+    #[arg(short = 'n', help = "first-n and last-n")]
+    pub n: usize,
+
+    #[arg(long = "length-thr")]
+    pub length_thr: Option<usize>,
+
+    #[arg(long = "length-percentile-thr", help = "0~100")]
+    pub length_percentile_thr: Option<usize>,
 }

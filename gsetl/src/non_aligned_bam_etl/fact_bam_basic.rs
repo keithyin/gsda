@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, File},
+    fs::{self},
     io::{BufWriter, Write},
     path,
 };
@@ -77,17 +77,21 @@ fn dump_one_record(record: &Record, writer: &mut dyn Write) {
     let mut acgt_cr_mean = [0.0; 4];
     let mut acgt_cnt = [0; 4];
 
-    bases.as_bytes().iter().enumerate().for_each(|(pos, &base)| {
-        let idx = SEQ_NT4_TABLE[base as usize] as usize;
-        // println!("base:{}, idx:{}", base as char, idx);
-        let dw = dwell_times[pos];
-        let ar = arrival_time[pos];        
-        let cr = capture_rates[pos];
-        acgt_dw_sum[idx] += dw;
-        acgt_ar_sum[idx] += ar;
-        acgt_cnt[idx] += 1;
-        acgt_cr_mean[idx] += cr;
-    });
+    bases
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .for_each(|(pos, &base)| {
+            let idx = SEQ_NT4_TABLE[base as usize] as usize;
+            // println!("base:{}, idx:{}", base as char, idx);
+            let dw = dwell_times[pos];
+            let ar = arrival_time[pos];
+            let cr = capture_rates[pos];
+            acgt_dw_sum[idx] += dw;
+            acgt_ar_sum[idx] += ar;
+            acgt_cnt[idx] += 1;
+            acgt_cr_mean[idx] += cr;
+        });
 
     acgt_cr_mean
         .iter_mut()
@@ -121,11 +125,10 @@ mod test {
 
     use crate::non_aligned_bam_etl::fact_bam_basic::dump_one_record;
 
-
     #[test]
     fn test_stat() {
-
-        let bam_file = "/data/ccs_data/data2025Q1/S_aureus_1h/20250207_Sync_Y0002_02_H01_Run0001_called.bam";
+        let bam_file =
+            "/data/ccs_data/data2025Q1/S_aureus_1h/20250207_Sync_Y0002_02_H01_Run0001_called.bam";
         let mut reader = Reader::from_path(bam_file).unwrap();
         reader.set_threads(10).unwrap();
         for record in reader.records() {

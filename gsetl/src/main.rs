@@ -10,6 +10,8 @@ use clap::Parser;
 use gskits::utils::command_line_str;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
+use crate::non_aligned_bam_etl::seq_n_stats::seq_n_stats_main;
+
 mod aligned_bam_etl;
 mod cli;
 mod non_aligned_bam_etl;
@@ -135,7 +137,10 @@ fn main() {
         }
         cli::Subcommands::NonAlignedBam(param) => {
             non_aligned_bam_etl::fact_bam_basic::fact_bam_basic(&param, &args.output_dir);
+        }
 
+        cli::Subcommands::NonAlignedBamSeqNStats(param) => {
+            seq_n_stats_main(param, &args.output_dir);
         }
     }
 }

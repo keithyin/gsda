@@ -18,6 +18,7 @@ use rust_htslib::bam::{Read, Reader, Record};
 
 use crate::{cli::NonAlignedBamParams, utils};
 pub mod fact_bam_basic;
+pub mod seq_n_stats;
 
 /// 最终是要生成一个 Run 的聚合数据。下面的是每个 base 的结果作为中间结果
 /// dw
