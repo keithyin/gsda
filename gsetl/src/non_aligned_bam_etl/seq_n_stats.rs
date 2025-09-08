@@ -22,12 +22,7 @@ pub fn seq_n_stats_main(param: &NonAlignedBamSeqNStatsParams, output_dir: &str) 
         .unwrap_or_else(|| length_percentile(&param.bam, param.length_percentile_thr.unwrap()));
 
     println!("length-thr={}", length_thr);
-    // assert!(
-    //     length_thr > param.n,
-    //     "expected length_thr > param.n. but got {} <= {}",
-    //     length_thr,
-    //     param.n
-    // );
+
     let bam_path = &param.bam;
     let n = param.n;
 
@@ -42,12 +37,19 @@ pub fn seq_n_stats_main(param: &NonAlignedBamSeqNStatsParams, output_dir: &str) 
         .unwrap()
         .to_string();
     let output_filepath = out_dir.join(format!("{}.seq_n_stats.csv", file_stem));
+
+    let first_n_out_fasta = out_dir.join(format!("{}.first-n.fasta", file_stem));
+    let last_n_out_fasta = out_dir.join(format!("{}.last-n.fasta", file_stem));
+
     let mut writer = BufWriter::new(std::fs::File::create(output_filepath.clone()).unwrap());
     writeln!(
         &mut writer,
         "qname\tdw-first-n-median\tdw-last-n-median\tar-first-n-median\tar-last-n-median\tdw-first-n-mean\tdw-last-n-mean\tar-first-n-mean\tar-last-n-mean"
     )
     .unwrap();
+
+    let mut first_n_writer = BufWriter::new(std::fs::File::create(first_n_out_fasta).unwrap());
+    let mut last_n_writer = BufWriter::new(std::fs::File::create(last_n_out_fasta).unwrap());
 
     std::thread::scope(|thread_scope| {
         let (record_sender, record_recv) = crossbeam::channel::bounded(1000);
@@ -75,6 +77,9 @@ pub fn seq_n_stats_main(param: &NonAlignedBamSeqNStatsParams, output_dir: &str) 
         for stat in stat_recv {
             pb.inc(1);
             writeln!(&mut writer, "{}", stat).unwrap();
+
+            writeln!(&mut first_n_writer, ">{}\n{}", stat.qname, stat.first_n).unwrap();
+            writeln!(&mut last_n_writer, ">{}\n{}", stat.qname, stat.last_n).unwrap();
         }
         pb.finish();
     });
@@ -92,6 +97,8 @@ struct Stats {
     ar_last_n_mean: f64,
     dw_first_n_mean: f64,
     dw_last_n_mean: f64,
+    first_n: String,
+    last_n: String,
 }
 
 impl Display for Stats {
@@ -160,6 +167,12 @@ fn bam_reader(bam: &str, length_thr: Option<usize>, sender: Sender<Record>) {
 fn stats_worker(recv: Receiver<Record>, sender: Sender<Stats>, n: usize) {
     for record in recv {
         let record_ext = BamRecordExt::new(&record);
+
+        let seq = record_ext.get_seq();
+        let n = n.min(seq.len());
+        let first_n_seq = &seq[0..n];
+        let last_n_seq = &seq[(seq.len() - n)..];
+
         let mut ar = record_ext.get_ar().unwrap();
         let mut dw = record_ext.get_dw().unwrap();
         let (ar_first_n_median, ar_last_n_median) = calculate_first_n_and_last_n_median(&mut ar, n);
@@ -167,7 +180,6 @@ fn stats_worker(recv: Receiver<Record>, sender: Sender<Stats>, n: usize) {
 
         let (ar_first_n_mean, ar_last_n_mean) = calculate_first_n_and_last_n_mean(&mut ar, n);
         let (dw_first_n_mean, dw_last_n_mean) = calculate_first_n_and_last_n_mean(&mut dw, n);
-
 
         sender
             .send(Stats {
@@ -181,6 +193,8 @@ fn stats_worker(recv: Receiver<Record>, sender: Sender<Stats>, n: usize) {
                 ar_last_n_mean: ar_last_n_mean,
                 dw_first_n_mean: dw_first_n_mean,
                 dw_last_n_mean: dw_last_n_mean,
+                first_n: first_n_seq.to_string(),
+                last_n: last_n_seq.to_string(),
             })
             .unwrap();
     }

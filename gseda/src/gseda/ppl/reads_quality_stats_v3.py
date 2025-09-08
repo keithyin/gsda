@@ -635,7 +635,10 @@ def main(
     force=False,
     outdir=None,
     copy_bam_file=False,
+    enable_basic=True,
+    enable_align=True
 ) -> str:
+    
     """
         step1: generate detailed metric info
         step2: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
@@ -659,6 +662,8 @@ def main(
     Return:
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
+    polars_env_init()
+    
 
     mm2_version_check()
     gsetl_version_check()
@@ -697,24 +702,26 @@ def main(
     """
 
     processes = []
-    if ref_fa != "":
+    if ref_fa != "" and enable_align:
         aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(
             bam_file, ref_fa, fact_metric_filename, force, threads))
         aligned_fact_thread.start()
         processes.append(aligned_fact_thread)
 
-    non_aligned_fact_thread = threading.Thread(target=generate_non_aligned_metric_fact_file, args=(
-        bam_file, no_aligned_fact_filename, outdir, force))
-    non_aligned_fact_thread.start()
-    processes.append(non_aligned_fact_thread)
+    if enable_basic:
+        non_aligned_fact_thread = threading.Thread(target=generate_non_aligned_metric_fact_file, args=(
+            bam_file, no_aligned_fact_filename, outdir, force))
+        non_aligned_fact_thread.start()
+        processes.append(non_aligned_fact_thread)
 
     for p in processes:
         p.join()
-    if ref_fa != "":
+    if ref_fa != "" and enable_align:
         aligned_metric_analysis(fact_metric_filename,
                                 aggr_metric_filename, force=force)
-    non_aligned_metric_analysis(
-        no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
+    if enable_basic:
+        non_aligned_metric_analysis(
+            no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
 
     return (aggr_metric_filename, fact_metric_filename, no_aligned_fact_filename)
 
@@ -743,7 +750,6 @@ def main_cli():
     aligned bam analysis & origin bam analysis
     在 metric 中使用
     """
-    polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")
     parser.add_argument("--bams", nargs="+", type=str,

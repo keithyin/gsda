@@ -1,3 +1,4 @@
+import reads_quality_stats_v3
 import subprocess
 import pathlib
 import os
@@ -5,13 +6,13 @@ import logging
 import polars as pl
 import shutil
 import argparse
-from multiprocessing import cpu_count
-import os
 import semver
-import threading
-import matplotlib.pyplot as plt
-import seaborn as sns
 from glob import glob
+import sys
+
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+print(cur_dir)
+sys.path.append(cur_dir)
 
 # deprecated ...
 logging.basicConfig(
@@ -27,18 +28,6 @@ def polars_env_init():
     os.environ["POLARS_FMT_MAX_ROWS"] = "300"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
 
-
-# def mm2_version_check():
-#     oup = subprocess.getoutput("gsmm2-aligned-metric -V")
-#     oup = oup.strip()
-#     version_str = oup.rsplit(" ", maxsplit=1)[1]
-
-#     logging.info(f"gsmm2-aligned-metric Version: {version_str}")
-#     mm2_version = semver.Version.parse(version_str)
-#     expected_version = "0.21.0"
-#     assert mm2_version >= semver.Version.parse(
-#         expected_version
-#     ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@={expected_version}' "
 
 
 def gsetl_version_check():
@@ -79,20 +68,15 @@ def stat_expr(name: str):
     first = name_items[0]
     name_items[0] = name_items[-1]
     name_items[-1] = first
-    
+
     out_name_items = [name_items[-1]]
     out_name_items.extend(name_items[:-1])
 
-
     out_name = "-".join(out_name_items)
     return [
-        # pl.col(name).min().alias(f"{name}-min"),
-        # pl.col(name).max().alias(f"{name}-max"),
         pl.col(name).mean().alias(f"MEAN-{out_name}"),
         pl.col(name).median().alias(f"MEDIAN-{out_name}"),
         pl.col(name).std().alias(f"STD-{out_name}"),
-        # pl.quantile(name, quantile=0.25).alias(f"{name}-p25"),
-        # pl.quantile(name, quantile=0.75).alias(f"{name}-p75"),
     ]
 
 
@@ -203,6 +187,7 @@ def main(
     seq_n_metric_aggr_filename = f"{outdir}/{stem}.seq_n_stats.aggr.csv"
     non_aligned_metric_analysis(
         seq_n_metric_filename, aggr_metric_filename=seq_n_metric_aggr_filename, force=True)
+    return outdir, stem
 
 
 def expand_bam_files(bam_files):
@@ -231,6 +216,8 @@ def main_cli():
                         type=int, dest="length_thr")
     parser.add_argument("--length-percentile-thr", default=None, type=int,
                         help="[0, 100], compute the length-thr according to the length-percentile-thr", dest="length_percentile_thr")
+    parser.add_argument("--ref-fa", default=None, type=str,
+                        help="ref fasta", dest="ref_fa")
     parser.add_argument(
         "-f",
         action="store_true",
@@ -241,12 +228,22 @@ def main_cli():
 
     assert args.length_thr is not None or args.length_percentile_thr is not None, "--length-thr and --length-percentile-thr can't all be None"
 
+    ref_fa = args.ref_fa
+
     bam_files = args.bams
     bam_files = expand_bam_files(bam_files)
 
     for bam in bam_files:
-        main(bam_file=bam, n=args.n, force=args.f, length_thr=args.length_thr,
-             length_percentile_thr=args.length_percentile_thr)
+        outdir, stem = main(bam_file=bam, n=args.n, force=args.f, length_thr=args.length_thr,
+                            length_percentile_thr=args.length_percentile_thr)
+
+        if ref_fa is not None:
+            first_n_fname = os.path.join(outdir, f"{stem}.first-n.fasta")
+            last_n_fname = os.path.join(outdir, f"{stem}.last-n.fasta")
+            reads_quality_stats_v3.main(
+                bam_file=first_n_fname, ref_fa=ref_fa, force=args.f, enable_basic=False)
+            reads_quality_stats_v3.main(
+                bam_file=last_n_fname, ref_fa=ref_fa, force=args.f, enable_basic=False)
 
 
 if __name__ == "__main__":

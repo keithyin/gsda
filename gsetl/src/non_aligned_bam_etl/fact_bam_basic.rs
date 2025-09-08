@@ -29,7 +29,13 @@ pub fn fact_bam_basic(param: &NonAlignedBamParams, output_dir: &str) {
 
     let bam_threads = param.bam_threads.unwrap_or(num_cpus::get_physical());
 
-    let mut reader = Reader::from_path(bam_file).unwrap();
+    let mut reader = if let Ok(reader) = Reader::from_path(bam_file) {
+        reader
+    } else {
+        eprintln!("exit: open bam error: {}", bam_file);
+        return;
+    };
+
     reader.set_threads(bam_threads).unwrap();
 
     let pb = get_spin_pb(format!("reading {bam_file}"), DEFAULT_INTERVAL);
