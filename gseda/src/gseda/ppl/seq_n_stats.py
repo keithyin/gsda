@@ -29,7 +29,6 @@ def polars_env_init():
     os.environ["POLARS_FMT_STR_LEN"] = "100"
 
 
-
 def gsetl_version_check():
     oup = subprocess.getoutput("gsetl -V")
     oup = oup.strip()
@@ -228,22 +227,12 @@ def main_cli():
 
     assert args.length_thr is not None or args.length_percentile_thr is not None, "--length-thr and --length-percentile-thr can't all be None"
 
-    ref_fa = args.ref_fa
-
     bam_files = args.bams
     bam_files = expand_bam_files(bam_files)
 
     for bam in bam_files:
-        outdir, stem = main(bam_file=bam, n=args.n, force=args.f, length_thr=args.length_thr,
+        main(bam_file=bam, n=args.n, force=args.f, length_thr=args.length_thr,
                             length_percentile_thr=args.length_percentile_thr)
-
-        if ref_fa is not None:
-            first_n_fname = os.path.join(outdir, f"{stem}.first-n.fasta")
-            last_n_fname = os.path.join(outdir, f"{stem}.last-n.fasta")
-            reads_quality_stats_v3.main(
-                bam_file=first_n_fname, ref_fa=ref_fa, force=args.f, enable_basic=False)
-            reads_quality_stats_v3.main(
-                bam_file=last_n_fname, ref_fa=ref_fa, force=args.f, enable_basic=False)
 
 
 if __name__ == "__main__":
