@@ -55,8 +55,7 @@ def dump_sub_bam(bam_path: str, out_path: str, length_thr: int, n: int, first=Tr
                 n = min(n, read.query_length)
 
                 seq_len = read.query_length
-                if read.has_tag("cr"):
-                    read.set_tag("cr", read.get_tag("cr")[0:1])
+                
                 if first:
                     read.query_sequence = read.query_sequence[0:n]
                     dw = read.get_tag("dw")
