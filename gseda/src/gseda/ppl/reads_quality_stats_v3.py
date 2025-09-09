@@ -723,7 +723,7 @@ def main(
         non_aligned_metric_analysis(
             no_aligned_fact_filename, no_aligned_aggr_filename, force, out_dir=outdir, stem=stem)
 
-    return (aggr_metric_filename, fact_metric_filename, no_aligned_fact_filename)
+    return (aggr_metric_filename, fact_metric_filename, no_aligned_aggr_filename, no_aligned_fact_filename)
 
 
 def test_stat():

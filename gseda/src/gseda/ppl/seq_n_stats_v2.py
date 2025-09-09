@@ -5,6 +5,7 @@ import logging
 import argparse
 from glob import glob
 import sys
+import polars as pl
 from multiprocessing import cpu_count
 from tqdm import tqdm
 
@@ -20,6 +21,17 @@ logging.basicConfig(
     datefmt="%Y/%m/%d %H:%M:%S",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
+
+def is_empty_file(filepath: str):
+    valid_line_cnt = 0
+    with open(filepath, mode="r", encoding="utf8") as f:
+        for line in f:
+            if line.strip() != "":
+                valid_line_cnt += 1
+            if valid_line_cnt > 1:
+                return False
+    return True
 
 
 def extract_filename(filepath: str) -> str:
@@ -49,13 +61,13 @@ def dump_sub_bam(bam_path: str, out_path: str, length_thr: int, n: int, first=Tr
     with pysam.AlignmentFile(bam_path, mode="rb", check_sq=False, threads=cpu_count() // 2) as bam_in:
         with pysam.AlignmentFile(
                 out_path, mode="wb", check_sq=False, header=bam_in.header, threads=cpu_count() // 2) as bam_out:
-            for read in tqdm(bam_in.fetch(until_eof=True), desc=f"reading {bam_path}"):
+            for read in tqdm(bam_in.fetch(until_eof=True), desc=f"reading {bam_path} for dump to {out_path}"):
                 if read.query_length < length_thr:
                     continue
                 n = min(n, read.query_length)
 
                 seq_len = read.query_length
-                
+
                 if first:
                     read.query_sequence = read.query_sequence[0:n]
                     dw = read.get_tag("dw")
@@ -75,6 +87,20 @@ def dump_sub_bam(bam_path: str, out_path: str, length_thr: int, n: int, first=Tr
                     read.set_tag("cr", cr[(seq_len - n):])
 
                 bam_out.write(read=read)
+
+
+def concat_metrics(non_aligned_metric_filepath, aligned_metric_filepath, new_value_name: str) -> pl.DataFrame:
+    concated_metrics = []
+    if not is_empty_file(non_aligned_metric_filepath):
+        concated_metrics.append(pl.read_csv(non_aligned_metric_filepath, separator="\t", schema_overrides={
+            "name": pl.String, "value": pl.Float32}))
+    if not is_empty_file(aligned_metric_filepath):
+        concated_metrics.append(pl.read_csv(aligned_metric_filepath, separator="\t", schema_overrides={
+            "name": pl.String, "value": pl.Float32}))
+    concated_metrics = pl.concat(concated_metrics)
+    assert isinstance(concated_metrics, pl.DataFrame)
+    concated_metrics = concated_metrics.rename({"value": new_value_name})
+    return concated_metrics
 
 
 def main(
@@ -100,15 +126,36 @@ def main(
 
     first_n_bam = os.path.join(outdir, f"{stem}.first-n.bam")
     last_n_bam = os.path.join(outdir, f"{stem}.last-n.bam")
+
+    final_res_csv = os.path.join(outdir, f"{stem}.seq-n-stats-aggr.csv")
+
     dump_sub_bam(bam_file, first_n_bam, length_thr=length_thr, n=n, first=True)
     dump_sub_bam(bam_file, last_n_bam, length_thr=length_thr, n=n, first=False)
 
-    reads_quality_stats_v3.main(
+    (first_n_aligned_aggr, _, first_n_non_aligned_aggr, _) = reads_quality_stats_v3.main(
         bam_file=first_n_bam, ref_fa=ref_fa, force=force)
-    reads_quality_stats_v3.main(
+    (last_n_aligned_aggr, _, last_n_non_aligned_aggr, _) = reads_quality_stats_v3.main(
         bam_file=last_n_bam, ref_fa=ref_fa, force=force)
 
-    pass
+    first_n_concated_metrics = concat_metrics(
+        first_n_non_aligned_aggr, first_n_aligned_aggr, new_value_name="value_first_n")
+    last_n_concated_metrics = concat_metrics(
+        last_n_non_aligned_aggr, last_n_aligned_aggr, new_value_name="value_last_n")
+
+    metric = first_n_concated_metrics.join(
+        last_n_concated_metrics, on="name", how="outer")
+
+    metric = metric.select([
+        pl.coalesce(pl.col("name"), pl.col("name_right")).alias("name"),
+        pl.col("value_first_n"),
+        pl.col("value_last_n"),
+    ])
+
+    print(metric)
+
+    metric.write_csv(final_res_csv, separator="\t")
+
+    logging.info(f"result dumped to {final_res_csv}")
 
 
 def expand_bam_files(bam_files):
