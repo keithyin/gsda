@@ -143,7 +143,7 @@ def main(
         last_n_non_aligned_aggr, last_n_aligned_aggr, new_value_name="value_last_n")
 
     metric = first_n_concated_metrics.join(
-        last_n_concated_metrics, on="name", how="outer")
+        last_n_concated_metrics, on="name", how="full")
 
     metric = metric.select([
         pl.coalesce(pl.col("name"), pl.col("name_right")).alias("name"),
