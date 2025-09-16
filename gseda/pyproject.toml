@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.16.4"
+version = "1.17.0"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -41,6 +41,7 @@ sequencing-report-overall-cli = "gseda.ppl.sequencing_report_overall:main_cli"
 seq-n-stats-cli = "gseda.ppl.seq_n_stats:main_cli"
 seq-n-stats-v2-cli = "gseda.ppl.seq_n_stats_v2:main_cli"
 
+low-high-q-quality-stats-cli = "gseda.ppl.low_high_q_quality_stats:main_cli"
 
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
 fastx-basic-stat-cli = "gseda.fastx_ana.fastx_basic_stat:main_cli"
