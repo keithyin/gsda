@@ -18,16 +18,18 @@ def q30_base_ratio_in_q30_channel(bam_file: str):
     print(f"{bam_file} --> q30_base_ratio_in_q30_channel:{q30_base_cnt / tot_base_cnt * 100. :3f}%")
 
 def main():
-    fname = "/data/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.polish2.smc_all_reads.bam"
-    fname = "/data/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
-    fname = "/data/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.polish2.smc_all_reads.bam"
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
     fnames = [
         
-        "/data/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.smc_all_reads.bam",
-        "/data/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002_adapter.bystrand.smc_all_reads.bam",
-        "/data/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.smc_all_reads.bam",
-        "/data/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.0.smc_all_reads.bam",
-        "/data/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.bystrand.smc_all_reads.bam"
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002_adapter.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.bystrand.qcali.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.0.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.bystrand.smc_all_reads.bam"
     ]
     for fname in fnames:
         q30_base_ratio_in_q30_channel(fname)
