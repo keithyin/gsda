@@ -108,6 +108,12 @@ pub fn fact_baseq_stat(
             let query_seq = record.seq().as_bytes();
             let qual = record.qual();
 
+            let mut pre_is_del = false;
+            /*
+               ref  : ACGTA--GT
+               query: A--GTACGT
+               只有 query 存在的位置是有 baseq 的， 如果 query base 前面是 del，那么当前会认为是错误的
+            */
             for [qpos, rpos] in record.aligned_pairs_full() {
                 if qpos.is_some() {
                     qpos_cursor = qpos;
@@ -147,40 +153,29 @@ pub fn fact_baseq_stat(
                     }
                 }
 
-                let baseq = qual[qpos_cursor.unwrap() as usize];
-                let stat = baseq2stat.entry(baseq).or_insert(BaseQStat::new(baseq));
-                if qpos.is_some() {
+                if let Some(q_pos_) = qpos.map(|v| v as usize) {
+                    let baseq = qual[qpos_cursor.unwrap() as usize];
+                    let stat = baseq2stat.entry(baseq).or_insert(BaseQStat::new(baseq));
                     stat.depth += 1;
-                }
-                if qpos.is_none() {
-                    stat.del += 1;
-                    continue;
-                }
-                if rpos.is_none() {
-                    // ins 需要加到 下一个 baseq 上
-                    let next_qpos = qpos_cursor.unwrap() + 1;
-                    if next_qpos >= query_end {
-                        continue;
-                    }
-
-                    let next_baseq = qual[next_qpos as usize];
-                    let stat = baseq2stat
-                        .entry(next_baseq)
-                        .or_insert(BaseQStat::new(next_baseq));
-                    stat.ins += 1;
-                    continue;
-                }
-
-                unsafe {
-                    if *refseq_bytes.get_unchecked(rpos.unwrap() as usize)
-                        == *query_seq.get_unchecked(qpos.unwrap() as usize)
-                    {
-                        // eq
-                        stat.eq += 1;
+                    if pre_is_del {
+                        stat.del += 1;
                     } else {
-                        // diff
-                        stat.diff += 1;
+                        if let Some(r_pos_) = rpos.map(|v| v as usize) {
+                            if refseq_bytes[r_pos_] == query_seq[q_pos_] {
+                                stat.eq += 1;
+                            } else {
+                                stat.diff += 1;
+                            }
+                        } else {
+                            stat.ins += 1;
+                        }
                     }
+                }
+
+                if qpos.is_none() {
+                    pre_is_del = true;
+                } else {
+                    pre_is_del = false;
                 }
             }
         }
