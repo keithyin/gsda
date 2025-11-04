@@ -63,6 +63,7 @@ def generate_aligned_metric_fact_file(
     bam_file: str,
     ref_fasta: str,
     out_filename: str,
+    short_aln=False,
     force: bool = False,
     threads=None,
     no_supp=False,
@@ -86,6 +87,8 @@ def generate_aligned_metric_fact_file(
             --out {out_filename} \
             --kmer 11 \
             --wins 1 """
+    if short_aln:
+        cmd += "  --short-aln"
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
@@ -631,6 +634,7 @@ def plot_histgram(data, fname, xlabel, ylabel, title, xlim=None, bins=100):
 def main(
     bam_file: str,
     ref_fa: str,
+    short_aln=False,
     threads=None,
     force=False,
     outdir=None,
@@ -704,7 +708,7 @@ def main(
     processes = []
     if ref_fa != "" and enable_align:
         aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(
-            bam_file, ref_fa, fact_metric_filename, force, threads))
+            bam_file, ref_fa, fact_metric_filename, short_aln,force, threads))
         aligned_fact_thread.start()
         processes.append(aligned_fact_thread)
 
@@ -756,6 +760,8 @@ def main_cli():
                         required=True, help="wildcard '*' is supported")
     parser.add_argument("--refs", nargs="+", type=str,
                         help="if not provided. the alignment related metric will not output")
+    parser.add_argument("--short-aln", type=int, default=0,
+                        help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
         "-f",
         action="store_true",
@@ -778,7 +784,7 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f)
+        main(bam_file=bam, ref_fa=ref, short_aln=args.short_aln==1 ,force=args.f)
 
 
 if __name__ == "__main__":

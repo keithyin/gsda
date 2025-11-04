@@ -267,7 +267,7 @@ def main(args):
 
     baseq_ana_args = {
         "fact_table": f"{gsetl_o_dir}/fact_baseq_stat.csv",
-        "o_prefix": None
+        "o_path": f"{gsetl_o_dir}/{smc_stem}.baseq2empq.png"
     }
     pred_baseq_and_emp_q.main(argparse.Namespace(**baseq_ana_args))
 

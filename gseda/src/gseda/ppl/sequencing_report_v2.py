@@ -176,6 +176,8 @@ def generate_metric_file(
     no_supp=False,
     no_mar=False,
     short_aln=False,
+    np_range=None,
+    rq_range=None,
 ) -> str:
 
     if no_supp and no_mar:
@@ -197,6 +199,12 @@ def generate_metric_file(
             --wins 1 """
     if short_aln:
         cmd += " --short-aln"
+
+    if np_range:
+        cmd += f" --np-range {np_range}"
+    
+    if rq_range:
+        cmd += f" --rq-range {rq_range}"
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
@@ -282,6 +290,10 @@ def align_stats(metric_filenames: List[str]):
                                    ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.83"),
         (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.90)
                                    ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.90"),
+        (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.99)
+                                   ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.99"),
+        (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.999)
+                                   ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.999"),
 
     ]).transpose(
         include_header=True, header_name="name", column_names=["value"]
@@ -443,6 +455,8 @@ def main(
     copy_bam_file=False,
     disable_basic_stat=False,
     disable_align_stat=False,
+    np_range=None,
+    rq_range=None
 ) -> str:
     """
         step1: generate detailed metric info
@@ -509,7 +523,9 @@ def main(
             out_filename=fact_metric_filename,
             force=force,
             threads=threads,
-            short_aln=short_aln
+            short_aln=short_aln,
+            np_range=np_range,
+            rq_range=rq_range
         )
 
     all_metrics = []
@@ -552,6 +568,9 @@ def main_cli():
                         action="store_true", dest="disable_basic_stat")
     parser.add_argument("--disable-align-stat",
                         action="store_true", dest="disable_align_stat")
+    
+    parser.add_argument("--np-range", type=str, default=None, dest="np_range", help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
+    parser.add_argument("--rq-range", type=str, default=None, dest="rq_range", help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
 
     parser.add_argument(
         "-f",
@@ -595,7 +614,10 @@ def main_cli():
             print(main(bam_file=bam, ref_fa=ref, force=args.f,
                        short_aln=args.short_aln == 1,
                        disable_basic_stat=args.disable_basic_stat,
-                       disable_align_stat=args.disable_align_stat))
+                       disable_align_stat=args.disable_align_stat,
+                       np_range=args.np_range,
+                       rq_range=args.rq_range
+                       ))
 
 
 if __name__ == "__main__":

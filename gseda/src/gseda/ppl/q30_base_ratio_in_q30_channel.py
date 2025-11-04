@@ -29,7 +29,9 @@ def main():
         "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.polish3.smc_all_reads.bam",
         "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.bystrand.smc_all_reads.bam",
         "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.0.smc_all_reads.bam",
-        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.bystrand.smc_all_reads.bam"
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002_adapter.xgb.smc_all_reads.bam",
+        
     ]
     
     for fname in fnames:

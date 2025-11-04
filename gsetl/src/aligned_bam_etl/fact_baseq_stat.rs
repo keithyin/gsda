@@ -100,6 +100,7 @@ pub fn fact_baseq_stat(
 
             let ref_start = record_ext.reference_start() as i64;
             let ref_end = record_ext.reference_end() as i64;
+            let query_start = record_ext.query_alignment_start() as i64;
             let query_end = record_ext.query_alignment_end() as i64;
 
             let mut rpos_cursor = None;
@@ -114,12 +115,20 @@ pub fn fact_baseq_stat(
                query: A--GTACGT
                只有 query 存在的位置是有 baseq 的， 如果 query base 前面是 del，那么当前会认为是错误的
             */
+            let mut can_break = false;
+
             for [qpos, rpos] in record.aligned_pairs_full() {
+                if can_break {
+                    break;
+                }
                 if qpos.is_some() {
                     qpos_cursor = qpos;
                 }
                 if rpos.is_some() {
                     rpos_cursor = rpos;
+                    if rpos.unwrap() == (ref_end - 1) {
+                        can_break = true;
+                    }
                 }
 
                 if let Some(rpos_cursor_) = rpos_cursor {
@@ -134,6 +143,9 @@ pub fn fact_baseq_stat(
                 }
 
                 if let Some(qpos_cursor_) = qpos_cursor {
+                    if qpos_cursor_ < query_start {
+                        continue;
+                    }
                     if qpos_cursor_ >= query_end {
                         break;
                     }

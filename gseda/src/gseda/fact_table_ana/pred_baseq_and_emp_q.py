@@ -24,14 +24,11 @@ def main(args):
     fact_table_path = pathlib.Path(args.fact_table)
     out_dir = fact_table_path.parent
     
-    
-    
-
     df = pl.read_csv(args.fact_table, separator="\t")
     df_shift = df.with_columns([pl.col("baseq")])
     df = df.with_columns(
         [
-            (pl.col("eq") / (pl.col("eq") + pl.col("diff") + pl.col("ins"))).alias(
+            (pl.col("eq") / (pl.col("eq") + pl.col("diff") + pl.col("ins") + pl.col("del") )).alias(
                 "emp_rq"
             )
         ]
