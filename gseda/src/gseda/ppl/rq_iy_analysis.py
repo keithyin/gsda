@@ -67,15 +67,20 @@ def RecallExpr(phreq_threshold):
 
 
 def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
-    figure = plt.figure(figsize=(10, 10))
+
+    # df = df.sample(n=10000)
+
+    figure = plt.figure(figsize=(20, 20))
     axs = figure.add_subplot(1, 1, 1)
     plt.sca(axs)
-    plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
 
-    df = df.to_pandas()
-    sns.scatterplot(df, x="phreq_rq", y="phreq_iy", ax=axs)
+    axs.set_xticks(list(range(0, 60, 2)))
+    axs.set_yticks(list(range(0, 60, 2)))
+
+    kde_df = df.to_pandas()
+    # sns.scatterplot(df, x="phreq_rq", y="phreq_iy", ax=axs)
     sns.kdeplot(
-        df,
+        kde_df,
         x="phreq_rq",
         y="phreq_iy",
         ax=axs,
@@ -85,9 +90,20 @@ def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
         label="Density",
         cbar=True,
     )
+    df = df.with_columns(
+        [pl.col("phreq_rq").round().cast(pl.Int32).alias("phreq_rq")])
+    violin_df = df.to_pandas()
+    sns.violinplot(
+        x='phreq_rq',
+        y='phreq_iy',
+        data=violin_df,
+        bw_adjust=0.5,
+        width=0.8,
+        inner="quart",
+        order=list(range(0, 60)),
+        density_norm='width',
+        ax=axs)
 
-    axs.set_xticks(list(range(0, 60, 2)))
-    axs.set_yticks(list(range(0, 60, 2)))
     axs.set_xlabel("PredictedChannelQ", fontdict={"size": 16})
     axs.set_ylabel("EmpericalChannelQ", fontdict={"size": 16})
     perfect_line = pl.DataFrame(
@@ -100,6 +116,9 @@ def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
     sns.lineplot(
         perfect_line.to_pandas(), x="x", y="y", ax=axs, color="blue", linestyle="--"
     )
+
+    plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
+
     fname = "rq_iy_scatter.png"
     if o_prefix is not None:
         fname = f"{o_prefix}-{fname}"
@@ -247,7 +266,6 @@ def main(args):
         gsmm2_cmd += f" --np-range {args.np_range}"
     if args.rq_range is not None:
         gsmm2_cmd += f" --rq-range {args.rq_range}"
-        
 
     print(f"running {gsmm2_cmd} ")
     subprocess.check_call(gsmm2_cmd, shell=True)
@@ -276,8 +294,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("rq_iy_diff")
     parser.add_argument("--smc-bam", metavar="smc_bam", dest="smc_bam")
     parser.add_argument("--ref", metavar="ref.fasta")
-    parser.add_argument("--np-range", default=None, type=str, dest="np_range", help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
-    parser.add_argument("--rq-range", default=None, type=str, dest="rq_range", help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
+    parser.add_argument("--np-range", default=None, type=str, dest="np_range",
+                        help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
+    parser.add_argument("--rq-range", default=None, type=str, dest="rq_range",
+                        help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
 
     args_ = parser.parse_args()
 
