@@ -40,7 +40,7 @@ def main():
     parser.add_argument("--np-thr", type=int, dest="np_thr", default=14,
                         help="only the channel that np≥np_thr will be processed")
     parser.add_argument("--rq-thr", type=float, dest="rq_thr",
-                        default=0.99,
+                        default=0.95,
                         help="only the channel that rq≥rq_thr will be processed")
 
     args = parser.parse_args()
