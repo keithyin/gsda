@@ -294,6 +294,10 @@ def align_stats(metric_filenames: List[str]):
                                    ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.99"),
         (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.999)
                                    ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.999"),
+        (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.9999)
+                                   ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.9999"),
+        (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.99999)
+                                   ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.99999"),
 
     ]).transpose(
         include_header=True, header_name="name", column_names=["value"]

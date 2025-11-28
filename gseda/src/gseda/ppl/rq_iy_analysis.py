@@ -153,7 +153,7 @@ def plot_predQ20_but_lower_Q20(df: pl.DataFrame, o_prefix=None):
 
 
 def stat(fname: str, o_prefix):
-    df = pl.read_csv(fname, separator="\t")
+    df = pl.read_csv(fname, separator="\t", schema_overrides={"iy": pl.Float64})
     df = df.with_columns(
         [
             pl.when(pl.col("rq") > 0.99999)
@@ -285,7 +285,7 @@ def main(args):
 
     baseq_ana_args = {
         "fact_table": f"{gsetl_o_dir}/fact_baseq_stat.csv",
-        "o_path": f"{gsetl_o_dir}/{smc_stem}.baseq2empq.png"
+        "o_prefix": f"{gsetl_o_dir}/{smc_stem}"
     }
     pred_baseq_and_emp_q.main(argparse.Namespace(**baseq_ana_args))
 

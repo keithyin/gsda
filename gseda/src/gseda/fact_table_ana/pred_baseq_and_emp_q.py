@@ -17,8 +17,6 @@ def main(args):
 
     # plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
     fact_table_path = pathlib.Path(args.fact_table)
-    out_dir = fact_table_path.parent
-
     df = pl.read_csv(args.fact_table, separator="\t")
     df = df.with_columns(
         [
@@ -48,8 +46,6 @@ def main(args):
         perfect_line.to_pandas(), x="x", y="y", ax=axs, color="blue", linestyle="--"
     )
 
-    fname = "baseq2empq.png"
-    fpath = out_dir.joinpath(fname)
     print(df.head(60))
 
     summary = df.select([
@@ -90,11 +86,35 @@ def main(args):
     print("Base Q Metric: \n", metric)
     
 
-    if args.o_path is not None:
-        fpath = args.o_path
+    baseq2emp_baseq_fpath = f"{args.o_prefix}.baseq2empq.png"
+    figure.savefig(fname=baseq2emp_baseq_fpath)
+    print(f"check image {baseq2emp_baseq_fpath}")
+    
+    baseq_cnt = (df.filter(pl.col("depth") > 10000)
+        .select([pl.col("baseq"), pl.col("depth")]))
+    baseq_cnt = baseq_cnt.to_pandas()
+    
+    
+    
+    # TODO baseq distribution
+    figure = plt.figure(figsize=(10, 10))
+    axs = figure.add_subplot(1, 1, 1)
+    plt.sca(axs)
+    plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
+    sns.barplot(baseq_cnt, x="baseq", y="depth", ax=axs, order=list(range(0, 50)),)
 
-    figure.savefig(fname=fpath)
-    print(f"check image {fpath}")
+    axs.set_xticks(list(range(0, 50, 2)))
+    axs.set_xlabel("PredictedBaseQ", fontdict={"size": 16})
+    axs.set_ylabel("Count", fontdict={"size": 16})
+    
+    baseq_dist_fpath = f"{args.o_prefix}.baseq-dist.png"
+    figure.savefig(fname=baseq_dist_fpath)
+    print(f"check image {baseq_dist_fpath}")
+    
+    
+    
+    
+    
 
 
 if __name__ == "__main__":

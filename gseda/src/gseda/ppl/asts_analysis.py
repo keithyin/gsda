@@ -93,7 +93,7 @@ def main():
     parser = argparse.ArgumentParser(prog="")
     parser.add_argument("sbr_bam")
     parser.add_argument("smc_bam")
-    parser.add_argument("--rq-range", type=str, default="0.99:1.0", dest="rq_range", help="start:end")
+    parser.add_argument("--rq-range", type=str, default="0.95:1.0", dest="rq_range", help="start:end")
     
     
     args = parser.parse_args()
