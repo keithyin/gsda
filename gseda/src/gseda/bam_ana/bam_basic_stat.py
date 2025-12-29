@@ -212,7 +212,8 @@ def stat_channel_reads(df: pl.DataFrame):
                 .alias("≥Q30")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 pl.col("seq_len").mean().cast(pl.Int32).alias("seq_len_mean"),
-                pl.col("seq_len").median().cast(pl.Int32).alias("seq_len_median"),
+                pl.col("seq_len").median().cast(
+                    pl.Int32).alias("seq_len_median"),
                 pl.quantile("seq_len", quantile=0.99)
                 .cast(dtype=pl.Int32)
                 .alias("seq_len_99"),
@@ -286,7 +287,8 @@ def len_dist(channel_level_info: pl.DataFrame) -> pl.DataFrame:
 
 
 def stat_subreads(df: pl.DataFrame):
-    df = df.with_columns([(pl.col("cx") == 3).cast(pl.Int32).alias("is_full_len")])
+    df = df.with_columns(
+        [(pl.col("cx") == 3).cast(pl.Int32).alias("is_full_len")])
 
     channel_level_info = df.group_by(["ch"]).agg(
         [
@@ -316,6 +318,12 @@ def stat_subreads(df: pl.DataFrame):
         channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 1)
     )
     print("------------------------Passes>=1----------------------------")
+    print(res)
+
+    res = len_dist(
+        channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 2)
+    )
+    print("------------------------Passes>=2----------------------------")
     print(res)
 
     res = len_dist(
