@@ -58,7 +58,7 @@ def try_split_seq_2(seq: str):
         identity = calculate_identity_from_cigar(hit.cigar_str)
         coverage1 = (hit.r_en - hit.r_st) / len(seq1)
         coverage2 = (hit.q_en - hit.q_st) / len(seq2)
-        if identity > 0.85 and coverage1 > 0.85 and coverage2 > 0.85:
+        if identity > 0.80 and coverage1 > 0.85 and coverage2 > 0.85:
             return True
     return False
 
@@ -101,7 +101,7 @@ def producer(bam_path, queue):
                 count += 1
                 if count % 10000 == 0:
                     print(f"\rProduced {count} reads...",
-                            end='', flush=True)
+                          end='', flush=True)
     print(f"\nProducer finished. Total reads enqueued: {count}")
 
 
@@ -136,12 +136,16 @@ def main(bam_path, threads):
     total = TOTAL_READS.value
     split = SPLIT_READS.value
     ratio = split / total if total > 0 else 0.0
-
-    print("\n===== SUMMARY =====")
-    print(f"Total reads processed : {total}")
-    print(f"Splittable reads      : {split}")
-    print(f"Split ratio           : {ratio:.6f}")
-    print(f"Elapsed Time          : {time.time() - start:.2f}s")
+    report_str = f"""
+================= Self Connect Report =================
+- Reads Processed: {total}
+- SelfConnected Reads  : {split}
+- SelfConnected Ratio  : {ratio*100: .2f}%
+- Elapsed Time         : {time.time() - start:.2f}s"
+=======================================================
+"""
+    print(report_str)
+    return report_str
 
 
 def main_cli():

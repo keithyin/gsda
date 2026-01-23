@@ -6,6 +6,8 @@ import argparse
 import time
 import mappy
 import re
+import pathlib
+import pysam
 
 # =========================
 # 全局计数器（多进程安全）
@@ -19,17 +21,6 @@ TOTAL_BASES_AFTER = Value('l', 0)
 TOTAL_READS_AFTER = Value('i', 0)
 
 COUNTER_LOCK = Lock()
-
-
-# =========================
-# 生信逻辑
-# =========================
-def reverse_complement(seq):
-    complement = {
-        'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N',
-        'a': 't', 'c': 'g', 'g': 'c', 't': 'a', 'n': 'n'
-    }
-    return "".join(complement.get(b, b) for b in reversed(seq))
 
 
 def calculate_identity_from_cigar(cigar_string):
@@ -93,37 +84,60 @@ def try_split_seq(seq: str):
             return (hit.r_en + hit.r_st) // 2
     return None
 
+
 def try_split_seq_2(seq: str):
     seq_len = len(seq)
     if seq_len > 20000:
         return None
-    
+
     seq1 = seq[:(seq_len // 2)]
     seq2 = seq[(seq_len // 2):]
-    
+
     aligner = mappy.Aligner(seq=seq1, extra_flags=67108864,
                             k=9, w=7, best_n=10, n_threads=1)
     for hit in aligner.map(seq2):
-        
+
         identity = calculate_identity_from_cigar(hit.cigar_str)
         coverage1 = (hit.r_en - hit.r_st) / len(seq1)
         coverage2 = (hit.q_en - hit.q_st) / len(seq2)
         if identity > 0.85 and coverage1 > 0.85 and coverage2 > 0.85:
-            
+
             # print("ctg:{}\tref_start:{}\tref_end:{}\tq_start:{}\tq_end:{}\tstrand:{}\tref_len:{}\tquery_len:{}. ideneity:{:.4f}".format(
             #     hit.ctg, hit.r_st, hit.r_en, hit.q_st, hit.q_en, hit.strand, len(seq1), len(seq2), calculate_identity_from_cigar(hit.cigar_str)))
-            
-            return (hit.r_en + hit.r_st) // 2
+
+            # return (hit.r_en + hit.r_st) // 2 this is BUG
+            return seq_len // 2
     return None
 
+
+def read_fastq(fastq_filepath):
+    with open(fastq_filepath) as fin:
+        while True:
+            header = fin.readline().rstrip()
+            if not header:
+                break
+            seq = fin.readline().rstrip()
+            _plus = fin.readline().rstrip()
+            qual = fin.readline().rstrip()
+            yield header, seq, qual
+
+
+def read_bam(filepath):
+    with pysam.AlignmentFile(filepath, mode="rb", check_sq=False) as bam_in:
+        for record in bam_in.fetch(until_eof=True):
+            yield f"@{record.query_name}", record.query_sequence, record.query_qualities_str
 
 # =========================
 # 单个 FASTQ 文件处理
 # =========================
-def process_fastq(fq_path, out_dir, threshold):
-    basename = os.path.basename(fq_path)
+
+
+def process_file(input_path: str, out_dir, threshold):
+
+    stem = pathlib.Path(input_path).stem
+
     out_path = os.path.join(
-        out_dir, basename.replace(".fastq", ".split.fastq"))
+        out_dir, f"{stem}.split.fastq")
 
     local_total = 0
     local_split = 0
@@ -132,14 +146,14 @@ def process_fastq(fq_path, out_dir, threshold):
     local_bases_after = 0
     local_reads_after = 0
 
-    with open(fq_path) as fin, open(out_path, "w") as fout:
-        while True:
-            header = fin.readline().rstrip()
-            if not header:
-                break
-            seq = fin.readline().rstrip()
-            plus = fin.readline().rstrip()
-            qual = fin.readline().rstrip()
+    input_iter = None
+    if input_path.endswith("bam"):
+        input_iter = read_bam(input_path)
+    if input_path.endswith("fastq"):
+        input_iter = read_fastq(input_path)
+
+    with open(out_path, "w") as fout:
+        for header, seq, qual in input_iter:
 
             local_total += 1
 
@@ -154,7 +168,6 @@ def process_fastq(fq_path, out_dir, threshold):
 
             if split_position is not None:
                 local_split += 1
-                
 
                 fout.write(
                     f"{header}_split_L\n"
@@ -188,32 +201,32 @@ def process_fastq(fq_path, out_dir, threshold):
 # =========================
 def worker(args):
     fq_files, out_dir, threshold = args
-    for fq in fq_files:
-        assert isinstance(fq, str)
-        if fq.endswith("unidentified.fastq"):
+    for file in fq_files:
+        assert isinstance(file, str)
+        if file.endswith("unidentified.fastq") or file.endswith("uncertain.bam"):
             continue
-        process_fastq(fq, out_dir, threshold)
+        process_file(file, out_dir, threshold)
 
 
 # =========================
 # 主函数
 # =========================
-def main(fq_dir, out_dir, threshold=0.85, threads=24):
+def main(fq_dir, out_dir, threshold=0.85, threads=24, iff="fastq"):
 
     start = time.time()
 
     os.makedirs(out_dir, exist_ok=True)
 
-    fq_files = sorted(glob(os.path.join(fq_dir, "*.fastq")))
-    if not fq_files:
-        print("No fastq files found!")
+    input_files = sorted(glob(os.path.join(fq_dir, f"*.{iff}")))
+    if not input_files:
+        print("No files found!")
         return
 
     # 按文件拆分任务
-    chunk_size = max(1, len(fq_files) // threads)
+    chunk_size = max(1, len(input_files) // threads)
     tasks = [
-        (fq_files[i:i+chunk_size], out_dir, threshold)
-        for i in range(0, len(fq_files), chunk_size)
+        (input_files[i:i+chunk_size], out_dir, threshold)
+        for i in range(0, len(input_files), chunk_size)
     ]
 
     with Pool(threads) as pool:
@@ -239,8 +252,15 @@ def main_cli():
     parser.add_argument(
         "-i", "--input-dir",
         required=True,
-        help="Directory containing input FASTQ files"
+        help="Directory containing input FASTQ/Bam files"
     )
+
+    parser.add_argument(
+        "--iff",
+        default="fastq",
+        help="input file format. bam or fastq"
+    )
+
     parser.add_argument(
         "-o", "--output-dir",
         required=True,
@@ -261,7 +281,7 @@ def main_cli():
 
     args = parser.parse_args()
     main(args.input_dir, args.output_dir,
-         threshold=args.threshold, threads=args.threads)
+         threshold=args.threshold, threads=args.threads, iff=args.iff)
 
 
 if __name__ == "__main__":

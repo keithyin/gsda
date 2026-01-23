@@ -3,7 +3,7 @@ import subprocess
 import pathlib
 import os
 import argparse
-
+import json
 
 def asts_alignment(query_bam: str, target_bam: str, np_thr: int, rq_thr: float):
     o_dir = os.path.dirname(target_bam)
@@ -21,17 +21,39 @@ def asts_alignment(query_bam: str, target_bam: str, np_thr: int, rq_thr: float):
     return o_name
 
 
-def main():
-    """
+def main(args):
 
-    1. extract Q30 channels from fwd_rev.bam(--byStrand=True) & dump them into a file
-    2. dump Q30 channels from origin.bam(--byStrand=False)
-    3. seperate Q30 channels in fwd_rev.bam into fwd.bam & rev.bam
-    4. alignment
-        1. align fwd_rev.q30.bam to origin.q30.bam
-        2. align sbr.bam to fwd.q30.bam and and rev.q30.bam
-    5. using pileup to analysis result    
-    """
+    smc_bam = args.smc_bam
+    sbr_bam = args.sbr_bam
+
+    sbr2smc_alignment = asts_alignment(
+        sbr_bam, smc_bam, np_thr=args.np_thr, rq_thr=args.rq_thr)
+
+    cmd = f"base_mismatch_identification v2 --smc-bam {smc_bam} --sbr2smc-bam {sbr2smc_alignment} --origin-bam-rq-thr {args.rq_thr} --origin-bam-np-thr {args.np_thr}"
+    subprocess.check_call(cmd, shell=True)
+    
+    smc_bam_path = pathlib.Path(smc_bam)
+    stem = smc_bam_path.stem
+    root = smc_bam_path.parent
+    result_json_path = root.joinpath(f"{stem}.strand-consistency.json")
+    with open(result_json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    inconsistence_ratio = data["inconsistence_ratio"]
+    
+    if os.path.exists(sbr2smc_alignment):
+        os.remove(sbr2smc_alignment)
+
+    report_str = f"""
+================= DNA Strand Inconsistency Analysis =================
+- InconsistenceRatio: {inconsistence_ratio * 100:.2f}%
+=====================================================================
+"""
+
+    return report_str
+    pass
+
+
+def main_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--smc-bam", type=str, required=True,
                         dest="smc_bam", help="byStrand=False bam file")
@@ -44,19 +66,8 @@ def main():
                         help="only the channel that rq≥rq_thr will be processed")
 
     args = parser.parse_args()
-    smc_bam = args.smc_bam
-    sbr_bam = args.sbr_bam
-
-    sbr2smc_alignment = asts_alignment(
-        sbr_bam, smc_bam, np_thr=args.np_thr, rq_thr=args.rq_thr)
-
-    cmd = f"base_mismatch_identification v2 --smc-bam {smc_bam} --sbr2smc-bam {sbr2smc_alignment} --origin-bam-rq-thr {args.rq_thr} --origin-bam-np-thr {args.np_thr}"
-    subprocess.check_call(cmd, shell=True)
-    if os.path.exists(sbr2smc_alignment):
-        os.remove(sbr2smc_alignment)
-
-    pass
+    main(args=args)
 
 
 if __name__ == "__main__":
-    main()
+    main_cli()

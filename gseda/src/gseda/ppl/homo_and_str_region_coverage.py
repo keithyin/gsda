@@ -48,18 +48,14 @@ def gff_reader(fname):
     return infos
 
 
-def main():
-
-    parser = argparse.ArgumentParser(prog="")
-    parser.add_argument("bam_file", nargs="+")
-    parser.add_argument('--rq-thr', type=float, default=0.95, dest="rq_thr")
-    args = parser.parse_args()
-    
+def main(args):
     bam_files = []
     for f_pat in args.bam_file:
         bam_files.extend(glob(f_pat))
     print(f"processing bam files: {bam_files}")
-    
+
+    report_inner = ""
+
     for bam_file in bam_files:
 
         record_infos = read_bam_file(bam_file=bam_file, rq_thr=args.rq_thr)
@@ -88,8 +84,26 @@ def main():
         for record_key, record_info in tqdm(record_infos.items(), desc=f"counting ..."):
             tot_len += record_info.length
             tr_len += gff_infos.get(record_key, 0)
+        
+        inner = f"HomoAndStrRatio:{(tr_len / tot_len) * 100:.2f} %"
+        report_inner += f"- {inner}\n"
+        print(inner)
 
-        print(f"tr_ratio:{(tr_len / tot_len) * 100:.2f} %")
+    report_str = f"""
+================= HomoAndStr Report =================
+{report_inner}
+
+"""
+    return report_str
+
+
+def main_cli():
+
+    parser = argparse.ArgumentParser(prog="")
+    parser.add_argument("bam_file", nargs="+")
+    parser.add_argument('--rq-thr', type=float, default=0.95, dest="rq_thr")
+    args = parser.parse_args()
+    main(args=args)
 
 
 if __name__ == "__main__":

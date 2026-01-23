@@ -74,7 +74,8 @@ def scp_directory_with_key(
 if __name__ == "__main__":
 
     uris = [
-        "user@192.168.3.72:/data1/EurusResV3/20260109_240601Y0088_Run0002",
+        # "user@192.168.3.125:/data1/512k_test/20260120_250302Y0004_Run0002/*.bam",
+        "user@192.168.3.125:/data1/EurusResV3/20260120_250302Y0004_Run0001/*.bam",
         # "user@192.168.3.125:/data1/EurusResV3/20260112_250302Y0004_Run0001",
         
     ]
@@ -87,7 +88,7 @@ if __name__ == "__main__":
             remote_user=user,
             remote_host=remote_host,
             remote_path=remote_path,
-            local_target_path="/data1/ccs_data/20260112-puze-waice",
+            local_target_path="/data1/ccs_data/20260120-huahongDPN",
             ssh_key_path="~/.ssh/id_rsa",  # 可选
             port=22
         )
