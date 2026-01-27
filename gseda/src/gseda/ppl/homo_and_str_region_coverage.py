@@ -92,7 +92,7 @@ def main(args):
     report_str = f"""
 ================= HomoAndStr Report =================
 {report_inner}
-
+=====================================================
 """
     return report_str
 
