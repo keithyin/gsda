@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.18.0"
+version = "1.19.0"
 authors = [
   { name="keithyin", email="yinpenghhz@hotmail.com" },
 ]
@@ -51,6 +51,8 @@ phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
 wga-cli = "gseda.ppl.whole_genome_alignment:main_cli"
 bam2fx = "gseda.bam_fiter.bam2fx:main_cli"
 smc-mem-est="gseda.bam_ana.mem_est:main_cli"
+
+low-q-analysis-ppl="gseda.ppl.low_q_analysis:main_cli"
 
 
 # 构建后端，默认为 Hatchling
