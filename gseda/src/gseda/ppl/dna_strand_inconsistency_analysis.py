@@ -6,7 +6,8 @@ import argparse
 import json
 
 def asts_alignment(query_bam: str, target_bam: str, np_thr: int, rq_thr: float):
-    o_dir = os.path.dirname(target_bam)
+    target_bam_path = pathlib.Path(target_bam)
+    o_dir = str(target_bam_path.parent)
     o_name = "{}-TO-{}.align".format(pathlib.Path(query_bam).stem,
                                      pathlib.Path(target_bam).stem)
     o_prefix = f"{o_dir}/{o_name}"
