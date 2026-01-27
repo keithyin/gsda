@@ -42,7 +42,8 @@ def main(args):
     asts_param = {
         "sbr_bam": sbr_bam,
         "smc_bam": smc_bam,
-        "rq_range": "0.95:1.0"
+        "rq_range": "0.95:1.0",
+        "np_range": "5:1000000"
     }
     asts_param = argparse.Namespace(**asts_param)
     report += asts_analysis.main(asts_param)

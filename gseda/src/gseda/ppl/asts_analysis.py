@@ -106,6 +106,8 @@ def main_cli():
     parser = argparse.ArgumentParser(prog="")
     parser.add_argument("sbr_bam")
     parser.add_argument("smc_bam")
+    parser.add_argument("--np-range", type=str,
+                        default="5:100000000", dest="np_range", help="start:end")
     parser.add_argument("--rq-range", type=str,
                         default="0.95:1.0", dest="rq_range", help="start:end")
 
@@ -122,7 +124,7 @@ def main(args):
     smc_path = pathlib.Path(smc_bam)
     prefix = smc_path.parent.joinpath(f"{smc_path.stem}.asts")
 
-    asts_cmd = f"asts -q {subreads_bam} -t {smc_bam} -p {prefix} --rq-range {args.rq_range} --ptTags dw"
+    asts_cmd = f"asts -q {subreads_bam} -t {smc_bam} -p {prefix} --np-range {args.np_range} --rq-range {args.rq_range} --ptTags dw"
     print(f"running: {asts_cmd}")
 
     subprocess.check_call(asts_cmd, shell=True)
