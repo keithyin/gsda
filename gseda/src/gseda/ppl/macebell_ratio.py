@@ -137,11 +137,11 @@ def main(bam_path, threads):
     split = SPLIT_READS.value
     ratio = split / total if total > 0 else 0.0
     report_str = f"""
-================= Self Connect Report =================
-- Reads Processed: {total}
-- SelfConnected Reads  : {split}
-- SelfConnected Ratio  : {ratio*100: .2f}%
-- Elapsed Time         : {time.time() - start:.2f}s"
+================= Macebell Report =================
+- Reads Processed : {total}
+- Macebell Reads  : {split}
+- Macebell Ratio  : {ratio*100: .2f}%
+- Elapsed Time    : {time.time() - start:.2f}s
 =======================================================
 """
     print(report_str)

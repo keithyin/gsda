@@ -20,7 +20,7 @@ print(f"sys.path={sys.path}")
 import homo_and_str_region_coverage  # noqa: E402
 import dna_strand_inconsistency_analysis  # noqa: E402
 import asts_analysis  # noqa: E402
-import inverted_repeat_ratio  # noqa: E402
+import macebell_ratio as macebell_ratio  # noqa: E402
 
 
 def main(args):
@@ -70,7 +70,7 @@ def main(args):
     #     ""
     # }
 
-    report += inverted_repeat_ratio.main(bam_path=smc_bam,
+    report += macebell_ratio.main(bam_path=smc_bam,
                                          threads=mp.cpu_count())
 
     print(report)
