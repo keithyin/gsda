@@ -1,22 +1,19 @@
 import os
-import argparse
-import time
 import mappy
 import re
-import pysam
-from multiprocessing import Process, Queue, Value, Lock, cpu_count
-import signal
+import pathlib
 import sys
+cur_path = pathlib.Path(os.path.abspath(__file__))
+cur_dir = cur_path.parent
+prev_dir = cur_path.parent.parent
+prev_prev_dir = cur_dir.parent.parent.parent
+sys.path.append(str(cur_dir))
+sys.path.append(str(prev_dir))
+sys.path.append(str(prev_prev_dir))
 
-# =========================
-# 全局计数器（多进程安全）
-# =========================
-TOTAL_READS = Value('i', 0)
-SPLIT_READS = Value('i', 0)
-COUNTER_LOCK = Lock()
 
-# Sentinel for queue termination
-_SENTINEL = None
+from mappy_ext import blast_like_alignment  # noqa: E402
+from mappy_ext import calculate_identity_from_cigar  # noqa: E402
 
 
 def calculate_identity_from_cigar(cigar_string):
@@ -43,28 +40,89 @@ def calculate_identity_from_cigar(cigar_string):
     return match_count / total_aligned
 
 
+def try_split_seq_1(seq: str):
+    seq_len = len(seq)
+    if seq_len < 200 or seq_len > 20000:
+        return False
+
+    # mid = seq_len // 2
+
+    seq1 = seq
+    seq2 = seq
+
+    # print(seq1[334: 482])
+    # print(seq2[2: 151])
+
+    aligner = mappy.Aligner(seq=seq1, extra_flags=67108864,
+                            k=9, w=7, best_n=10, n_threads=1)
+
+    ok = False
+    print("###################    try_split_seq_1    ##########################\n")
+    for hit in aligner.map(seq2):
+        identity = calculate_identity_from_cigar(hit.cigar_str)
+        coverage1 = (hit.r_en - hit.r_st) / len(seq1)
+        coverage2 = (hit.q_en - hit.q_st) / len(seq2)
+
+        print("TSt:{}\tTEn:{}\tQSt:{}\tQEn:{}\tstrand:{}\tTLen:{}\tQLen:{}\tIden:{:.4f}\tQryCov:{:.4f}\tTagtCov:{:.4f}".format(
+            hit.r_st, hit.r_en, hit.q_st, hit.q_en, hit.strand, len(
+                seq1), len(seq2),
+            calculate_identity_from_cigar(hit.cigar_str),
+            (hit.q_en - hit.q_st) / len(seq2),
+            (hit.r_en - hit.r_st) / len(seq1)))
+
+        # blast_like_alignment(seq2, seq1, hit)
+
+        if identity > 0.80 and coverage1 > 0.85 and coverage2 > 0.85:
+            ok |= True
+    print("\n###################    try_split_seq_1 DONE    ####################")
+
+    return ok
+
+
 def try_split_seq_2(seq: str):
     seq_len = len(seq)
     if seq_len < 200 or seq_len > 20000:
         return False
 
     mid = seq_len // 2
+
     seq1 = seq[:mid]
     seq2 = seq[mid:]
 
+    # print(seq1[334: 482])
+    # print(seq2[2: 151])
+
     aligner = mappy.Aligner(seq=seq1, extra_flags=67108864,
                             k=9, w=7, best_n=10, n_threads=1)
+    print("###################    try_split_seq_2    ##########################\n")
+
+    ok = False
     for hit in aligner.map(seq2):
         identity = calculate_identity_from_cigar(hit.cigar_str)
         coverage1 = (hit.r_en - hit.r_st) / len(seq1)
         coverage2 = (hit.q_en - hit.q_st) / len(seq2)
+
+        print("TSt:{}\tTEn:{}\tQSt:{}\tQEn:{}\tstrand:{}\tTLen:{}\tQLen:{}\tIden:{:.4f}\tQryCov:{:.4f}\tTagtCov:{:.4f}".format(
+            hit.r_st, hit.r_en, hit.q_st, hit.q_en, hit.strand, len(
+                seq1), len(seq2),
+            calculate_identity_from_cigar(hit.cigar_str),
+            (hit.q_en - hit.q_st) / len(seq2),
+            (hit.r_en - hit.r_st) / len(seq1)))
+
+        blast_like_alignment(seq2, seq1, hit)
+
         if identity > 0.80 and coverage1 > 0.85 and coverage2 > 0.85:
-            return True
-    return False
+            ok |= True
+    print("\n###################    try_split_seq_2    ##########################")
+
+    return ok
 
 
 def main_cli():
-    seq = "CCCCGGGGAAAATTTTGAGAAGAGAGCCCCGCACTTCCACCACCAGCTCCTCCATCTTCTCTTCAGCCCTGCTAGCGCCGGGAGCCCGCCCCCGAGAGGTGGGCTGCGGGCGCTCGAGGCCCAGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCTCCGCCGCCGCCGCCGCCGCCGCCGCCGCCTCCGCCGCCGCCGCCGCCGCCGCCGCCGCGCTGCCGCACGCCCCCTGGCAGCGGCGCCTCCGTCACCGCCGCCGCCCGCGCTCGCCGTCGGCCCGCCGCCCGCTCAGAGGCGGCCCTCCACCGGAAGTGAAACCGAAACGGAGCTGAGCGCCCCGCACTTCCACCACCAGCTCCTCCATCTTCTCTTCGGCCCTGCTAGCGCCGGGAGCCCGCCCCCGAGAGGTGGGCTGCGGGCGCTCGAGGCCCAGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCTCCGCCGCCGCCGCCGCCGCCGCCGCCTCCGCCGCCGCCGCCGCCGCCGCCGCCGCGCTGCCGCACGCCCCCTGGCAGCGGCGCCTCCGTCACCGCCGCCGCCCGCGCTCGCCGTCGGCCCGCCGCCCGCTCAGAGGCGGCCCTCCACCGGAAGTGAAACCGAAACGGAGCTGAGCATCTCTCTCAAAATTTTCCCCGGGG"
+    seq = "CCCCGGGGAAAATTTTGAGAGAGATGCTCAGCTCCGTTTCGGTTTCACTTCCGGTGGAGGGCCGCCTCTGAGCGGGCGGCGGGCCGACGGCGAGCGCGGGCGGCGGCGGTGACGGAGGCGCCGCTGCCAGGGGGCGTGCGGCAGCGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCTGGGCCTCGAGCGCCCGCAGCCCACCTCTCGGGGGCGGGCTCCCGGCGCTAGCAGGGCTGAAGAGGAGATGGAGGAGCTGGTGGTGGAAGTGCGGGGCTGCTCAGCTCCGTTTCGGTTTCACTTCCGGTGGAGGGCCGCCTCTGAGCGGGCGGCGGGCCGACGGCGAGCGCGGGCGGCGGCGGTGACGGAGGCGCCGCTGCCAGGGGGCGTGCGGCAGCGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCTGGGCCTCGAGCGCCCGCAGCCCACCTCTCGGGGGCGGGCTCCCGGCGCTAGCAGGGCCGAAGAGAAGATGGAGGAGCTGGTGGTGGAAGTGCGGGGCTCTCAGCTCCGTTTCGGTTTCACTTCCGGTGGAGGGCCGCCTCTGAGCGGGCGGCGGGCCGACGGCGAGCGCGGGCGGCGGCGGTGACGGAGGCGCCGCTGCCAGGGGGCGTGCGGCAGCGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGAGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCTGGGCCTCGAGCGCCCGCAGCCCACCTCTCGGGGGCGGGCTCCCGGCGCTAGCAGGGCTGAAGAGAAGATGGAGGAGCTGGTGGTGGAAGTGCGGGGCTATCTCTCTCAAAATTTTCCCCGGGG"
+    try_split_seq_1(seq=seq)
+
+    print("\n\n\n")
     tag = try_split_seq_2(seq=seq)
     print(f"it is ok? = {tag}")
 

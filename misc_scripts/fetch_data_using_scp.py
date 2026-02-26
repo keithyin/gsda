@@ -78,10 +78,10 @@ if __name__ == "__main__":
         # "user@192.168.3.125:/data1/EurusResV3/20260120_250302Y0004_Run0001/*.bam",
         # "user@192.168.3.125:/data1/EurusResV3/20260112_250302Y0004_Run0001",
         # "user@192.168.3.72:/data1/EurusResV3/20260127_250302Y0001_Run0001/",
-        # "user@192.168.3.72:/data1/EurusResV3/20260129_250302Y0001_Run0003/",
-        "user@192.168.3.40:/data1/EurusResV3/20260130_240601Y0002_Run0004/*.bam",
-        "user@192.168.3.37:/data1/EurusResV3/20260130_240601Y0014_Run0005/*.bam",
-        "user@192.168.3.35:/data1/EurusResV3/20260130_250214YJ006_Run0003/*.bam",
+        # "user@192.168.3.72:/data1/EurusResV3/20260205_250302Y0001_Run0002/*.bam",
+        # "user@192.168.3.40:/data1/EurusResV3/20260130_240601Y0002_Run0004/*.bam",
+        # "user@192.168.3.37:/data1/EurusResV3/20260130_240601Y0014_Run0005/*.bam",
+        "user@192.168.3.35:/data1/EurusResV3/20260210_250214YJ006_Run0006/*.bam",
 
     ]
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
             remote_user=user,
             remote_host=remote_host,
             remote_path=remote_path,
-            local_target_path="/data1/ccs_data/20260130-ecoli",
+            local_target_path="/data1/ccs_data/20260219-zhejiang-guanghegu-q30low",
             ssh_key_path="~/.ssh/id_rsa",  # 可选
             port=22
         )
