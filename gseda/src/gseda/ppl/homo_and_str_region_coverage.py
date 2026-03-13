@@ -5,6 +5,7 @@ import pysam
 from tqdm import tqdm
 import argparse
 from glob import glob
+import multiprocessing as mp
 
 
 class RecordInfo:
@@ -16,7 +17,7 @@ class RecordInfo:
 
 def read_bam_file(bam_file: str, rq_thr: float):
     infos = {}
-    with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=40) as in_bam:
+    with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=mp.cpu_count()) as in_bam:
         for record in tqdm(in_bam.fetch(until_eof=True), desc=f"reading {bam_file}"):
             rq = 1.0
             if record.has_tag("rq"):
@@ -84,7 +85,7 @@ def main(args):
         for record_key, record_info in tqdm(record_infos.items(), desc=f"counting ..."):
             tot_len += record_info.length
             tr_len += gff_infos.get(record_key, 0)
-        
+
         inner = f"HomoAndStrRatio:{(tr_len / tot_len) * 100:.2f} %"
         report_inner += f"- {inner}\n"
         print(inner)
@@ -94,13 +95,15 @@ def main(args):
 {report_inner}
 =====================================================
 """
+    print(report_str)
     return report_str
 
 
 def main_cli():
 
     parser = argparse.ArgumentParser(prog="")
-    parser.add_argument("bam_file", nargs="+")
+    parser.add_argument("files", nargs="+",
+                        help=".bam, .fa, .fasta, .fastq, .fq")
     parser.add_argument('--rq-thr', type=float, default=0.95, dest="rq_thr")
     args = parser.parse_args()
     main(args=args)
