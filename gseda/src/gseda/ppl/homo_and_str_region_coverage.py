@@ -39,7 +39,7 @@ def process_fastx_to_fasta(input_file: str, output_fasta: str):
     infos = {}
     with pysam.FastxFile(input_file) as fx:
         out_fa = None
-        if input_file.endswith(".fq", ".fastq"):
+        if input_file.endswith(".fq") or input_file.endswith(".fastq"):
             out_fa = open(output_fasta, "w")
 
         for entry in tqdm(fx, desc=f"processing {input_file}"):
