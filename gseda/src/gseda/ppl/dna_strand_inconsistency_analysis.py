@@ -17,7 +17,7 @@ def asts_alignment(query_bam: str, target_bam: str, np_thr: int, rq_thr: float):
     if os.path.exists(o_name):
         return o_name
 
-    cmd = f"asts -q {query_bam} -t {target_bam} -p {o_prefix} --np-range {np_thr}:10000000 --rq-range {rq_thr}:1.1"
+    cmd = f"asts -q {query_bam} -t {target_bam} -p {o_prefix} --np-range {np_thr}:10000000 --rq-range {rq_thr}:1.1 --m 4 --M 10 --o 4,48 --e 2,1"
     subprocess.check_call(cmd, shell=True)
     return o_name
 
