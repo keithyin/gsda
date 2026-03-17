@@ -142,6 +142,11 @@ def stat_channel_reads(df: pl.DataFrame):
             .alias("≥Q20")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
             pl.col("phreq")
+            .ge(pl.lit(25))
+            .sum()
+            .alias("≥Q25")
+            .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
+            pl.col("phreq")
             .ge(pl.lit(30))
             .sum()
             .alias("≥Q30")
@@ -163,6 +168,9 @@ def stat_channel_reads(df: pl.DataFrame):
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(20)).sum() / pl.len())
             .alias("≥Q20")
+            .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
+            (pl.col("phreq").ge(pl.lit(25)).sum() / pl.len())
+            .alias("≥Q25")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(30)).sum() / pl.len())
             .alias("≥Q30")

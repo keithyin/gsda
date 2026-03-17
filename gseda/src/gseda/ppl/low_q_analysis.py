@@ -12,10 +12,10 @@ sys.path.append(str(cur_dir))
 sys.path.append(str(prev_dir))
 sys.path.append(str(prev_prev_dir))
 
-print(f"cur_dir:{cur_dir}")
-print(f"prev_dir:{prev_dir}")
-print(f"prev_prev_dir:{prev_prev_dir}")
-print(f"sys.path={sys.path}")
+# print(f"cur_dir:{cur_dir}")
+# print(f"prev_dir:{prev_dir}")
+# print(f"prev_prev_dir:{prev_prev_dir}")
+# print(f"sys.path={sys.path}")
 
 import homo_and_str_region_coverage  # noqa: E402
 import dna_strand_inconsistency_analysis  # noqa: E402
@@ -60,7 +60,7 @@ def main(args):
         dna_strand_in_consisteny_param)
 
     homo_str_regin_cov_param = {
-        "bam_file": [smc_bam],
+        "files": [smc_bam],
         "rq_thr": 0.95
     }
     homo_str_regin_cov_param = argparse.Namespace(**homo_str_regin_cov_param)
@@ -71,7 +71,7 @@ def main(args):
     # }
 
     report += macebell_ratio.main(bam_path=smc_bam,
-                                         threads=mp.cpu_count())
+                                  threads=mp.cpu_count())
 
     print(report)
     pass

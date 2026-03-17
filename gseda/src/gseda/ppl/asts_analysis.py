@@ -13,7 +13,7 @@ def asts_bam_identity(asts_bam_file: str):
     coverage_count = {}
     identity_m_coverage_count = {}
 
-    with pysam.AlignmentFile(asts_bam_file, mode="rb", check_sq=False, threads=cpu_count()) as in_bam:
+    with pysam.AlignmentFile(asts_bam_file, mode="rb", threads=cpu_count()) as in_bam:
         for record in tqdm(in_bam.fetch(), desc=f"reading {asts_bam_file}"):
             identity = record.get_tag("iy")
             coverage = record.get_tag("ec")
