@@ -1,5 +1,23 @@
 import subprocess
 import sys
+import os
+
+
+def create_dir_with_777(path: str):
+    # 1. 检查目录是否存在
+    if not os.path.exists(path):
+        # 2. 创建目录 (exist_ok=True 防止并发创建时报错)
+        # mode=0o777 在某些系统上受 umask 影响，可能无法直接达到 777
+        os.makedirs(path, mode=0o777, exist_ok=True)
+        print(f"目录已创建: {path}")
+    else:
+        print(f"目录已存在: {path}")
+
+    # 3. 显式修改权限为 777
+    # 0o777 是八进制表示法
+    os.chmod(path, 0o777)
+    print(f"权限已设置为 777")
+
 
 def scp_directory_with_key(
     remote_user,
@@ -11,7 +29,6 @@ def scp_directory_with_key(
 ):
     """
     使用 scp 复制远程目录到本地（使用 SSH 密钥认证）
-    
     :param remote_user: 远程用户名
     :param remote_host: 远程主机 IP 或域名
     :param remote_path: 远程目录路径
@@ -29,6 +46,8 @@ def scp_directory_with_key(
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null"
     ]
+
+    create_dir_with_777(local_target_path)
 
     remote_spec = f"{remote_user}@{remote_host}:{remote_path}"
     scp_cmd += [remote_spec, local_target_path]
@@ -49,33 +68,48 @@ def scp_directory_with_key(
         print(f"❌ scp 失败:\n{e.stderr}", file=sys.stderr)
         return False
 
+
 # 示例用法
 if __name__ == "__main__":
-    
+
     uris = [
-        "user@192.168.3.125:/data1/EurusResV3/20251224_250302Y0004_Run0001",
-        "user@192.168.3.125:/data1/EurusResV3/20251224_250302Y0004_Run0002",
-        "user@192.168.3.125:/data1/EurusResV3/20251226_250302Y0004_Run0002",
-        "user@192.168.3.125:/data1/EurusResV3/20251229_250302Y0004_Run0003",
-        "user@192.168.3.125:/data1/EurusResV3/20251230_250302Y0004_Run0001",
-        "user@192.168.3.125:/data1/EurusResV3/20251231_250302Y0004_Run0001",
-        "user@192.168.3.63:/data1/EurusResV3/20260106_250302Y0001_Run0003",
-        "user@192.168.3.63:/data1/EurusResV3/20260106_250302Y0001_Run0002",
-        "user@192.168.3.63:/data1/EurusResV3/20260105_250302Y0001_Run0005",
-        "user@192.168.3.63:/data1/EurusResV3/20260108_250302Y0001_Run0001",
-        "user@192.168.3.72:/data1/EurusResV3/20260108_240601Y0088_Run0001",
+        # "user@192.168.3.125:/data1/EurusResV3/20260303_250302Y0004_Run0002/*.bam",
+        # "user@192.168.3.125:/data1/EurusResV3/20260304_250302Y0004_Run0001/*.bam",
+        # "user@192.168.3.125:/data1/EurusResV3/20260304_250302Y0004_Run0002/*.bam",
+        # "user@192.168.3.125:/data1/EurusResV3/20260304_250302Y0004_Run0003/*.bam",
+        # "user@192.168.3.72:/data1/EurusResV3/20260127_250302Y0001_Run0001/",
+        # "user@192.168.3.72:/data1/EurusResV3/20260303_250302Y0001_Run0002/*.bam",
         
+        "user@192.168.3.36:/data1/EurusResV3/20260304_240601Y0012_Run0006/*.bam",
+        # "user@192.168.3.36:/data1/EurusResV3/20260312_240601Y0012_Run0001/*.bam",
+        # "user@192.168.3.36:/data1/EurusResV3/20260311_240601Y0012_Run0003/*.bam",
+        
+        # "user@192.168.3.189:/data1/EurusResV3/20260315_240901Y0006_Run0003/*.bam",
+        
+        # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0001/*.bam",
+        # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0002/*.bam",
+        # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0003/*.bam",
+        
+        
+        
+        
+        
+        
+        # "user@192.168.3.40:/data1/EurusResV3/20260130_240601Y0002_Run0004/*.bam",
+        # "user@192.168.3.37:/data1/EurusResV3/20260130_240601Y0014_Run0005/*.bam",
+        # "user@192.168.3.35:/data1/EurusResV3/20260210_250214YJ006_Run0006/*.bam",
+
     ]
-    
+
     for uri in uris:
         user, ext = uri.split("@")
         remote_host, remote_path = ext.split(":")
-        
+
         success = scp_directory_with_key(
             remote_user=user,
             remote_host=remote_host,
             remote_path=remote_path,
-            local_target_path="/data1/ccs_data/20260109-saisuofei-resplit",
+            local_target_path="/data1/ccs_data/20260304_240601Y0012_Run0006-smc-tail-problem",
             ssh_key_path="~/.ssh/id_rsa",  # 可选
             port=22
         )

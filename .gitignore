@@ -7,3 +7,5 @@ ana/*
 *.jpg
 *.png
 *.log
+*.txt
+*.json

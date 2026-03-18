@@ -26,9 +26,10 @@ for input_file in *_adapter.bam; do
                 --maxLength 10000000 \
                 --minLength 10 \
                 --modelSpecs /root/models/2025Q1-stage1-polish-cnn-dw-smicing-epo50.tar.gz \
-                --modelSpecs /root/models/hg-2025Q1-icing-selfattn-dw-qhead-ls0.01-smicing-epo32.tar.gz \
-                --poaEdUnifyStrand 1 \
-                --reservedThreads 8
+                --modelSpecs /root/models/hg-2025Q1-icing-selfattn-dw-qhead-ls0.01-smicing-epo32-fp16-2o.tar.gz \
+                --modelSpecs /root/models/hg-2025Q1-icing-selfattn-dw-qhead-ls0.01-smicing-epo32-fp16-2o.tar.gz \
+                --enableCalibration 1 \
+                --poaEdUnifyStrand 1 
         
         # 检查命令是否执行成功
         if [ $? -eq 0 ]; then
