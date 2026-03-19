@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.21.6"
+version = "1.21.7"
 authors = [{ name = "keithyin", email = "yinpenghhz@hotmail.com" }]
 description = "gsetl"
 readme = "README.md"

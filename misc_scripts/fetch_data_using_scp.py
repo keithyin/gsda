@@ -89,10 +89,9 @@ if __name__ == "__main__":
         # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0002/*.bam",
         # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0003/*.bam",
         
-        "user@192.168.3.72:/data1/EurusResV3/20260313_250302Y0001_Run0003/*.bam",
-        "user@192.168.3.125:/data1/EurusResV3/20260316_250302Y0004_Run0001/*.bam",
-        "user@192.168.3.125:/data1/EurusResV3/20260316_250302Y0004_Run0002/*.bam",
-
+        "user@192.168.3.72:/data1/EurusResV3/20260318_250302Y0001_Run0001/*_called.bam",
+        "user@192.168.3.72:/data1/EurusResV3/20260318_250302Y0001_Run0002/*_called.bam",
+        "user@192.168.3.170:/data1/EurusResV3/20260318_250804Y0005_Run0002/*_called.bam",
         
         # "user@192.168.3.40:/data1/EurusResV3/20260130_240601Y0002_Run0004/*.bam",
         # "user@192.168.3.37:/data1/EurusResV3/20260130_240601Y0014_Run0005/*.bam",
@@ -108,7 +107,7 @@ if __name__ == "__main__":
             remote_user=user,
             remote_host=remote_host,
             remote_path=remote_path,
-            local_target_path="/data1/ccs_data/20260316-sxs",
+            local_target_path="/data1/ccs_data/20260315-bystrand-needed",
             ssh_key_path="~/.ssh/id_rsa",  # 可选
             port=22
         )

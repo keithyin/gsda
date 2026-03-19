@@ -57,10 +57,17 @@ def read_bam_info(
             if record.has_tag("cx"):
                 cx = record.get_tag("cx")
                 is_sbr = True
-            if not record.has_tag(channel_tag):
+
+            ch = None
+
+            if record.has_tag("ch"):
+                ch = int(record.get_tag("ch"))
+            if record.has_tag("zm"):
+                ch = int(record.get_tag("zm"))
+
+            if ch is None:
                 ch = int(record.query_name.split("_")[1])
-            else:
-                ch = int(record.get_tag(channel_tag))
+
             channels.append(ch)
             seq_lens.append(record.query_length)
             rqs.append(rq)
