@@ -13,7 +13,7 @@ import sys
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
-import env_prepare # noqa: E402
+import env_prepare  # noqa: E402
 
 
 logging.basicConfig(
@@ -98,24 +98,55 @@ def stats(metric_filename, filename):
         ])
     )
 
-    df = (df
-          .group_by(["motif", "true_base", "true_cnt", "called", "tag"])
-          .agg([
-              pl.col("num").sum()])
-          .with_columns([
-              (pl.col("num") /
-               pl.col("num").sum().over(["motif", "tag"])).alias("ratio_within_motif_tag"),
+    df1 = (df
+           .group_by(["motif", "true_base", "true_cnt", "called", "tag"])
+           .agg([
+               pl.col("num").sum()])
+           .with_columns([
+               (pl.col("num") /
+                pl.col("num").sum().over(["motif", "tag"])).alias("ratio_within_motif_tag"),
 
-              (pl.col("num") /
-               pl.col("num").sum().over(["motif"])).alias("ratio_within_motif"),
-          ])
-          .sort(
-              [pl.col("true_base").str.len_chars(), pl.col("true_base"),
-               pl.col("true_cnt"), pl.col("tag"), pl.col("called")],
-              descending=[False, False, False, False, False])
-          )
+               (pl.col("num") /
+                   pl.col("num").sum().over(["motif"])).alias("ratio_within_motif"),
+           ])
+           .sort(
+               [pl.col("true_base").str.len_chars(), pl.col("true_base"),
+                pl.col("true_cnt"), pl.col("tag"), pl.col("called")],
+               descending=[False, False, False, False, False])
+           )
+    # print(df1)
+
+    df2 = (df
+           .group_by(["motif", "true_base", "true_cnt", "called"])
+           .agg([
+               pl.col("num").sum()])
+           .with_columns([
+               (pl.col("num") /
+                pl.col("num").sum().over(["motif"])).alias("ratio_within_motif_tag"),
+
+               (pl.col("num") /
+                   pl.col("num").sum().over(["motif"])).alias("ratio_within_motif"),
+               pl.lit("pure+mixed").alias("tag")
+           ])
+           .sort(
+               [pl.col("true_base").str.len_chars(), pl.col("true_base"),
+                pl.col("true_cnt"), pl.col("tag"), pl.col("called")],
+               descending=[False, False, False, False, False])
+           ).select(["motif", "true_base", "true_cnt", "called", "tag", "num", "ratio_within_motif_tag", "ratio_within_motif"])
+
+    df = pl.concat([df1, df2])
+
+    df = df.with_columns(
+        (1 - pl.col("ratio_within_motif_tag")
+         .sort_by("called")
+         .shift(1)
+         .fill_null(0)
+         .cum_sum()
+         .over(["motif", "tag"])
+         ).alias("ratio")
+    )
+
     print(df)
-
     df.write_csv(filename, include_header=True, separator="\t")
 
 

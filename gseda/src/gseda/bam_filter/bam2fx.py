@@ -1,6 +1,7 @@
 import pysam
 import argparse
 from tqdm import tqdm
+import multiprocessing as mp
 
 
 def bam_to_fastx(bam_path, fastx_path: str, rq_threshold):
@@ -9,7 +10,7 @@ def bam_to_fastx(bam_path, fastx_path: str, rq_threshold):
     output_fq = fastx_path.endswith("fastq")
 
     with pysam.AlignmentFile(
-        bam_path, "rb", threads=40, check_sq=False
+        bam_path, "rb", threads=mp.cpu_count(), check_sq=False
     ) as bam_file, open(fastx_path, "w") as fastx_out:
         for read in tqdm(
             bam_file.fetch(until_eof=True), desc=f"dumping {bam_path} to {fastx_path}"
@@ -43,7 +44,8 @@ def bam_to_fastx(bam_path, fastx_path: str, rq_threshold):
 
 
 def main_cli():
-    parser = argparse.ArgumentParser(description="Convert BAM to FASTQ with rq filter.")
+    parser = argparse.ArgumentParser(
+        description="Convert BAM to FASTQ with rq filter.")
     parser.add_argument("bam", help="Input BAM file path")
     parser.add_argument("fastx", help="Output FASTX file path. fasta/fastq")
     parser.add_argument(
@@ -51,7 +53,8 @@ def main_cli():
     )
 
     args = parser.parse_args()
-    assert args.fastx.endswith("fastq") or args.fastx.endswith("fasta"), "only fastq/fasta are supported"
+    assert args.fastx.endswith("fastq") or args.fastx.endswith(
+        "fasta"), "only fastq/fasta are supported"
     bam_to_fastx(args.bam, args.fastx, args.rq)
 
 

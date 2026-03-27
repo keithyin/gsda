@@ -49,3 +49,13 @@ docker run -it -v `pwd`:/data --gpus all \
         --minLength 10 \
         --hmmModelSpec Kit__500_Chem__1_BC__1_PW3_v4 \
         --byStrand 1
+
+
+
+IMAGE_BASE="192.168.3.38:5000/algo/adacus"
+# 获取所有匹配的镜像，按创建时间倒序，取第一行
+LATEST_IMAGE=$(docker images --format "table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | \
+               grep "^${IMAGE_BASE}:" | \
+               sort -k2 -r | \
+               head -n1 | \
+               awk '{print $1}')

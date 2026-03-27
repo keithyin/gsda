@@ -555,6 +555,9 @@ def main(
 
 
 def main_cli():
+    """
+    比 v1 多了一些输入参数
+    """
     env_prepare.polars_env_init()
 
     parser = argparse.ArgumentParser(prog="parser")

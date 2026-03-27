@@ -13,7 +13,7 @@ import sys
 cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
 print(cur_dir)
 sys.path.append(cur_dir)
-import env_prepare # noqa: E402
+import env_prepare  # noqa: E402
 
 
 logging.basicConfig(
@@ -152,7 +152,8 @@ def main(
 
     env_prepare.check_and_install(
         "gsmm2-metric", semver.Version.parse("0.4.1"), "cargo install gsmm2-metric")
-
+   
+        
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
         if not os.path.exists(outdir):
@@ -186,12 +187,8 @@ def main(
     if force and os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
-    # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
-    # else:
-    #     logging.warning(
-    #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
-    #     )
+
     return (aggr_metric_filename, fact_metric_filename)
 
 

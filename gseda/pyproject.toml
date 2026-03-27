@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.21.7"
+version = "1.21.9"
 authors = [{ name = "keithyin", email = "yinpenghhz@hotmail.com" }]
 description = "gsetl"
 readme = "README.md"
@@ -34,6 +34,8 @@ reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
 reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
 reads-quality-hp-cli = "gseda.ppl.reads_quality_stats_hp:main_cli"
 sequencing-report-cli = "gseda.ppl.sequencing_report:main_cli"
+sequencing-report-v2-cli = "gseda.ppl.sequencing_report_v2:main_cli"
+
 sequencing-report-overall-cli = "gseda.ppl.sequencing_report_overall:main_cli"
 
 seq-n-stats-cli = "gseda.ppl.seq_n_stats:main_cli"
@@ -47,13 +49,14 @@ fastx-basic-stat-cli = "gseda.fastx_ana.fastx_basic_stat:main_cli"
 msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
 phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
 wga-cli = "gseda.ppl.whole_genome_alignment:main_cli"
-bam2fx = "gseda.bam_fiter.bam2fx:main_cli"
+bam2fx-cli = "gseda.bam_filter.bam2fx:main_cli"
 smc-mem-est = "gseda.bam_ana.mem_est:main_cli"
 
 low-q-analysis-ppl = "gseda.ppl.low_q_analysis:main_cli"
 homo-and-str-ratio = "gseda.ppl.homo_and_str_region_coverage:main_cli"
 macebell-ratio-cli = "gseda.ppl.macebell_ratio:main_cli"
 
+dump-specified-barcode-sbr = "gseda.bam_filter.dump_sbr_according_barcode:main_cli"
 
 # 构建后端，默认为 Hatchling
 [build-system]

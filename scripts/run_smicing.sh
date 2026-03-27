@@ -44,12 +44,41 @@ done
 echo "所有文件处理完成！"
 
 
->Barcode2_F
-GGGGCCCCAAAATTTTGAGAGAGAT
->Barcode2_R
-ATCTCTCTCAAAATTTTGGGGCCCC
+#!/bin/bash
 
->Barcode6_F
-GGGGAAAACCCCTTTTGAGAGAGAT
->Barcode6_R
-ATCTCTCTCAAAAGGGGTTTTCCCC
+# 获取所有以subreads.bam结尾的文件列表
+files=(*adapter.bam)
+
+# 检查是否找到文件
+if [ ${#files[@]} -eq 0 ]; then
+    echo "未找到任何以subreads.bam结尾的文件"
+    exit 1
+fi
+
+echo "找到以下待处理文件:"
+printf '%s\n' "${files[@]}"
+
+# 遍历处理每个文件
+for file in "${files[@]}"; do
+    echo "正在处理文件: $file"
+    fstem="${file%.bam}"
+    echo "$file -> $fstem"
+
+    sync
+    sudo echo 3 > /proc/sys/vm/drop_caches
+
+    docker run --rm -t --gpus all \
+        -v `pwd`:/data \
+        192.168.3.38:5000/algo/adacus:smc5.5.0_adapter_demux0.0.5_barcode_remover1.0.3_smicing0.6.1_bmi_0.1.5_gseda_1.19.2 \
+        /bin/bash -c " \
+            LD_PRELOAD=/lib/x86_64-linux-gnu/libjemalloc.so.2  smicing consensus /data/$file /data/$fstem.new \
+                --smcMinPasses 1 \
+                --smcMaxPasses 25 \
+                --maxLength 10000000 --minLength 10 \
+                --modelSpecs /root/models/2025Q1-stage1-polish-cnn-dw-smicing-epo50.tar.gz \
+                --modelSpecs /root/models/hg-2025Q1-icing-selfattn-dw-qhead-ls0.01-smicing-epo32-fp16-2o.tar.gz \
+                --poaEdUnifyStrand 1 \
+        "
+done
+
+echo "所有文件处理完成"
