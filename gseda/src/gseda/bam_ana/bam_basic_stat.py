@@ -3,7 +3,7 @@ from tqdm import tqdm
 import polars as pl
 import os
 import argparse
-from typing import Tuple
+from typing import Tuple, Optional
 import numpy as np
 
 
@@ -12,6 +12,23 @@ def polars_env_init():
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
     os.environ["POLARS_FMT_MAX_ROWS"] = "300"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
+    # Ensure consistent table formatting across environments
+    import sys, shutil
+    # Use UTF8 borders for a rich look (falls back gracefully)
+    pl.Config.set_tbl_formatting("ASCII_FULL")
+    pl.Config.set_tbl_width_chars(500)
+    pl.Config.set_tbl_hide_dtype_separator(True)
+    pl.Config.set_tbl_hide_column_data_types(True)
+    # pl.Config.settb
+    # Respect terminal width when possible
+    try:
+        width = shutil.get_terminal_size().columns
+        # Some Polars versions expose set_tbl_width, others do not
+        if hasattr(pl.Config, "set_tbl_width"):
+            pl.Config.set_tbl_width(width)
+    except Exception:
+        # If we cannot determine size or the API is missing, leave default
+        pass
 
 
 def q2phreq_expr(inp_name, oup_name=None):
@@ -123,7 +140,7 @@ def stat_channel_reads(df: pl.DataFrame):
     lengths = df.select([pl.col("seq_len")]).to_pandas()["seq_len"].to_numpy()
     print("N50:{}".format(compute_n50(lengths)))
 
-    print(res)
+    pretty_print(res)
 
     # q
     res = df.select(
@@ -160,7 +177,7 @@ def stat_channel_reads(df: pl.DataFrame):
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
         ]
     )
-    print(res)
+    pretty_print(res)
 
     res = df.select(
         [
@@ -186,7 +203,7 @@ def stat_channel_reads(df: pl.DataFrame):
             pl.col("phreq").median().alias("MedianQValue"),
         ]
     )
-    print(res)
+    pretty_print(res)
 
     # np
     res = (
@@ -248,7 +265,7 @@ def stat_channel_reads(df: pl.DataFrame):
     )
 
     print("------------------------Channel----------------------------")
-    print(res)
+    pretty_print(res)
     pass
 
 
@@ -327,25 +344,25 @@ def stat_subreads(df: pl.DataFrame):
 
     res = len_dist(channel_level_info=channel_level_info)
     print("------------------------Passes>=0----------------------------")
-    print(res)
+    pretty_print(res)
 
     res = len_dist(
         channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 1)
     )
     print("------------------------Passes>=1----------------------------")
-    print(res)
+    pretty_print(res)
 
     res = len_dist(
         channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 2)
     )
     print("------------------------Passes>=2----------------------------")
-    print(res)
+    pretty_print(res)
 
     res = len_dist(
         channel_level_info=channel_level_info.filter(pl.col("oriPasses") >= 3)
     )
     print("------------------------Passes>=3----------------------------")
-    print(res)
+    pretty_print(res)
 
 
 def main(args):
@@ -382,6 +399,19 @@ def main_cli():
     args = parser.parse_args()
     main(args=args)
 
+
+def pretty_print(obj):
+    """Print objects with Polars display settings applied.
+    Currently used for DataFrames; falls back to regular print for other types.
+    """
+    try:
+        import shutil
+        pl.Config.set_tbl_formatting("UTF8")
+        width = shutil.get_terminal_size().columns
+        pl.Config.set_tbl_width(width)
+    except Exception:
+        pass
+    print(obj)
 
 if __name__ == "__main__":
     main_cli()

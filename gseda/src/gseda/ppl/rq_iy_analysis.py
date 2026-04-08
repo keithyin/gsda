@@ -250,6 +250,7 @@ def stat(fname: str, o_prefix):
         )
         .sort(["phreq_rq"], descending=[False])
     )
+    # stats3.rept
     print(stats3)
 
 

@@ -91,9 +91,16 @@ def consumer(queue):
 # =========================
 # 生产者：从 BAM 读取并放入队列
 # =========================
-def producer(bam_path, queue):
+def producer(path: str, queue):
+    if path.endswith("bam"):
+        bam_record_producer(path, queue=queue)
+    else:
+        fastx_record_producer(path=path, queue=queue)
+
+
+def bam_record_producer(path, queue):
     count = 0
-    with pysam.AlignmentFile(bam_path, "rb", threads=10, check_sq=False) as bam:
+    with pysam.AlignmentFile(path, "rb", threads=10, check_sq=False) as bam:
         for read in bam.fetch(until_eof=True):
             seq = read.query_sequence
             if seq:
@@ -105,9 +112,24 @@ def producer(bam_path, queue):
     print(f"\nProducer finished. Total reads enqueued: {count}")
 
 
+def fastx_record_producer(path, queue):
+    count = 0
+    with pysam.FastxFile(path) as in_file:
+        for read in in_file:
+            seq = read.sequence
+            if seq:
+                queue.put(seq)
+                count += 1
+                if count % 10000 == 0:
+                    print(f"\rProduced {count} reads...",
+                          end='', flush=True)
+    print(f"\nProducer finished. Total reads enqueued: {count}")
+
 # =========================
 # 主函数
 # =========================
+
+
 def main(bam_path, threads):
     start = time.time()
 

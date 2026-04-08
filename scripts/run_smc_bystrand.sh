@@ -1,6 +1,12 @@
 #!/bin/bash
 
-adapter_file=*_adapter.bam
+adapter_files=( *_adapter.bam )
+if [ ${#adapter_files[@]} -eq 1 ]; then
+    adapter_file="${adapter_files[0]}"
+else
+    echo "Error: found ${#adapter_files[@]} adapter files, expected exactly one." >&2
+    exit 1
+fi
 output_prefix="${adapter_file%_adapter.bam}.bystrand"
 echo "processing $adapter_file -> $output_prefix"
 IMAGE_BASE="192.168.3.38:5000/algo/adacus"
@@ -87,10 +93,7 @@ if __name__ == "__main__":
 EOF
 
 bystrand_filename=${output_prefix}.bam
-docker exec -it gseq_product_dna python `pwd`/bam2fx.py $bystrand_filename ${output_prefix}.q8.fastq --rq 0.84151
-docker exec -it gseq_product_dna python `pwd`/bam2fx.py $bystrand_filename ${output_prefix}.q10.fastq --rq 0.9
-docker exec -it gseq_product_dna python `pwd`/bam2fx.py $bystrand_filename ${output_prefix}.q20.fastq --rq 0.99
-docker exec -it gseq_product_dna python `pwd`/bam2fx.py $bystrand_filename ${output_prefix}.q30.fastq --rq 0.999
-
-
-
+docker exec -it gseq_product_dna /home/user/anaconda3/envs/conda_env38/bin/python `pwd`/bam2fx.py `pwd`/$bystrand_filename `pwd`/${output_prefix}.q8.fastq --rq 0.84151
+docker exec -it gseq_product_dna /home/user/anaconda3/envs/conda_env38/bin/python `pwd`/bam2fx.py `pwd`/$bystrand_filename `pwd`/${output_prefix}.q10.fastq --rq 0.9
+docker exec -it gseq_product_dna /home/user/anaconda3/envs/conda_env38/bin/python `pwd`/bam2fx.py `pwd`/$bystrand_filename `pwd`/${output_prefix}.q20.fastq --rq 0.99
+docker exec -it gseq_product_dna /home/user/anaconda3/envs/conda_env38/bin/python `pwd`/bam2fx.py `pwd`/$bystrand_filename `pwd`/${output_prefix}.q30.fastq --rq 0.999

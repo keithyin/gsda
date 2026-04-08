@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: #f5f7fa;
+        }
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e4e7ed;
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #e4e7ed;
+            margin-bottom: 10px;
+        }
+        .sidebar-header h2 {
+            margin: 0;
+            color: #303133;
+            font-size: 18px;
+        }
+        .search-box {
+            padding: 0 20px 15px;
+        }
+        .tools-list {
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+        }
+        .tool-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        .tool-item:hover {
+            background: #f5f7fa;
+            border-left-color: #409eff;
+        }
+        .tool-item.active {
+            background: #ecf5ff;
+            border-left-color: #409eff;
+            color: #409eff;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .panel-header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #303133;
+        }
+        .form-section {
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #606266;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #409eff;
+        }
+        .result-section {
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e4e7ed;
+        }
+        .result-output {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #909399;
+        }
+        .loading-overlay {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+        .tag-container {
+            margin-top: 8px;
+        }
+        .tool-tag {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container class="app-container">
+            <!-- Sidebar -->
+            <el-aside width="280px" style="background: #fff;">
+                <div class="sidebar-header">
+                    <h2>GSEDA 工具集</h2>
+                </div>
+                <div class="search-box">
+                    <el-input
+                        v-model="searchQuery"
+                        placeholder="搜索工具..."
+                        prefix-icon="Search"
+                        clearable
+                    ></el-input>
+                </div>
+                <div class="tools-list">
+                    <div v-if="canShowTools">
+                        <div
+                            v-for="tool in filteredTools"
+                            :key="tool.name"
+                            :class="['tool-item', { active: selectedTool === tool.name }]"
+                            @click="selectTool(tool)"
+                            v-text="tool.name"
+                        ></div>
+                    </div>
+                </div>
+            </el-aside>
+
+            <!-- Main Content -->
+            <el-main class="main-content">
+                <!-- Loading -->
+                <div v-if="tools.length === 0" class="empty-state">
+                    <el-icon :size="64"><Files /></el-icon>
+                    <p style="margin-top: 20px; font-size: 16px;">
+                        正在加载工具...
+                    </p>
+                </div>
+
+                <!-- No Tool Selected -->
+                <div v-else-if="!selectedTool" class="empty-state">
+                    <el-icon :size="64"><Files /></el-icon>
+                    <p style="margin-top: 20px; font-size: 16px;">
+                        请选择一个工具开始使用
+                    </p>
+                </div>
+
+                <!-- Tool Form -->
+                <div v-else class="form-section">
+                    <div class="panel-header">
+                        <h1>{{ selectedToolName }}</h1>
+                        <el-tag size="small" type="info">{{ selectedTool.module_path }}</el-tag>
+                    </div>
+
+                    <!-- BAM Basic Stat Form -->
+                    <div v-if="selectedToolName === 'bam-basic-stat'">
+                        <div class="form-group">
+                            <label>BAM 文件路径<span style="color: #f56c6c">*</span></label>
+                            <el-input
+                                v-for="(path, index) in formData.bams"
+                                :key="index"
+                                v-model="formData.bams[index]"
+                                placeholder="/path/to/file.bam"
+                            >
+                                <template #append>
+                                    <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
+                                </template>
+                            </el-input>
+                            <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Channel Tag</label>
+                            <el-select v-model="formData.channel_tag" placeholder="选择 channel tag">
+                                <el-option label="ch" value="ch"></el-option>
+                                <el-option label="zm" value="zm"></el-option>
+                            </el-select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Minimum RQ (可选)</label>
+                            <el-input
+                                v-model.number="formData.min_rq"
+                                placeholder="例如：0.8，留空则不设置最低质量标准"
+                            ></el-input>
+                        </div>
+
+                        <el-button type="primary" size="large" :loading="executing" @click="executeTool">
+                            <span v-if="executing">执行中...</span>
+                            <span v-else>开始分析</span>
+                        </el-button>
+                    </div>
+
+                    <!-- MSA View Form -->
+                    <div v-else-if="selectedToolName === 'msa-view'">
+                        <div class="form-group">
+                            <label>Alignment BAM<span style="color: #f56c6c">*</span></label>
+                            <el-input
+                                v-model="formData.bam"
+                                placeholder="/path/to/aligned.bam"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reference FASTA<span style="color: #f56c6c">*</span></label>
+                            <el-input
+                                v-model="formData.ref_fasta"
+                                placeholder="/path/to/reference.fa"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reference Name<span style="color: #f56c6c">*</span></label>
+                            <el-input
+                                v-model="formData.ref_name"
+                                placeholder="例如：contig_001"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reference Start (可选)</label>
+                            <el-input
+                                v-model.number="formData.start"
+                                type="number"
+                                placeholder="起始位置"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reference End (可选)</label>
+                            <el-input
+                                v-model.number="formData.end"
+                                type="number"
+                                placeholder="结束位置"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>输出 FASTA 文件路径 (可选)</label>
+                            <el-input
+                                v-model="formData.o_fasta"
+                                placeholder="/path/to/output.fasta"
+                            ></el-input>
+                        </div>
+
+                        <div class="form-group">
+                            <label>输出图片路径 (可选)</label>
+                            <el-input
+                                v-model="formData.o_pic"
+                                type="file"
+                                placeholder="/path/to/output.png"
+                            ></el-input>
+                        </div>
+
+                        <el-button type="primary" size="large" :loading="executing" @click="executeTool">
+                            <span v-if="executing">执行中...</span>
+                            <span v-else>生成 MSA</span>
+                        </el-button>
+                    </div>
+
+                    <!-- Other tools (placeholder) -->
+                    <div v-else>
+                        <p style="color: #909399;">
+                            此工具 "{{ selectedToolName }}" 的配置表单正在开发中，请稍后使用。
+                        </p>
+                        <el-button type="primary" :loading="executing" @click="executeTool">
+                            <span v-if="executing">执行中...</span>
+                            <span v-else>执行工具</span>
+                        </el-button>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div v-if="result" class="result-section">
+                    <div class="result-header">
+                        <h3>执行结果</h3>
+                        <div>
+                            <el-tag :type="result.success ? 'success' : 'danger'" size="small">
+                                {{ result && result.success ? '成功' : '失败' }} (代码：{{ result ? result.exit_code : '' }})
+                            </el-tag>
+                        </div>
+                    </div>
+
+                    <pre class="result-output">{{ formattedResult }}</pre>
+
+                    <div style="margin-top: 15px; text-align: right;">
+                        <el-button @click="copyResult">复制结果</el-button>
+                    </div>
+                </div>
+            </el-main>
+        </el-container>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+        const { Search, Files } = ElementPlusIconsVue;
+
+        const app = createApp({
+            setup() {
+                const tools = ref([]);
+                const searchQuery = ref('');
+                const selectedTool = ref(null);
+                const formData = ref({});
+                const result = ref(null);
+                const executing = ref(false);
+
+                // Load available tools
+                const loadTools = async () => {
+                    try {
+                        const response = await fetch('/api/tools/list');
+                        const data = await response.json();
+                        if (data.success) {
+                            tools.value = data.data.tools;
+                        }
+                    } catch (error) {
+                        ElMessage.error('加载工具列表失败：' + error.message);
+                    }
+                };
+
+                // Filter tools by search query
+                const filteredTools = computed(() => {
+                    if (!searchQuery.value) return tools.value;
+                    return tools.value.filter(t => t.name.includes(searchQuery.value));
+                });
+
+                // Check if tools are loaded
+                const canShowTools = computed(() => {
+                    return tools.value.length > 0;
+                });
+
+                // Select a tool
+                const selectTool = (tool) => {
+                    selectedTool.value = tool;
+                    selectedToolName.value = tool.name;
+                    resetForm();
+                    result.value = null;
+                };
+
+                // Reset form
+                const resetForm = () => {
+                    if (selectedTool.value?.name === 'bam-basic-stat') {
+                        formData.value = {
+                            bams: ['/path/to/file1.bam'],
+                            channel_tag: 'ch',
+                            min_rq: null
+                        };
+                    } else if (selectedTool.value?.name === 'msa-view') {
+                        formData.value = {
+                            bam: '',
+                            ref_fasta: '',
+                            ref_name: '',
+                            start: null,
+                            end: null,
+                            o_fasta: null,
+                            o_pic: null
+                        };
+                    } else {
+                        formData.value = {};
+                    }
+                };
+
+                const selectedToolName = ref('');
+
+                // Add BAM file path
+                const addBam = () => {
+                    formData.value.bams.push('/path/to/file.bam');
+                };
+
+                // Remove BAM file path
+                const removeBam = (index) => {
+                    if (formData.value.bams.length > 1) {
+                        formData.value.bams.splice(index, 1);
+                    }
+                };
+
+                // Execute tool
+                const executeTool = async () => {
+                    if (!selectedTool.value) return;
+
+                    executing.value = true;
+                    try {
+                        const payload = {
+                            tool_name: selectedTool.value.name,
+                            args: formData.value
+                        };
+
+                        const response = await fetch(
+                            `/api/tools/${selectedTool.value.name}/execute`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            }
+                        );
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            result.value = data.data;
+                            ElMessage.success('工具执行成功');
+                        } else {
+                            result.value = {
+                                success: false,
+                                tool_name: selectedTool.value.name,
+                                stdout: data.data?.stdout || '',
+                                stderr: data.data?.stderr || '',
+                                exit_code: -1
+                            };
+                            ElMessage.error('工具执行失败，请查看错误信息');
+                        }
+                    } catch (error) {
+                        ElMessage.error('执行出错：' + error.message);
+                        result.value = {
+                            success: false,
+                            tool_name: selectedTool.value.name,
+                            stdout: '',
+                            stderr: error.message,
+                            exit_code: -1
+                        };
+                    } finally {
+                        executing.value = false;
+                    }
+                };
+
+                // Copy result to clipboard
+                const copyResult = () => {
+                    if (result.value) {
+                        const text = [
+                            `工具：${result.value.tool_name}`,
+                            `状态：${result.value.success ? '成功' : '失败'}`,
+                            `退出码：${result.value.exit_code}`,
+                            '',
+                            '--- STDOUT ---',
+                            result.value.stdout || '(无输出)',
+                            '',
+                            '--- STDERR ---',
+                            result.value.stderr || '(无错误)'
+                        ].join('\n');
+
+                        navigator.clipboard.writeText(text).then(() => {
+                            ElMessage.success('结果已复制到剪贴板');
+                        });
+                    }
+                };
+
+                // Computed formatted result
+                const formattedResult = computed(() => {
+                    if (!result.value) return '';
+                    return [
+                        `工具：${result.value.tool_name}`,
+                        `状态：${result.value.success ? '成功' : '失败'}`,
+                        `退出码：${result.value.exit_code}`,
+                        '',
+                        '--- STDOUT ---',
+                        result.value.stdout || '(无输出)',
+                        '',
+                        '--- STDERR ---',
+                        result.value.stderr || '(无错误)'
+                    ].join('\n');
+                });
+
+                // Load tools when component is mounted
+                onMounted(() => {
+                    loadTools();
+                });
+
+                return {
+                    tools,
+                    searchQuery,
+                    filteredTools,
+                    selectedTool,
+                    selectedToolName,
+                    tools,
+                    filteredTools,
+                    canShowTools,
+                    selectedToolName,
+                    selectedTool,
+                    formData,
+                    result,
+                    executing,
+                    selectTool,
+                    addBam,
+                    removeBam,
+                    executeTool,
+                    copyResult,
+                    formattedResult
+                };
+            }
+        });
+
+        // Register icon components
+        app.use(ElementPlus);
+        app.component('Search', Search);
+        app.component('Files', Files);
+
+        app.mount('#app');
+    </script>
+</body>
+</html>
