@@ -6,7 +6,6 @@ import argparse
 from typing import Tuple, Optional
 import numpy as np
 
-
 def polars_env_init():
     os.environ["POLARS_FMT_TABLE_ROUNDED_CORNERS"] = "1"
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
@@ -149,31 +148,31 @@ def stat_channel_reads(df: pl.DataFrame):
             .ge(pl.lit(8))
             .sum()
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String)
-            .alias("≥Q8"),
+            .alias(">=Q8"),
             pl.col("phreq")
             .ge(pl.lit(10))
             .sum()
-            .alias("≥Q10")
+            .alias(">=Q10")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
             pl.col("phreq")
             .ge(pl.lit(15))
             .sum()
-            .alias("≥Q15")
+            .alias(">=Q15")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
             pl.col("phreq")
             .ge(pl.lit(20))
             .sum()
-            .alias("≥Q20")
+            .alias(">=Q20")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
             pl.col("phreq")
             .ge(pl.lit(25))
             .sum()
-            .alias("≥Q25")
+            .alias(">=Q25")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
             pl.col("phreq")
             .ge(pl.lit(30))
             .sum()
-            .alias("≥Q30")
+            .alias(">=Q30")
             .map_elements(lambda x: f"{x:,}", return_dtype=pl.String),
         ]
     )
@@ -182,22 +181,22 @@ def stat_channel_reads(df: pl.DataFrame):
     res = df.select(
         [
             (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
-            .alias("≥Q8")
+            .alias(">=Q8")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(10)).sum() / pl.len())
-            .alias("≥Q10")
+            .alias(">=Q10")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(15)).sum() / pl.len())
-            .alias("≥Q15")
+            .alias(">=Q15")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(20)).sum() / pl.len())
-            .alias("≥Q20")
+            .alias(">=Q20")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(25)).sum() / pl.len())
-            .alias("≥Q25")
+            .alias(">=Q25")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             (pl.col("phreq").ge(pl.lit(30)).sum() / pl.len())
-            .alias("≥Q30")
+            .alias(">=Q30")
             .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
             pl.col("phreq").mean().alias("MeanQValue"),
             pl.col("phreq").median().alias("MedianQValue"),
@@ -229,19 +228,19 @@ def stat_channel_reads(df: pl.DataFrame):
                 .map_elements(lambda x: f"{x: .2f}", return_dtype=pl.String)
                 .alias("maxQv"),
                 (pl.col("phreq").ge(pl.lit(8)).sum() / pl.len())
-                .alias("≥Q8")
+                .alias(">=Q8")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 (pl.col("phreq").ge(pl.lit(10)).sum() / pl.len())
-                .alias("≥Q10")
+                .alias(">=Q10")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 (pl.col("phreq").ge(pl.lit(15)).sum() / pl.len())
-                .alias("≥Q15")
+                .alias(">=Q15")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 (pl.col("phreq").ge(pl.lit(20)).sum() / pl.len())
-                .alias("≥Q20")
+                .alias(">=Q20")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 (pl.col("phreq").ge(pl.lit(30)).sum() / pl.len())
-                .alias("≥Q30")
+                .alias(">=Q30")
                 .map_elements(lambda x: f"{x: .2%}", return_dtype=pl.String),
                 pl.col("seq_len").mean().cast(pl.Int32).alias("seq_len_mean"),
                 pl.col("seq_len").median().cast(
@@ -393,7 +392,7 @@ def main_cli():
         "--min-rq",
         type=float,
         default=None,
-        help="only the rq ≥ min-rq will be considered",
+        help="only the rq >= min-rq will be considered",
         dest="min_rq",
     )
     args = parser.parse_args()
@@ -406,7 +405,7 @@ def pretty_print(obj):
     """
     try:
         import shutil
-        pl.Config.set_tbl_formatting("UTF8")
+        pl.Config.set_tbl_formatting("ASCII")
         width = shutil.get_terminal_size().columns
         pl.Config.set_tbl_width(width)
     except Exception:

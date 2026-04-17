@@ -45,7 +45,7 @@ def main():
     # Check templates
     print("Checking templates:")
     html_file = server_dir / "templates" / "index.html"
-    if check_file_exists(str(html_file), "Main HTML template"):
+    if check_file_exists(str(html_file), "Main HTML template (fallback)"):
         file_size = os.path.getsize(html_file)
         print(f"  File size: {file_size:,} bytes")
     print()
@@ -70,6 +70,12 @@ def main():
     print("Checking build configuration:")
     check_file_exists(str(server_dir / "frontend" / "package.json"), "npm package.json")
     check_file_exists(str(server_dir / "frontend" / "vite.config.ts"), "Vite configuration")
+
+    # Check built frontend (optional - may not exist in dev mode)
+    print()
+    print("Checking built frontend (optional):")
+    check_file_exists(str(server_dir / "static" / "dist" / "index.html"), "Built frontend")
+
     print()
 
     # Check requirements
@@ -88,6 +94,8 @@ def main():
         print("✓ All required files are present!")
     else:
         print("✗ Some files are missing. Please review the output above.")
+    print()
+    print("Note: For production deployment, run 'npm run build' in the frontend directory.")
     print("=" * 60)
 
 

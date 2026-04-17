@@ -85,14 +85,36 @@ templates = Jinja2Templates(env=env)
 # Mount static files (for Vue frontend after build)
 static_dir = settings.STATIC_DIR
 os.makedirs(static_dir, exist_ok=True)
+
+# Create custom StaticFiles that serves index.html for SPA routing
+class SPAStaticFiles(StaticFiles):
+    """StaticFiles that serves index.html for unknown paths (SPA fallback)"""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except Exception:
+            # If file not found, serve index.html for SPA routing
+            return await self.get_response("index.html", scope)
+
 if os.path.exists(settings.FRONTEND_BUILD_DIR):
     app.mount(
-        "/static", StaticFiles(directory=settings.FRONTEND_BUILD_DIR), name="static")
+        "/static", SPAStaticFiles(directory=settings.FRONTEND_BUILD_DIR, html=True), name="static")
 
 
 @app.get("/")
 async def root(request: Request):
-    """Serve the main web application"""
+    """Serve the main web application
+
+   优先返回构建后的前端静态文件，如果不存在则返回模板文件作为回退
+    """
+    # Check if built frontend exists
+    built_index = os.path.join(settings.FRONTEND_BUILD_DIR, "index.html")
+    if os.path.exists(built_index):
+        # Serve built frontend (will be handled by static files middleware)
+        return FileResponse(built_index)
+
+    # Fallback to template if not built
     return templates.TemplateResponse(
         "index.html", {
             "request": request,

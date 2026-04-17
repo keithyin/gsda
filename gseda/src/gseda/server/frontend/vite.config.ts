@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   base: '/static/',
   build: {
-    outDir: '../../static/dist',
+    outDir: '../static/dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {

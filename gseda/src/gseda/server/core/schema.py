@@ -16,6 +16,8 @@ class BAMBasicStatRequest(ToolRequestBase):
     bams: List[str] = Field(..., description="Path(s) to BAM file(s)")
     channel_tag: Optional[str] = Field("ch", description="Channel tag: 'ch' or 'zm'")
     min_rq: Optional[float] = Field(None, description="Minimum read quality (0-1)")
+    ssh_server: Optional[str] = Field(None, description="SSH server address for remote files")
+    ssh_password: Optional[str] = Field(None, description="SSH password for remote files")
 
 
 class MSAViewRequest(ToolRequestBase):
@@ -37,6 +39,10 @@ class ToolExecutionRequest(BaseModel):
     tool_name: str = Field(..., description="Name of the CLI tool to execute")
     args: Dict[str, Any] = Field(default_factory=dict, description="Tool-specific arguments as JSON")
 
+    class Config:
+        """Pydantic config to allow extra fields from request body"""
+        extra = "allow"
+
 
 # Response schemas
 
@@ -49,6 +55,7 @@ class ToolExecutionResponse(BaseModel):
     stderr: str
     exit_code: int
     result_data: Optional[Dict[str, Any]] = None
+    command: Optional[List[str]] = Field(None, description="The executed command for debugging")
 
 
 class ErrorResponse(BaseModel):

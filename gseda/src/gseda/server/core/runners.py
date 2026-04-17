@@ -2,8 +2,17 @@
 
 import subprocess
 import json
+import logging
 from typing import List, Tuple, Any, Dict
 from gseda.server.config import settings
+
+# Configure logging for console output
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 class CLIRunner:
@@ -12,7 +21,7 @@ class CLIRunner:
     @staticmethod
     def run_cli_module(
         module_path: str, args: List[str], timeout: int = None
-    ) -> Tuple[int, str, str]:
+    ) -> Tuple[int, str, str, List[str]]:
         """
         Run a CLI module via subprocess.
 
@@ -22,7 +31,7 @@ class CLIRunner:
             timeout: Execution timeout in seconds (default from settings)
 
         Returns:
-            Tuple of (exit_code, stdout, stderr)
+            Tuple of (exit_code, stdout, stderr, command)
         """
         if timeout is None:
             timeout = settings.CLI_TOOL_TIMEOUT
@@ -35,10 +44,6 @@ class CLIRunner:
             callable_name = "main_cli"
 
         # Build command
-        # Build command to import and execute the target callable.
-        # Use a simple script that imports the callable and runs it directly.
-        # The previous implementation used double braces which produced a literal
-        # `{callable_name}` in the executed code, leading to a NameError.
         cmd = [
             "python",
             "-c",
@@ -46,6 +51,10 @@ class CLIRunner:
         ] + args
 
         try:
+            # Print to console for easy debugging
+            print("\n" + "="*60, flush=True)
+            print(f"[CLI] EXECUTING: {' '.join(cmd)}", flush=True)
+            print("="*60 + "\n", flush=True)
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -53,11 +62,19 @@ class CLIRunner:
                 timeout=timeout,
                 cwd=settings.PROJECT_ROOT,
             )
-            return result.returncode, result.stdout, result.stderr
+            print(f"[CLI] EXIT CODE: {result.returncode}", flush=True)
+            if result.stdout:
+                print(f"[CLI] STDOUT:\n{result.stdout}", flush=True)
+            if result.stderr:
+                print(f"[CLI] STDERR:\n{result.stderr}", flush=True)
+            print("="*60 + "\n", flush=True)
+            return result.returncode, result.stdout, result.stderr, cmd
         except subprocess.TimeoutExpired:
-            return -1, "", f"Command timed out after {timeout} seconds"
+            print(f"[CLI] TIMEOUT: Command timed out after {timeout} seconds", flush=True)
+            return -1, "", f"Command timed out after {timeout} seconds", cmd
         except Exception as e:
-            return -1, "", str(e)
+            print(f"[CLI] EXCEPTION: {str(e)}", flush=True)
+            return -1, "", str(e), cmd
 
     @staticmethod
     def parse_args_from_module(module_path: str) -> Dict[str, Any]:
@@ -75,7 +92,7 @@ class CLIRunner:
     @staticmethod
     def run_cli_with_json(
         module_path: str, json_args: str, timeout: int = None
-    ) -> Tuple[int, str, str]:
+    ) -> Tuple[int, str, str, List[str]]:
         """
         Run a CLI module with JSON-formatted arguments.
 
@@ -85,10 +102,12 @@ class CLIRunner:
             timeout: Execution timeout in seconds
 
         Returns:
-            Tuple of (exit_code, stdout, stderr)
+            Tuple of (exit_code, stdout, stderr, command)
         """
+        print(f"[CLI RUNNER] Parsed args from JSON: {json_args}")
         args_dict = json.loads(json_args)
         args_list = CLIRunner._dict_to_args(args_dict)
+        print(f"[CLI RUNNER] Converted to CLI args: {args_list}")
         return CLIRunner.run_cli_module(module_path, args_list, timeout)
 
     @staticmethod
@@ -128,8 +147,9 @@ class CLIRunner:
 
             # Convert key to CLI format (snake_case to kebab-case)
             cli_key = f"--{key.replace('_', '-') }"
-
-
+            # Add the key-value pair to args
+            if value is not None:
+                args.extend([cli_key, str(value)])
 
         return args
 
@@ -154,6 +174,20 @@ ARGUMENT_SCHEMAS = {
             {"name": "end", "type": "number", "required": False},
             {"name": "o_fasta", "type": "file_output", "required": False},
             {"name": "o_pic", "type": "file_output", "required": False},
+        ],
+    },
+    "reads-quality-stats-v3": {
+        "arguments": [
+            {"name": "bams", "type": "file", "required": True, "multiple": True, "placeholder": "支持通配符 *, 例如：/path/to/*.bam"},
+            {"name": "refs", "type": "file", "required": False, "multiple": True, "placeholder": "如果不提供，则不输出对齐相关的指标"},
+            {"name": "short_aln", "type": "number", "required": False, "default": 0, "placeholder": "0-200, 用于查询或目标长度"},
+            {"name": "force", "type": "boolean", "required": False, "default": False, "help": "重新生成指标文件如果存在"},
+        ],
+    },
+    "low-q-analysis": {
+        "arguments": [
+            {"name": "sbr_bam", "type": "file", "required": True},
+            {"name": "smc_bam", "type": "file", "required": True},
         ],
     },
 }

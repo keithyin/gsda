@@ -9,6 +9,41 @@ const api = axios.create({
   }
 })
 
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log('[Axios Request]', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: config.url ? `${config.baseURL}${config.url}` : null,
+      params: config.params,
+      data: config.data,
+      headers: config.headers
+    })
+    return config
+  },
+  (error) => {
+    console.error('[Axios Request Error]', error)
+    return Promise.reject(error)
+  }
+)
+
+// Add response interceptor
+api.interceptors.response.use(
+  (response) => {
+    console.log('[Axios Response]', {
+      status: response.status,
+      data: response.data
+    })
+    return response
+  },
+  (error) => {
+    console.error('[Axios Response Error]', error)
+    return Promise.reject(error)
+  }
+)
+
 // Tool types
 export interface Tool {
   name: string

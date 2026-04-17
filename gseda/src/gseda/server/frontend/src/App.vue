@@ -54,6 +54,7 @@
             :is="getFormComponent()"
             v-if="selectedTool"
             :selectedTool="selectedTool"
+            :is-executing="isExecuting"
             @execute="onExecute"
           ></component>
 
@@ -74,6 +75,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 // Components
 import ToolForm from './components/ToolForm.vue'
@@ -98,6 +100,8 @@ const tools = ref<Tool[]>([])
 const searchQuery = ref('')
 const selectedTool = ref<Tool | null>(null)
 const result = ref<Result | null>(null)
+const isExecuting = ref(false)
+
 
 // Load tools
 const loadTools = async () => {
@@ -130,13 +134,46 @@ const getFormComponent = () => {
 
 // Handle tool execution
 const onExecute = async (data: any) => {
-  if (!selectedTool.value) return
+  // Set loading state to show visual feedback
+  isExecuting.value = true
+  result.value = null
+
+  console.log('=== App.vue - onExecute() START ===')
+  console.log('Selected tool:', selectedTool.value)
+  console.log('Received data from form:', data)
+  console.log('Data type:', typeof data)
+  console.log('Data keys:', Object.keys(data))
+
+  if (!selectedTool.value) {
+    console.error('No tool selected!')
+    isExecuting.value = false
+    return
+  }
 
   try {
+    console.log('=== DEBUG: About to send request ===')
+    console.log('Target URL:', `/api/tools/${selectedTool.value.name}/execute`)
+    console.log('Full URL:', window.location.origin + `/api/tools/${selectedTool.value.name}/execute`)
+    console.log('Request body:', JSON.stringify(data, null, 2))
+
+    const config = {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      onUploadProgress: (progressEvent: any) => {
+        console.log('Upload progress:', progressEvent.loaded, progressEvent.total, progressEvent.progress)
+      }
+    }
+
     const response = await axios.post(
       `/api/tools/${selectedTool.value.name}/execute`,
-      data
+      data,
+      config
     )
+
+    console.log('=== API response received ===')
+    console.log('Response status:', response.status)
+    console.log('Response data:', response.data)
 
     result.value = {
       success: response.data.success,
@@ -152,6 +189,15 @@ const onExecute = async (data: any) => {
       ElMessage.error('工具执行失败，请查看错误信息')
     }
   } catch (error: any) {
+    console.error('=== Error in onExecute() ===')
+    console.error('Error object:', error)
+    console.error('Error message:', error.message)
+    console.error('Error response:', error.response)
+    console.error('Error response data:', error.response?.data)
+    console.error('Error request:', error.request)
+    console.error('Error code:', error.code)
+    console.error('Error config:', error.config)
+
     result.value = {
       success: false,
       tool_name: selectedTool.value.name,
@@ -160,6 +206,8 @@ const onExecute = async (data: any) => {
       exit_code: -1
     }
     ElMessage.error('执行出错：' + (error.message || '未知错误'))
+  } finally {
+    isExecuting.value = false
   }
 }
 
@@ -188,13 +236,14 @@ loadTools()
 
 <style scoped>
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .sidebar {
   background: #fff;
   border-right: 1px solid #e4e7ed;
-  overflow-y: auto;
+  flex-shrink: 0;
+  width: 280px;
 }
 
 .sidebar-header {
@@ -213,8 +262,7 @@ loadTools()
 }
 
 .tools-list {
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
+  padding-top: 10px;
 }
 
 .tool-item {
@@ -237,26 +285,32 @@ loadTools()
 
 .main-content {
   padding: 20px;
-  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
 }
 
 .empty-state {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: calc(100vh - 150px);
+  min-height: 400px;
 }
 
 .tool-panel {
-  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
   border-bottom: 1px solid #e4e7ed;
 }
 

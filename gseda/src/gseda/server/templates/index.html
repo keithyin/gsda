@@ -105,6 +105,28 @@
             outline: none;
             border-color: #409eff;
         }
+        .form-actions {
+            margin-top: 20px;
+        }
+        .remote-toggle {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+        }
+        .file-upload-zone {
+            border: 2px dashed #d9d9d9;
+            border-radius: 6px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-upload-zone:hover {
+            border-color: #409eff;
+            background: #f5f7fa;
+        }
         .result-section {
             background: #fff;
             padding: 25px;
@@ -147,6 +169,15 @@
         .tool-tag {
             margin-right: 8px;
         }
+        .source-tag {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .source-local { background: #e6fffa; color: #48c774; }
+        .source-remote { background: #fff7e6; color: #ff9f43; }
     </style>
 </head>
 <body>
@@ -206,18 +237,96 @@
                     <!-- BAM Basic Stat Form -->
                     <div v-if="selectedToolName === 'bam-basic-stat'">
                         <div class="form-group">
-                            <label>BAM 文件路径<span style="color: #f56c6c">*</span></label>
-                            <el-input
-                                v-for="(path, index) in formData.bams"
-                                :key="index"
-                                v-model="formData.bams[index]"
-                                placeholder="/path/to/file.bam"
-                            >
-                                <template #append>
-                                    <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
-                                </template>
-                            </el-input>
-                            <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                            <div class="remote-toggle">
+                                <el-checkbox v-model="useRemoteFiles">
+                                    使用远程文件 (SCP)
+                                </el-checkbox>
+                            </div>
+
+                            <!-- Remote File Inputs -->
+                            <div v-if="useRemoteFiles">
+                                <div class="form-group">
+                                    <label>SSH 服务器地址 (格式: user@host)</label>
+                                    <el-input
+                                        v-model="formData.ssh_server"
+                                        placeholder="例如: root@192.168.1.100"
+                                    ></el-input>
+                                </div>
+                                <div class="form-group">
+                                    <label>SSH 密码</label>
+                                    <el-input
+                                        v-model="formData.ssh_password"
+                                        type="password"
+                                        placeholder="SSH 密码"
+                                        show-password
+                                    ></el-input>
+                                </div>
+                                <div class="form-group">
+                                    <label>BAM 文件路径 (远程)</label>
+                                    <el-input
+                                        v-for="(path, index) in formData.bams"
+                                        :key="'remote-' + index"
+                                        v-model="formData.bams[index]"
+                                        placeholder="/path/to/file.bam"
+                                    >
+                                        <template #append>
+                                            <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
+                                        </template>
+                                    </el-input>
+                                    <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                                </div>
+                            </div>
+
+                            <!-- Local File Inputs -->
+                            <div v-else>
+                                <div class="form-group">
+                                    <label>BAM 文件路径 (本地)</label>
+                                    <el-input
+                                        v-for="(path, index) in formData.bams"
+                                        :key="'local-' + index"
+                                        v-model="formData.bams[index]"
+                                        placeholder="/path/to/file.bam"
+                                    >
+                                        <template #append>
+                                            <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
+                                        </template>
+                                    </el-input>
+                                    <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                                </div>
+                                <div class="form-group">
+                                    <label>或上传文件</label>
+                                    <div
+                                        class="file-upload-zone"
+                                        @click="$refs.uploadInput.click()"
+                                    >
+                                        <el-icon :size="48" color="#909399">
+                                            <Upload />
+                                        </el-icon>
+                                        <p style="margin-top: 10px; color: #909399;">
+                                            点击上传 BAM 文件
+                                        </p>
+                                        <input
+                                            ref="uploadInput"
+                                            type="file"
+                                            accept=".bam"
+                                            style="display: none"
+                                            @change="handleUpload"
+                                            multiple
+                                        />
+                                    </div>
+                                    <div v-if="uploadedFiles.length > 0" style="margin-top: 10px;">
+                                        <el-tag
+                                            v-for="(file, index) in uploadedFiles"
+                                            :key="index"
+                                            closable
+                                            @close="removeUploadedFile(index)"
+                                            class="source-tag source-local"
+                                        >
+                                            {{ file.name }}
+                                        </el-tag>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -236,10 +345,168 @@
                             ></el-input>
                         </div>
 
-                        <el-button type="primary" size="large" :loading="executing" @click="executeTool">
-                            <span v-if="executing">执行中...</span>
-                            <span v-else>开始分析</span>
-                        </el-button>
+                        <div class="form-actions">
+                            <el-button
+                                type="primary"
+                                size="large"
+                                :loading="executing"
+                                @click="executeTool"
+                            >
+                                <span v-if="executing">执行中...</span>
+                                <span v-else>开始分析</span>
+                            </el-button>
+                        </div>
+                    </div>
+
+                    <!-- Reads Quality Stats V3 Form -->
+                    <div v-else-if="selectedToolName === 'reads-quality-stats-v3'">
+                        <div class="form-group">
+                            <div class="remote-toggle">
+                                <el-checkbox v-model="useRemoteFiles">
+                                    使用远程文件 (SCP)
+                                </el-checkbox>
+                            </div>
+
+                            <!-- Remote File Inputs -->
+                            <div v-if="useRemoteFiles">
+                                <div class="form-group">
+                                    <label>SSH 服务器地址 (格式: user@host)</label>
+                                    <el-input
+                                        v-model="formData.ssh_server"
+                                        placeholder="例如: root@192.168.1.100"
+                                    ></el-input>
+                                </div>
+                                <div class="form-group">
+                                    <label>SSH 密码</label>
+                                    <el-input
+                                        v-model="formData.ssh_password"
+                                        type="password"
+                                        placeholder="SSH 密码"
+                                        show-password
+                                    ></el-input>
+                                </div>
+                                <div class="form-group">
+                                    <label>BAM 文件路径 (支持通配符*)</label>
+                                    <el-input
+                                        v-for="(path, index) in formData.bams"
+                                        :key="'remote-' + index"
+                                        v-model="formData.bams[index]"
+                                        placeholder="/path/to/*.bam 或 /path/to/file.bam"
+                                    >
+                                        <template #append>
+                                            <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
+                                        </template>
+                                    </el-input>
+                                    <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                                </div>
+                            </div>
+
+                            <!-- Local File Inputs -->
+                            <div v-else>
+                                <div class="form-group">
+                                    <label>BAM 文件路径 (支持通配符*)</label>
+                                    <el-input
+                                        v-for="(path, index) in formData.bams"
+                                        :key="'local-' + index"
+                                        v-model="formData.bams[index]"
+                                        placeholder="/path/to/*.bam 或 /path/to/file.bam"
+                                    >
+                                        <template #append>
+                                            <el-button @click="removeBam(index)" :disabled="index === 0">-</el-button>
+                                        </template>
+                                    </el-input>
+                                    <el-button style="margin-top: 8px;" @click="addBam">添加 BAM 文件</el-button>
+                                </div>
+                                <div class="form-group">
+                                    <label>或上传文件</label>
+                                    <div
+                                        class="file-upload-zone"
+                                        @click="$refs.uploadInput.click()"
+                                    >
+                                        <el-icon :size="48" color="#909399">
+                                            <Upload />
+                                        </el-icon>
+                                        <p style="margin-top: 10px; color: #909399;">
+                                            点击上传 BAM 文件
+                                        </p>
+                                    </div>
+                                    <input
+                                        ref="uploadInput"
+                                        type="file"
+                                        accept=".bam"
+                                        style="display: none"
+                                        @change="handleUpload"
+                                        multiple
+                                    />
+                                    <div v-if="uploadedFiles.length > 0" style="margin-top: 10px;">
+                                        <el-tag
+                                            v-for="(file, index) in uploadedFiles"
+                                            :key="index"
+                                            closable
+                                            @close="removeUploadedFile(index)"
+                                            class="source-tag source-local"
+                                        >
+                                            {{ file.name }}
+                                        </el-tag>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reference FASTA 文件 (可选)</label>
+                            <div v-for="(path, index) in formData.refs" :key="'ref-' + index" class="input-row">
+                                <el-input
+                                    v-model="formData.refs[index]"
+                                    placeholder="/path/to/reference.fa"
+                                    clearable
+                                >
+                                    <template #append>
+                                        <el-button @click="removeRef(index)" :disabled="index === 0">-</el-button>
+                                    </template>
+                                </el-input>
+                            </div>
+                            <el-button type="primary" plain @click="addRef">
+                                添加 Reference
+                            </el-button>
+                            <p class="hint">如果不提供，则不输出对齐相关的指标</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Short Alignment (可选)</label>
+                            <el-radio-group v-model="formData.short_aln">
+                                <el-radio :label="0">不使用 Short Alignment</el-radio>
+                                <el-radio :label="1">使用 Short Alignment</el-radio>
+                            </el-radio-group>
+                            <p class="hint">
+                                <span v-if="formData.refs && formData.refs.length > 0">
+                                    💡 <strong>Short Alignment 使用说明：</strong><br>
+                                    Short Alignment 用于处理长度在 [30, 200] 范围内的Reference序列。<br>
+                                    如果您的Reference序列长度 < 200，建议选择"使用 Short Alignment"<br>
+                                    如果Reference序列长度 ≥ 200，通常不需要Short Alignment
+                                </span>
+                                <span v-else>
+                                    💡 提示：请先添加Reference FASTA文件
+                                </span>
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <el-checkbox v-model="formData.force">强制重新生成指标文件</el-checkbox>
+                            <p class="hint">如果指标文件已存在，默认会跳过。勾选此选项将强制重新生成</p>
+                        </div>
+
+                        <div class="form-actions">
+                            <el-button
+                                type="primary"
+                                size="large"
+                                :loading="executing"
+                                @click="executeTool"
+                            >
+                                <span v-if="executing">执行中...</span>
+                                <span v-else>开始分析</span>
+                            </el-button>
+                        </div>
                     </div>
 
                     <!-- MSA View Form -->
@@ -303,10 +570,17 @@
                             ></el-input>
                         </div>
 
-                        <el-button type="primary" size="large" :loading="executing" @click="executeTool">
-                            <span v-if="executing">执行中...</span>
-                            <span v-else>生成 MSA</span>
-                        </el-button>
+                        <div class="form-actions">
+                            <el-button
+                                type="primary"
+                                size="large"
+                                :loading="executing"
+                                @click="executeTool"
+                            >
+                                <span v-if="executing">执行中...</span>
+                                <span v-else>生成 MSA</span>
+                            </el-button>
+                        </div>
                     </div>
 
                     <!-- Other tools (placeholder) -->
@@ -314,10 +588,16 @@
                         <p style="color: #909399;">
                             此工具 "{{ selectedToolName }}" 的配置表单正在开发中，请稍后使用。
                         </p>
-                        <el-button type="primary" :loading="executing" @click="executeTool">
-                            <span v-if="executing">执行中...</span>
-                            <span v-else>执行工具</span>
-                        </el-button>
+                        <div class="form-actions">
+                            <el-button
+                                type="primary"
+                                :loading="executing"
+                                @click="executeTool"
+                            >
+                                <span v-if="executing">执行中...</span>
+                                <span v-else>执行工具</span>
+                            </el-button>
+                        </div>
                     </div>
                 </div>
 
@@ -343,9 +623,9 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
         const { ElMessage, ElMessageBox } = ElementPlus;
-        const { Search, Files } = ElementPlusIconsVue;
+        const { Search, Files, Upload } = ElementPlusIconsVue;
 
         const app = createApp({
             setup() {
@@ -355,6 +635,8 @@
                 const formData = ref({});
                 const result = ref(null);
                 const executing = ref(false);
+                const useRemoteFiles = ref(false);
+                const uploadedFiles = ref([]);
 
                 // Load available tools
                 const loadTools = async () => {
@@ -386,6 +668,8 @@
                     selectedToolName.value = tool.name;
                     resetForm();
                     result.value = null;
+                    useRemoteFiles.value = false;
+                    uploadedFiles.value = [];
                 };
 
                 // Reset form
@@ -394,7 +678,9 @@
                         formData.value = {
                             bams: ['/path/to/file1.bam'],
                             channel_tag: 'ch',
-                            min_rq: null
+                            min_rq: null,
+                            ssh_server: '',
+                            ssh_password: ''
                         };
                     } else if (selectedTool.value?.name === 'msa-view') {
                         formData.value = {
@@ -405,6 +691,15 @@
                             end: null,
                             o_fasta: null,
                             o_pic: null
+                        };
+                    } else if (selectedTool.value?.name === 'reads-quality-stats-v3') {
+                        formData.value = {
+                            bams: ['/path/to/file1.bam'],
+                            refs: [],
+                            short_aln: 0,
+                            force: false,
+                            ssh_server: '',
+                            ssh_password: ''
                         };
                     } else {
                         formData.value = {};
@@ -425,40 +720,181 @@
                     }
                 };
 
+                // Check if any refseq is shorter than 200 (placeholder)
+                const refseqShorterThan200 = computed(() => {
+                    // In browser environment, we can't read file content to determine sequence length
+                    // This is a placeholder - actual implementation would need server-side API or client-side file reading
+                    return false;
+                });
+
+                // Handle file upload
+                const handleUpload = async (event) => {
+                    const files = event.target.files;
+                    if (files.length === 0) return;
+
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        if (!file.name.endsWith('.bam')) {
+                            ElMessage.warning('只支持上传 .bam 文件');
+                            continue;
+                        }
+
+                        try {
+                            const formDataObj = new FormData();
+                            formDataObj.append('file', file);
+
+                            const response = await fetch('/api/files/upload', {
+                                method: 'POST',
+                                body: formDataObj,
+                            });
+
+                            const data = await response.json();
+                            if (data.success) {
+                                uploadedFiles.value.push({
+                                    name: file.name,
+                                    localPath: data.data.local_path
+                                });
+                                // Add to bams array
+                                formData.value.bams.push(data.data.local_path);
+                                ElMessage.success(`上传成功: ${file.name}`);
+                            } else {
+                                ElMessage.error(`上传失败: ${data.message || '未知错误'}`);
+                            }
+                        } catch (error) {
+                            ElMessage.error(`上传失败: ${error.message}`);
+                        }
+                    }
+                    // Reset input
+                    event.target.value = '';
+                };
+
+                // Remove uploaded file
+                const removeUploadedFile = (index) => {
+                    uploadedFiles.value.splice(index, 1);
+                    // Remove from bams array
+                    const localPath = uploadedFiles.value[index]?.localPath;
+                    if (localPath) {
+                        formData.value.bams = formData.value.bams.filter(
+                            p => p !== localPath
+                        );
+                    }
+                };
+
+                // Add Reference file
+                const addRef = () => {
+                    if (!formData.value.refs) {
+                        formData.value.refs = [];
+                    }
+                    formData.value.refs.push('/path/to/reference.fa');
+                };
+
+                // Remove Reference file
+                const removeRef = (index) => {
+                    if (formData.value.refs && formData.value.refs.length > 0) {
+                        formData.value.refs.splice(index, 1);
+                    }
+                };
+
                 // Execute tool
                 const executeTool = async () => {
                     if (!selectedTool.value) return;
 
                     executing.value = true;
                     try {
-                        const payload = {
-                            tool_name: selectedTool.value.name,
-                            args: formData.value
-                        };
+                        // Prepare payload
+                        let payload;
+                        let headers = { 'Content-Type': 'application/json' };
 
-                        const response = await fetch(
-                            `/api/tools/${selectedTool.value.name}/execute`,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(payload)
+                        if (selectedTool.value.name === 'bam-basic-stat') {
+                            // For bam-basic-stat, send files and SSH info
+                            const args = { ...formData.value };
+                            // Remove SSH fields from args
+                            delete args.ssh_server;
+                            delete args.ssh_password;
+
+                            // If using remote files, include SSH config in payload
+                            if (useRemoteFiles.value && formData.value.ssh_server && formData.value.ssh_password) {
+                                payload = {
+                                    tool_name: selectedTool.value.name,
+                                    args: {
+                                        bams: formData.value.bams,
+                                        ssh_server: formData.value.ssh_server,
+                                        ssh_password: formData.value.ssh_password
+                                    }
+                                };
+
+                                const response = await fetch(
+                                    `/api/tools/${selectedTool.value.name}/execute`,
+                                    {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify(payload)
+                                    }
+                                );
+                                const data = await response.json();
+                                handleResponse(data);
+                            } else {
+                                // Local files
+                                payload = {
+                                    tool_name: selectedTool.value.name,
+                                    args: { bams: formData.value.bams, ...args }
+                                };
+                                const response = await fetch(
+                                    `/api/tools/${selectedTool.value.name}/execute`,
+                                    {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify(payload)
+                                    }
+                                );
+                                const data = await response.json();
+                                handleResponse(data);
                             }
-                        );
-
-                        const data = await response.json();
-
-                        if (data.success) {
-                            result.value = data.data;
-                            ElMessage.success('工具执行成功');
-                        } else {
-                            result.value = {
-                                success: false,
+                        } else if (selectedTool.value.name === 'reads-quality-stats-v3') {
+                            // For reads-quality-stats-v3
+                            payload = {
                                 tool_name: selectedTool.value.name,
-                                stdout: data.data?.stdout || '',
-                                stderr: data.data?.stderr || '',
-                                exit_code: -1
+                                args: {
+                                    bams: formData.value.bams,
+                                    refs: formData.value.refs,
+                                    short_aln: formData.value.short_aln,
+                                    force: formData.value.force
+                                }
                             };
-                            ElMessage.error('工具执行失败，请查看错误信息');
+
+                            // If using remote files, include SSH config in args
+                            if (fileSource.value === 'remote' && formData.value.ssh_server && formData.value.ssh_password) {
+                                payload.args.ssh_server = formData.value.ssh_server;
+                                payload.args.ssh_password = formData.value.ssh_password;
+                            }
+
+                            const response = await fetch(
+                                `/api/tools/${selectedTool.value.name}/execute`,
+                                {
+                                    method: 'POST',
+                                    headers,
+                                    body: JSON.stringify(payload)
+                                }
+                            );
+                            const data = await response.json();
+                            handleResponse(data);
+                        } else if (selectedTool.value.name === 'msa-view') {
+                            payload = {
+                                tool_name: selectedTool.value.name,
+                                args: formData.value
+                            };
+
+                            const response = await fetch(
+                                `/api/tools/${selectedTool.value.name}/execute`,
+                                {
+                                    method: 'POST',
+                                    headers,
+                                    body: JSON.stringify(payload)
+                                }
+                            );
+
+                            const data = await response.json();
+                            handleResponse(data);
                         }
                     } catch (error) {
                         ElMessage.error('执行出错：' + error.message);
@@ -471,6 +907,23 @@
                         };
                     } finally {
                         executing.value = false;
+                    }
+                };
+
+                // Handle API response
+                const handleResponse = (data) => {
+                    if (data.success) {
+                        result.value = data.data;
+                        ElMessage.success('工具执行成功');
+                    } else {
+                        result.value = {
+                            success: false,
+                            tool_name: selectedTool.value.name,
+                            stdout: data.data?.stdout || '',
+                            stderr: data.data?.stderr || '',
+                            exit_code: -1
+                        };
+                        ElMessage.error('工具执行失败，请查看错误信息');
                     }
                 };
 
@@ -530,9 +983,13 @@
                     formData,
                     result,
                     executing,
+                    useRemoteFiles,
+                    uploadedFiles,
                     selectTool,
                     addBam,
                     removeBam,
+                    handleUpload,
+                    removeUploadedFile,
                     executeTool,
                     copyResult,
                     formattedResult
@@ -544,6 +1001,7 @@
         app.use(ElementPlus);
         app.component('Search', Search);
         app.component('Files', Files);
+        app.component('Upload', Upload);
 
         app.mount('#app');
     </script>

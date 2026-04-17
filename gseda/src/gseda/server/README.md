@@ -55,29 +55,34 @@ gseda/src/gseda/server/
 
 ## Installation
 
-### Backend Dependencies
+### Dependencies
 
-Install Python dependencies:
+Install Python and Node.js dependencies:
 
 ```bash
 cd gseda/src/gseda/server
 pip install -r requirements.txt
+
+cd frontend
+npm install
 ```
 
-### Frontend Dependencies
+### Building the Frontend
 
-Install Vue dependencies (first build time):
+Build the Vue 3 frontend:
 
 ```bash
 cd gseda/src/gseda/server/frontend
-npm install
+npm run build
 ```
+
+The build output will be placed in `../static/dist/`.
 
 ## Running the Server
 
 ### Development Mode (Backend Only)
 
-Start the FastAPI server:
+Start the FastAPI server (uses CDN-based frontend):
 
 ```bash
 cd gseda/src/gseda/server
@@ -86,7 +91,10 @@ uvicorn gseda.server.main:app --reload --host 0.0.0.0 --port 8000
 
 Then visit `http://localhost:8000` in your browser.
 
-### Building and Running the Full Application
+**Note**: This mode uses Vue.js from CDN and is intended for quick development/testing.
+For production, build the frontend with `npm run build`.
+
+### Production Mode (Built Frontend)
 
 1. Build the frontend:
 

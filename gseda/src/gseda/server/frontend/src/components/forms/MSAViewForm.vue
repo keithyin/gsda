@@ -1,5 +1,5 @@
 <template>
-  <div class="form-container">
+  <div class="form-container" :class="{ 'is-loading': isExecuting }">
     <div class="form-section">
       <h3>MSA View - 多重序列比对视图</h3>
       <p class="description">将 BAM 文件中的比对结果转换为 MSA（多重序列比对）格式，支持生成 FASTA 文件和可视化图片。</p>
@@ -94,10 +94,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 
 const emit = defineEmits<{
   execute: [data: any]
+}>()
+
+const props = defineProps<{
+  isExecuting?: boolean
 }>()
 
 const formData = reactive({
@@ -111,6 +115,11 @@ const formData = reactive({
 })
 
 const loading = ref(false)
+
+// Sync loading state with parent's isExecuting prop
+watch(() => props.isExecuting, (newVal) => {
+  loading.value = newVal
+})
 
 onMounted(() => {
   // Watch for changes and update parent
@@ -130,6 +139,33 @@ const execute = async () => {
   padding: 25px;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
+}
+
+.form-container.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.form-container.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  color: #409eff;
+  font-weight: 500;
 }
 
 h3 {
@@ -174,5 +210,6 @@ h3 {
   margin-top: 30px;
   padding-top: 20px;
   border-top: 1px solid #e4e7ed;
+  flex-shrink: 0;
 }
 </style>
