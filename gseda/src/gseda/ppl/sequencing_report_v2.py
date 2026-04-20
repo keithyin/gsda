@@ -580,7 +580,7 @@ def main_cli():
     parser.add_argument("--rq-range", type=str, default=None, dest="rq_range", help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
 
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -618,7 +618,7 @@ def main_cli():
         assert len(bam_files) == len(refs)
 
         for bam, ref in zip(bam_files, refs):
-            print(main(bam_file=bam, ref_fa=ref, force=args.f,
+            print(main(bam_file=bam, ref_fa=ref, force=args.force,
                        short_aln=args.short_aln == 1,
                        disable_basic_stat=args.disable_basic_stat,
                        disable_align_stat=args.disable_align_stat,

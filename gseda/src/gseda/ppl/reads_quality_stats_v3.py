@@ -12,6 +12,11 @@ import threading
 import matplotlib.pyplot as plt
 import seaborn as sns
 from glob import glob
+import sys
+cur_dir = os.path.abspath(__file__).rsplit("/", maxsplit=1)[0]
+print(cur_dir)
+sys.path.append(cur_dir)
+import env_prepare  # noqa: E402
 
 # deprecated ...
 logging.basicConfig(
@@ -26,32 +31,6 @@ def polars_env_init():
     os.environ["POLARS_FMT_MAX_COLS"] = "100"
     os.environ["POLARS_FMT_MAX_ROWS"] = "300"
     os.environ["POLARS_FMT_STR_LEN"] = "100"
-
-
-def mm2_version_check():
-    oup = subprocess.getoutput("gsmm2-aligned-metric -V")
-    oup = oup.strip()
-    version_str = oup.rsplit(" ", maxsplit=1)[1]
-
-    logging.info(f"gsmm2-aligned-metric Version: {version_str}")
-    mm2_version = semver.Version.parse(version_str)
-    expected_version = "0.21.0"
-    assert mm2_version >= semver.Version.parse(
-        expected_version
-    ), f"current mm2 version:{mm2_version} < {expected_version}, try 'cargo uninstall mm2; cargo install mm2@={expected_version}' "
-
-
-def gsetl_version_check():
-    oup = subprocess.getoutput("gsetl -V")
-    oup = oup.strip()
-    version_str = oup.rsplit(" ", maxsplit=1)[1]
-
-    logging.info(f"gsetl Version: {version_str}")
-    gsetl_version = semver.Version.parse(version_str)
-    expected_version = "0.7.1"
-    assert gsetl_version >= semver.Version.parse(
-        expected_version
-    ), f"current gsetl version:{gsetl_version} < {expected_version}, try 'cargo uninstall gsetl; cargo install gsetl@={expected_version}' "
 
 
 def extract_filename(filepath: str) -> str:
@@ -642,7 +621,6 @@ def main(
     enable_basic=True,
     enable_align=True
 ) -> str:
-    
     """
         step1: generate detailed metric info
         step2: compute the aggr metric. the result aggr_metric.csv is a '\t' seperated csv file. the header is name\tvalue
@@ -667,10 +645,12 @@ def main(
         (aggr_metric_filename, fact_metric_filename) (str, str)
     """
     polars_env_init()
-    
 
-    mm2_version_check()
-    gsetl_version_check()
+    env_prepare.check_and_install(
+        "gsmm2-aligned-metric", semver.Version.parse("0.24.0"), "cargo install mm2")
+
+    env_prepare.check_and_install(
+        "gsetl", semver.Version.parse("0.9.0"), "cargo install gsetl")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -708,7 +688,7 @@ def main(
     processes = []
     if ref_fa != "" and enable_align:
         aligned_fact_thread = threading.Thread(target=generate_aligned_metric_fact_file, args=(
-            bam_file, ref_fa, fact_metric_filename, short_aln,force, threads))
+            bam_file, ref_fa, fact_metric_filename, short_aln, force, threads))
         aligned_fact_thread.start()
         processes.append(aligned_fact_thread)
 
@@ -763,7 +743,7 @@ def main_cli():
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -784,7 +764,8 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, short_aln=args.short_aln==1 ,force=args.f)
+        main(bam_file=bam, ref_fa=ref,
+             short_aln=args.short_aln == 1, force=args.force)
 
 
 if __name__ == "__main__":

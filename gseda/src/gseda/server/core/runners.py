@@ -105,36 +105,31 @@ class CLIRunner:
             Tuple of (exit_code, stdout, stderr, command)
         """
         print(f"[CLI RUNNER] Parsed args from JSON: {json_args}")
+
+        # Determine tool name from module path for correct argument mapping
+        tool_name = None
+        for name, path in settings.TOOLS_CONFIG:
+            if path == module_path:
+                tool_name = name
+                break
+
         args_dict = json.loads(json_args)
-        args_list = CLIRunner._dict_to_args(args_dict)
+        args_list = CLIRunner._dict_to_args(tool_name, args_dict)
         print(f"[CLI RUNNER] Converted to CLI args: {args_list}")
         return CLIRunner.run_cli_module(module_path, args_list, timeout)
 
     @staticmethod
-    def _dict_to_args(args_dict: Dict[str, Any]) -> List[str]:
+    def _dict_to_args(tool_name: str, args_dict: Dict[str, Any]) -> List[str]:
         """Convert a dict of arguments to command-line format."""
         args = []
         for key, value in args_dict.items():
-            # Special handling for known positional arguments (currently only "bams").
-            # Positional arguments are passed without a preceding "--" flag.
-            if key == "bams":
-                if isinstance(value, list):
-                    for item in value:
-                        args.append(str(item))
-                else:
-                    args.append(str(value))
-                continue
-
-            # Convert key to CLI format (snake_case to kebab-case)
-            # Determine if the argument is defined as positional in ARGUMENT_SCHEMAS.
+            # Determine if the argument is defined as positional for this specific tool.
             is_positional = False
-            for schema in ARGUMENT_SCHEMAS.values():
-                for arg in schema.get("arguments", []):
+            if tool_name and tool_name in ARGUMENT_SCHEMAS:
+                for arg in ARGUMENT_SCHEMAS[tool_name].get("arguments", []):
                     if arg.get("name") == key and arg.get("positional"):
                         is_positional = True
                         break
-                if is_positional:
-                    break
 
             if is_positional:
                 # Positional arguments are added without a flag.
@@ -149,7 +144,11 @@ class CLIRunner:
             cli_key = f"--{key.replace('_', '-') }"
             # Add the key-value pair to args
             if value is not None:
-                args.extend([cli_key, str(value)])
+                if isinstance(value, bool):
+                    if value:
+                        args.append(cli_key)
+                else:
+                    args.extend([cli_key, str(value)])
 
         return args
 

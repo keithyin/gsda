@@ -212,7 +212,7 @@ def main_cli():
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -227,7 +227,7 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f,
+        main(bam_file=bam, ref_fa=ref, force=args.force,
              short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
 
 

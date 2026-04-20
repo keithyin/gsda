@@ -138,7 +138,7 @@ def main_cli():
     parser.add_argument("--ref-fa", default="", type=str,
                         help="ref fasta", dest="ref_fa")
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -151,7 +151,7 @@ def main_cli():
     bam_files = expand_bam_files(bam_files)
 
     for bam in bam_files:
-        main(bam_file=bam, q_ranges=args.q_ranges.strip(), ref_fa=ref_fa, force=args.f)
+        main(bam_file=bam, q_ranges=args.q_ranges.strip(), ref_fa=ref_fa, force=args.force)
 
 
 if __name__ == "__main__":

@@ -339,7 +339,7 @@ def main_cli():
         dest="short_aln",
     )
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -354,7 +354,7 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f, short_aln=args.short_aln == 1)
+        main(bam_file=bam, ref_fa=ref, force=args.force, short_aln=args.short_aln == 1)
 
 
 if __name__ == "__main__":

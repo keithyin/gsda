@@ -252,7 +252,7 @@ def main_cli():
     parser.add_argument("--np-range", type=str, default=None, dest="np_range")
     parser.add_argument("--rq-range", type=str, default=None, dest="rq_range")
     parser.add_argument(
-        "-f",
+        "-f", "--force",
         action="store_true",
         default=False,
         help="regenerate the metric file if exists",
@@ -267,7 +267,7 @@ def main_cli():
     assert len(bam_files) == len(refs)
 
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.f,
+        main(bam_file=bam, ref_fa=ref, force=args.force,
              short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
 
 
