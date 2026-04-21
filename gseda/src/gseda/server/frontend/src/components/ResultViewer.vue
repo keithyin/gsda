@@ -27,6 +27,7 @@
     <div class="tabs-container" v-if="!isMinimized">
       <el-radio-group v-model="activeTab" class="tabs-group">
         <el-radio-button value="summary" :disabled="!hasAnyOutput">汇总</el-radio-button>
+        <el-radio-button value="files" v-if="hasFileOutputs">文件</el-radio-button>
         <el-radio-button value="stdout" :disabled="!hasContent(result.stdout)">STDOUT</el-radio-button>
         <el-radio-button value="stderr" :disabled="!hasContent(result.stderr)">STDERR</el-radio-button>
       </el-radio-group>
@@ -101,6 +102,32 @@
             <el-icon><Close /></el-icon>
             收起预览
           </el-button>
+        </div>
+      </div>
+
+      <!-- Files Tab -->
+      <div v-if="activeTab === 'files' && result.file_outputs && result.file_outputs.length > 0" class="output-tab">
+        <div class="output-controls">
+          <div class="control-left">
+            <span class="output-title">输出文件 ({{ result.file_outputs.length }})</span>
+          </div>
+          <div class="control-right">
+            <el-button size="small" @click="downloadAllFiles">
+              <el-icon><Download /></el-icon>
+              全部下载
+            </el-button>
+          </div>
+        </div>
+        <div class="output-content">
+          <div class="file-list">
+            <div v-for="file in result.file_outputs" :key="file.name" class="file-item">
+              <span class="file-name">{{ file.name }}</span>
+              <el-button size="small" type="primary" link @click="downloadFile(file.download_url, file.filename)">
+                <el-icon><Download /></el-icon>
+                下载
+              </el-button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -226,6 +253,7 @@ const props = defineProps<{
     stdout: string
     stderr: string
     exit_code: number
+    file_outputs?: { name: string; filename: string; download_url: string }[]
   }
 }>()
 
@@ -235,7 +263,7 @@ const emit = defineEmits<{
 }>()
 
 // Tab state
-const activeTab = ref<'summary' | 'stdout' | 'stderr'>('summary')
+const activeTab = ref<'summary' | 'files' | 'stdout' | 'stderr'>('summary')
 const isMinimized = ref(false)
 
 // Section expansion state
@@ -256,6 +284,11 @@ const stderrPre = ref<HTMLElement | null>(null)
 // Compute if there's any output
 const hasAnyOutput = computed(() => {
   return !!(props.result.stdout || props.result.stderr)
+})
+
+// Compute if there are file outputs
+const hasFileOutputs = computed(() => {
+  return !!(props.result.file_outputs && props.result.file_outputs.length > 0)
 })
 
 // Filter STDOUT lines based on search
@@ -377,6 +410,37 @@ const downloadText = (content: string, filename: string) => {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   ElMessage.success(`文件已下载：${filename}`)
+}
+
+// Download a single file from server
+const downloadFile = async (url: string, filename: string) => {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      ElMessage.error(`下载失败：${filename}`)
+      return
+    }
+    const blob = await response.blob()
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(downloadUrl)
+    ElMessage.success(`文件已下载：${filename}`)
+  } catch {
+    ElMessage.error(`下载失败：${filename}`)
+  }
+}
+
+// Download all files
+const downloadAllFiles = async () => {
+  if (!props.result.file_outputs) return
+  for (const file of props.result.file_outputs) {
+    await downloadFile(file.download_url, file.filename)
+  }
 }
 
 // Build full result text
@@ -610,6 +674,32 @@ nextTick(() => {
 
 .control-right {
   flex-shrink: 0;
+}
+
+.output-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.file-list {
+  padding: 10px;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.file-name {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  color: #303133;
 }
 
 .output-content {

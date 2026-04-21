@@ -1,8 +1,8 @@
 <template>
   <div class="form-container" :class="{ 'is-loading': isExecuting }">
     <div class="form-section">
-      <h3>BAM Basic Stat - BAM 基本质量统计</h3>
-      <p class="description">统计 BAM 文件中 reads 的基本质量指标，包括 channel 分布、读长统计、质量分数分布（Q8~Q30）等</p>
+      <h3>HomoAndStr Ratio - 同源与串联重复比率分析</h3>
+      <p class="description">统计 BAM/FASTQ/FASTA 文件中同源重复（homo）和串联重复（str）区域的比率。</p>
     </div>
 
     <!-- File Source Toggle -->
@@ -37,31 +37,52 @@
       </div>
 
       <div class="form-group">
-        <label>BAM 文件路径 (远程)</label>
-        <div v-for="(path, index) in formData.bams" :key="'remote-' + index" class="input-row">
+        <label>文件路径 (远程)</label>
+        <div v-for="(path, index) in formData.files" :key="'remote-' + index" class="input-row">
           <el-input
-            v-model="formData.bams[index]"
-            placeholder="/path/to/file.bam"
+            v-model="formData.files[index]"
+            placeholder="user@host:/path/to/file.bam 或 /path/to/*.fq"
             clearable
           >
             <template #append>
-              <el-button @click="removeBam(index)" :disabled="index === 0">
+              <el-button @click="removeFile(index)" :disabled="index === 0">
                 <el-icon><Minus /></el-icon>
               </el-button>
             </template>
           </el-input>
         </div>
-        <el-button type="primary" plain @click="addBam">
-          <el-icon><Plus /></el-icon> 添加 BAM 文件
+        <el-button type="primary" plain @click="addFile">
+          <el-icon><Plus /></el-icon> 添加文件
         </el-button>
       </div>
     </div>
 
     <!-- Local File Inputs -->
-    <div v-if="fileSource === 'local'">
+    <div v-else>
+      <!-- File Paths -->
+      <div class="form-group">
+        <label>文件路径 (本地)</label>
+        <div v-for="(path, index) in formData.files" :key="'local-' + index" class="input-row">
+          <el-input
+            v-model="formData.files[index]"
+            placeholder="/path/to/file.bam 或 /path/to/*.fq"
+            clearable
+          >
+            <template #append>
+              <el-button @click="removeFile(index)" :disabled="index === 0">
+                <el-icon><Minus /></el-icon>
+              </el-button>
+            </template>
+          </el-input>
+        </div>
+        <el-button type="primary" plain @click="addFile">
+          <el-icon><Plus /></el-icon> 添加文件
+        </el-button>
+      </div>
+
       <!-- File Upload -->
       <div class="form-group">
-        <label>上传文件</label>
+        <label>或上传文件</label>
         <div
           class="file-upload-zone"
           @dragover="handleDragOver"
@@ -71,7 +92,7 @@
         >
           <div v-if="uploadedFiles.length === 0">
             <el-icon :size="48" color="#909399"><Upload /></el-icon>
-            <p style="margin-top: 10px; color: #909399;">拖拽 BAM 文件到此处，或点击上传</p>
+            <p style="margin-top: 10px; color: #909399;">拖拽 .bam/.fq/.fastq/.fa/.fasta 文件到此处，或点击上传</p>
           </div>
           <div v-else>
             <el-tag
@@ -91,59 +112,31 @@
           <input
             ref="uploadInput"
             type="file"
-            accept=".bam"
+            accept=".bam,.fq,.fastq,.fa,.fasta"
             style="display: none"
             @change="handleUpload"
             multiple
           />
         </div>
       </div>
-
-      <!-- BAM File Paths -->
-      <div class="form-group">
-        <label>BAM 文件路径 (本地或已上传)</label>
-        <div v-for="(path, index) in formData.bams" :key="'local-' + index" class="input-row">
-          <el-input
-            v-model="formData.bams[index]"
-            placeholder="/path/to/file.bam"
-            clearable
-          >
-            <template #append>
-              <el-button @click="removeBam(index)" :disabled="index === 0">
-                <el-icon><Minus /></el-icon>
-              </el-button>
-            </template>
-          </el-input>
-        </div>
-        <el-button type="primary" plain @click="addBam">
-          <el-icon><Plus /></el-icon> 添加 BAM 文件
-        </el-button>
-      </div>
     </div>
 
-    <!-- Channel Tag -->
-    <div class="form-group">
-      <label>Channel Tag</label>
-      <el-select v-model="formData.channel_tag" placeholder="选择 channel tag">
-        <el-option label="ch (标准 channel)" value="ch" />
-        <el-option label="zm (Zymo 标准)" value="zm" />
-      </el-select>
-    </div>
-
-    <!-- Min RQ -->
+    <!-- RQ Threshold -->
     <div class="form-group">
       <label>Minimum RQ (可选)</label>
       <el-input-number
-        v-model="formData.min_rq"
+        v-model="formData.rq_thr"
         :min="0"
         :max="1"
-        :step="0.1"
-        placeholder="留空则不设置最低质量标准"
+        :step="0.05"
+        :precision="2"
+        :placeholder="0.95"
       >
         <template #append>
           <span>RQ</span>
         </template>
       </el-input-number>
+      <p class="hint">过滤 reads 的最小质量值，默认 0.95</p>
     </div>
 
     <!-- Execute Button -->
@@ -183,9 +176,8 @@ const uploadedFiles = ref<{name: string, localPath: string}[]>([])
 const uploadInput = ref<HTMLInputElement | null>(null)
 
 const formData = reactive({
-  bams: ['/path/to/file1.bam'],
-  channel_tag: 'ch',
-  min_rq: null as number | null
+  files: ['/path/to/file1.bam'],
+  rq_thr: 0.95
 })
 
 const loading = ref(false)
@@ -195,13 +187,13 @@ watch(() => props.isExecuting, (newVal) => {
   loading.value = newVal
 })
 
-const addBam = () => {
-  formData.bams.push('/path/to/file.bam')
+const addFile = () => {
+  formData.files.push('/path/to/file.bam')
 }
 
-const removeBam = (index: number) => {
-  if (formData.bams.length > 1) {
-    formData.bams.splice(index, 1)
+const removeFile = (index: number) => {
+  if (formData.files.length > 1) {
+    formData.files.splice(index, 1)
   }
 }
 
@@ -215,10 +207,14 @@ const handleUpload = async (event: Event) => {
   const files = target.files
   if (!files) return
 
+  const validExtensions = ['.bam', '.fq', '.fastq', '.fa', '.fasta']
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
-    if (!file.name.endsWith('.bam') && !file.name.endsWith('.bam')) {
-      ElMessage.warning(`只支持 .bam 文件: ${file.name}`)
+    const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+
+    if (!hasValidExt) {
+      ElMessage.warning(`只支持 .bam, .fq, .fastq, .fa, .fasta 文件: ${file.name}`)
       continue
     }
 
@@ -232,7 +228,7 @@ const handleUpload = async (event: Event) => {
           name: file.name,
           localPath: response.data.data.local_path
         })
-        formData.bams.push(response.data.data.local_path)
+        formData.files.push(response.data.data.local_path)
       }
     } catch (error: any) {
       ElMessage.error(`上传失败: ${error.message || '未知错误'}`)
@@ -248,8 +244,8 @@ const handleUpload = async (event: Event) => {
 const removeUploadedFile = (index: number) => {
   const file = uploadedFiles.value[index]
   uploadedFiles.value.splice(index, 1)
-  // Remove from bams array
-  formData.bams = formData.bams.filter(p => p !== file.localPath)
+  // Remove from files array
+  formData.files = formData.files.filter(p => p !== file.localPath)
 }
 
 // Drag and drop handlers
@@ -266,10 +262,14 @@ const handleDrop = async (e: DragEvent) => {
   const files = e.dataTransfer?.files
   if (!files) return
 
+  const validExtensions = ['.bam', '.fq', '.fastq', '.fa', '.fasta']
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
-    if (!file.name.endsWith('.bam')) {
-      ElMessage.warning(`只支持 .bam 文件: ${file.name}`)
+    const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+
+    if (!hasValidExt) {
+      ElMessage.warning(`只支持 .bam, .fq, .fastq, .fa, .fasta 文件: ${file.name}`)
       continue
     }
 
@@ -283,7 +283,7 @@ const handleDrop = async (e: DragEvent) => {
           name: file.name,
           localPath: response.data.data.local_path
         })
-        formData.bams.push(response.data.data.local_path)
+        formData.files.push(response.data.data.local_path)
       }
     } catch (error: any) {
       ElMessage.error(`上传失败: ${error.message || '未知错误'}`)
@@ -303,7 +303,7 @@ const scrollToActions = () => {
 }
 
 const execute = async () => {
-  console.log('=== BAMBasicStatForm - execute() START ===')
+  console.log('=== HomoAndStrRatioForm - execute() START ===')
   console.log('formData:', formData)
   console.log('fileSource:', fileSource.value)
   console.log('sshConfig:', sshConfig.value)
@@ -314,12 +314,11 @@ const execute = async () => {
 
   loading.value = true
   try {
-    // Build request body matching BAMBasicStatRequest schema
+    // Build request body
     const request: any = {
-      tool_name: 'bam-basic-stat',
-      bams: formData.bams,
-      channel_tag: formData.channel_tag,
-      min_rq: formData.min_rq
+      tool_name: 'homo-and-str-ratio',
+      files: formData.files,
+      rq_thr: formData.rq_thr
     }
 
     // Add SSH config for remote files
@@ -328,7 +327,7 @@ const execute = async () => {
       request.ssh_password = sshConfig.value.password
     }
 
-    console.log('=== Step 2: Emitting execute event ===')
+    console.log('=== Emitting execute event ===')
     console.log('Full request object:', JSON.stringify(request, null, 2))
 
     emit('execute', request)
@@ -449,5 +448,12 @@ h3 {
   padding-top: 20px;
   border-top: 1px solid #e4e7ed;
   flex-shrink: 0;
+}
+
+.hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 6px;
+  margin-left: 1px;
 }
 </style>

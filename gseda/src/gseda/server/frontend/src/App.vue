@@ -93,6 +93,7 @@ interface Result {
   stdout: string
   stderr: string
   exit_code: number
+  file_outputs?: { name: string; filename: string; download_url: string }[]
 }
 
 const router = useRouter()
@@ -180,7 +181,8 @@ const onExecute = async (data: any) => {
       tool_name: selectedTool.value.name,
       stdout: response.data.data?.stdout || '',
       stderr: response.data.data?.stderr || '',
-      exit_code: response.data.data?.exit_code || -1
+      exit_code: response.data.data?.exit_code || -1,
+      file_outputs: response.data.data?.file_outputs || null,
     }
 
     if (response.data.success) {

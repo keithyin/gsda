@@ -32,6 +32,15 @@ class MSAViewRequest(ToolRequestBase):
     o_pic: Optional[str] = Field(None, description="Output image file path")
 
 
+class MacebellRatioRequest(ToolRequestBase):
+    """Request schema for macebell-ratio tool"""
+
+    input_bam: str = Field(..., description="Input BAM file path")
+    threads: Optional[int] = Field(None, description="Number of consumer processes")
+    ssh_server: Optional[str] = Field(None, description="SSH server address for remote files")
+    ssh_password: Optional[str] = Field(None, description="SSH password for remote files")
+
+
 # Generic request that can be used for any tool
 class ToolExecutionRequest(BaseModel):
     """Generic schema for executing any CLI tool"""
@@ -56,6 +65,7 @@ class ToolExecutionResponse(BaseModel):
     exit_code: int
     result_data: Optional[Dict[str, Any]] = None
     command: Optional[List[str]] = Field(None, description="The executed command for debugging")
+    file_outputs: Optional[List[Dict[str, str]]] = Field(None, description="List of output files produced by the tool")
 
 
 class ErrorResponse(BaseModel):

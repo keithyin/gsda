@@ -6,11 +6,26 @@
     <!-- Reads Quality Stats V3 Form -->
     <ReadsQualityStatsV3Form v-else-if="selectedTool?.name === 'reads-quality-stats-v3'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
 
+    <!-- Sequencing Report V2 Form -->
+    <SequencingReportV2Form v-else-if="selectedTool?.name === 'sequencing-report-v2'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
     <!-- MSA View Form -->
     <MSAViewForm v-else-if="selectedTool?.name === 'msa-view'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
 
     <!-- Low Q Analysis Form -->
     <LowQAnalysisForm v-else-if="selectedTool?.name === 'low-q-analysis'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
+    <!-- Reads Quality HP-TR Form -->
+    <ReadsQualityStatsHPTrForm v-else-if="selectedTool?.name === 'reads-quality-hp-tr'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
+    <!-- Reads Quality HP Form -->
+    <ReadsQualityStatsHPForm v-else-if="selectedTool?.name === 'reads-quality-hp'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
+    <!-- Homo And Str Ratio Form -->
+    <HomoAndStrRatioForm v-else-if="selectedTool?.name === 'homo-and-str-ratio'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
+    <!-- Macebell Ratio Form -->
+    <MacebellRatioForm v-else-if="selectedTool?.name === 'macebell-ratio'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
 
     <!-- Dynamic form for other tools -->
     <div v-else class="dynamic-form" :class="{ 'is-loading': isExecuting }">
@@ -35,8 +50,12 @@ import { computed, ref, watch } from 'vue'
 import axios from 'axios'
 import BAMBasicStatForm from './forms/BAMBasicStatForm.vue'
 import ReadsQualityStatsV3Form from './forms/ReadsQualityStatsV3Form.vue'
-import MSAViewForm from './forms/MSAViewForm.vue'
+import SequencingReportV2Form from './forms/SequencingReportV2Form.vue'
 import LowQAnalysisForm from './forms/LowQAnalysisForm.vue'
+import ReadsQualityStatsHPTrForm from './forms/ReadsQualityStatsHPTrForm.vue'
+import ReadsQualityStatsHPForm from './forms/ReadsQualityStatsHPForm.vue'
+import HomoAndStrRatioForm from './forms/HomoAndStrRatioForm.vue'
+import MacebellRatioForm from './forms/MacebellRatioForm.vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps<{

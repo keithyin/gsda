@@ -1,8 +1,8 @@
 <template>
   <div class="form-container" :class="{ 'is-loading': isExecuting }">
     <div class="form-section">
-      <h3>Reads Quality Stats V3 - Reads 多维度质量统计</h3>
-      <p class="description">使用 gsmm2-aligned-metric 对 BAM + Reference 生成详细对齐指标（覆盖率、一致性、indel率等）和基础统计（读长、质量分布等）</p>
+      <h3>Reads Quality HP </h3>
+      <p class="description">使用 gsmm2-metric (hp-v2) 分析 BAM 中 poly-N 区域的质量</p>
     </div>
 
     <!-- File Source Toggle -->
@@ -102,7 +102,7 @@
 
     <!-- Reference FASTA Files -->
     <div class="form-group">
-      <label>Reference FASTA 文件 (可选)</label>
+      <label>Reference FASTA 文件 (必填)</label>
       <div v-for="(path, index) in formData.refs" :key="'ref-' + index" class="input-row">
         <el-input
           v-model="formData.refs[index]"
@@ -119,7 +119,7 @@
       <el-button type="primary" plain @click="addRef">
         <el-icon><Plus /></el-icon> 添加 Reference
       </el-button>
-      <p class="hint">如果不提供，则不输出对齐相关的指标</p>
+      <p class="hint">如果不提供，则无法生成对齐相关的指标。单个 Reference 可自动对应多个 BAM 文件</p>
     </div>
 
     <!-- Reference FASTA Source Toggle -->
@@ -197,6 +197,28 @@
       </div>
     </div>
 
+    <!-- NP Range -->
+    <div class="form-group">
+      <label>NP Range (可选)</label>
+      <el-input
+        v-model="formData.np_range"
+        placeholder="例如: 0.9-1.0"
+        clearable
+      />
+      <p class="hint">reads 的 nominal purity 范围</p>
+    </div>
+
+    <!-- RQ Range -->
+    <div class="form-group">
+      <label>RQ Range (可选)</label>
+      <el-input
+        v-model="formData.rq_range"
+        placeholder="例如: 0.8-1.0"
+        clearable
+      />
+      <p class="hint">reads 的质量范围</p>
+    </div>
+
     <!-- Short Alignment -->
     <div class="form-group">
       <label>Short Alignment (可选)</label>
@@ -262,8 +284,10 @@ const refUploadInput = ref<HTMLInputElement | null>(null)
 
 const formData = reactive({
   bams: ['/path/to/file1.bam'],
-  refs: [] as string[],
+  refs: ['/path/to/reference.fa'],
   scp_refs: [] as string[],
+  np_range: '',
+  rq_range: '',
   short_aln: 0,
   force: false
 })
@@ -290,7 +314,7 @@ const addRef = () => {
 }
 
 const removeRef = (index: number) => {
-  if (formData.refs.length > 0) {
+  if (formData.refs.length > 1) {
     formData.refs.splice(index, 1)
   }
 }
@@ -339,7 +363,6 @@ const handleRefUpload = async (event: Event) => {
     }
   }
 
-  // Reset input
   if (refUploadInput.value) {
     refUploadInput.value.value = ''
   }
@@ -375,7 +398,6 @@ const handleUpload = async (event: Event) => {
     }
   }
 
-  // Reset input
   if (uploadInput.value) {
     uploadInput.value.value = ''
   }
@@ -393,26 +415,24 @@ const scrollToActions = () => {
 }
 
 const execute = async () => {
-  console.log('=== ReadsQualityStatsV3Form - execute() START ===')
-  console.log('formData:', formData)
-  console.log('fileSource:', fileSource.value)
-  console.log('sshConfig:', sshConfig.value)
-  console.log('refSource:', refSource.value)
-  console.log('scpRefConfig:', scpRefConfig.value)
-
-  // Scroll to ensure button is visible
   await nextTick()
   scrollToActions()
 
   loading.value = true
   try {
-    // Build request body matching schema
     const request: any = {
-      tool_name: 'reads-quality-stats-v3',
+      tool_name: 'reads-quality-hp',
       bams: formData.bams,
       refs: formData.refs,
       short_aln: formData.short_aln,
       force: formData.force
+    }
+
+    if (formData.np_range) {
+      request.np_range = formData.np_range
+    }
+    if (formData.rq_range) {
+      request.rq_range = formData.rq_range
     }
 
     // Add SSH config for remote BAM files
@@ -428,20 +448,13 @@ const execute = async () => {
       }
       request.scp_refs = formData.scp_refs
 
-      // Add SSH config for SCP reference files if not already set
       if (scpRefConfig.value.server && scpRefConfig.value.password) {
         request.ssh_server = scpRefConfig.value.server
         request.ssh_password = scpRefConfig.value.password
       }
     }
 
-    console.log('=== Emitting execute event ===')
-    console.log('Full request object:', JSON.stringify(request, null, 2))
-
     emit('execute', request)
-  } catch (error) {
-    console.error('=== execute() ERROR ===', error)
-    throw error
   } finally {
     loading.value = false
   }
@@ -515,11 +528,6 @@ h3 {
   font-weight: 500;
 }
 
-.required {
-  color: #f56c6c;
-  margin-left: 4px;
-}
-
 .input-row {
   margin-bottom: 10px;
 }
@@ -545,10 +553,6 @@ h3 {
   border-radius: 6px;
   border: 1px solid #bae6fd;
   margin-bottom: 20px;
-}
-
-.ref-remote-section {
-  margin-top: 20px;
 }
 
 .form-actions {

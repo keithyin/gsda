@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from gseda.server.config import settings
 from gseda.server.core.runners import CLIRunner, ARGUMENT_SCHEMAS
+from fastapi.responses import FileResponse as FastAPIFileResponse
 from gseda.server.core.schema import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -138,6 +139,49 @@ async def upload_file(file: UploadFile = File(...)) -> APIResponse:
             error="Upload failed",
             message=str(e),
         )
+
+
+# ============================================================================
+# Tool File Download Endpoints
+# ============================================================================
+
+
+class ToolFileDownloadRequest(BaseModel):
+    """Request for downloading tool output file"""
+    filename: str
+
+
+@api_router.get(
+    "/files/download/{filename}",
+    summary="Download tool output file",
+    description="Download a file output from a previously executed CLI tool",
+)
+async def download_tool_file(filename: str) -> FastAPIFileResponse:
+    """Download a tool output file by filename."""
+    import os as _os
+
+    # Path traversal protection
+    if ".." in filename or filename.startswith("/"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    from gseda.server.core.runners import _load_file_index
+
+    index = _load_file_index()
+    entry = None
+    for e in index:
+        entry_fname = e.get("filename") or e.get("name", "")
+        if entry_fname == filename and _os.path.exists(e.get("path", "")):
+            entry = e
+            break
+
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
+
+    return FastAPIFileResponse(
+        path=entry["path"],
+        filename=filename,
+        media_type="application/octet-stream",
+    )
 
 
 # ============================================================================
@@ -379,6 +423,9 @@ async def execute_tool(
                 message=str(e),
             )
 
+    # Clean up old file outputs
+    CLIRunner.cleanup_file_outputs()
+
     # Execute the CLI module
     print_log(f"Executing CLI with args: {json.dumps(args_dict, indent=2)}")
     returncode, stdout, stderr, command = CLIRunner.run_cli_with_json(
@@ -395,6 +442,9 @@ async def execute_tool(
     # Clean up temporary files
     FileManager.cleanup_temp_files()
 
+    # Get file outputs if available
+    file_outputs = CLIRunner.get_registered_files()
+
     # Build response
     response = ToolExecutionResponse(
         success=(returncode == 0),
@@ -403,6 +453,7 @@ async def execute_tool(
         stderr=stderr,
         exit_code=returncode,
         command=command if command else None,
+        file_outputs=file_outputs if file_outputs else None,
     )
 
     if returncode == 0:
@@ -452,6 +503,9 @@ async def execute_tool_get(
             detail=f"Tool '{tool_name}' not found",
         )
 
+    # Clean up old file outputs
+    CLIRunner.cleanup_file_outputs()
+
     # Build arguments from query parameters
     args_dict = {}
     if bams:
@@ -470,6 +524,9 @@ async def execute_tool_get(
     # Clean up temporary files
     FileManager.cleanup_temp_files()
 
+    # Get file outputs if available
+    file_outputs = CLIRunner.get_registered_files()
+
     # Build response
     response = ToolExecutionResponse(
         success=(returncode == 0),
@@ -478,6 +535,7 @@ async def execute_tool_get(
         stderr=stderr,
         exit_code=returncode,
         command=command if command else None,
+        file_outputs=file_outputs if file_outputs else None,
     )
 
     if returncode == 0:

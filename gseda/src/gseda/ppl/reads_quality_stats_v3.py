@@ -316,7 +316,7 @@ def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
 
 def stats(metric_filename: str, filename: str):
     df = pl.read_csv(
-        metric_filename, separator="\t", infer_schema_length=3000, schema_overrides={"longIndel": pl.String}
+        metric_filename, separator="\t", infer_schema_length=3000, schema_overrides={"longIndel": pl.String}, glob=False
     )
     metric_aligned_not_aligned = analysis_aligned(df=df)
     df = df.filter(pl.col("rname") != "")
@@ -748,6 +748,12 @@ def main_cli():
         default=False,
         help="regenerate the metric file if exists",
     )
+    parser.add_argument(
+        "--outdir",
+        type=str,
+        default=None,
+        help="output directory for metric files (used by server)",
+    )
     args = parser.parse_args()
 
     bam_files = args.bams
@@ -765,7 +771,33 @@ def main_cli():
 
     for bam, ref in zip(bam_files, refs):
         main(bam_file=bam, ref_fa=ref,
-             short_aln=args.short_aln == 1, force=args.force)
+             short_aln=args.short_aln == 1, force=args.force, outdir=args.outdir)
+
+    # Register output files for download when run from server
+    index_path = os.environ.get("GSEDA_FILE_INDEX_PATH")
+    if index_path:
+        from gseda.server.core.runners import FileRegistry
+        files_to_register = []
+        for bam_file in bam_files:
+            stem = extract_filename(bam_file)
+            outdir = args.outdir or os.path.join(
+                os.path.dirname(bam_file) or ".", f"{stem}-metric"
+            )
+            for fname in [
+                f"{stem}.gsmm2_aligned_metric_aggr.csv",
+                f"{stem}.gsmm2_aligned_metric_fact.csv",
+                f"{stem}.non_aligned_aggr.csv",
+                f"{stem}.non_aligned_fact.csv",
+                f"{stem}.idenity_hist.png",
+                f"{stem}.readlength_hist.png",
+                f"{stem}.dw_hist.png",
+                f"{stem}.ar_hist.png",
+            ]:
+                fpath = os.path.join(outdir, fname)
+                if os.path.exists(fpath):
+                    files_to_register.append({"name": fname, "path": fpath})
+        if files_to_register:
+            FileRegistry.register(files_to_register)
 
 
 if __name__ == "__main__":

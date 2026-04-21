@@ -1,8 +1,8 @@
 <template>
   <div class="form-container" :class="{ 'is-loading': isExecuting }">
     <div class="form-section">
-      <h3>Low Q-Analysis - 低质量分析</h3>
-      <p class="description">低 Q20 Q30 yield 的问题分析。执行多项分析包括：正反链一致性、SMC 比对质量、homo+str 区域覆盖、macebell 比率。</p>
+      <h3>Low Q Analysis - 低质量产率问题分析</h3>
+      <p class="description">分析低 Q20/Q30 产率问题，综合执行多项分析：subreads-SMC 一致性检查、正反链不一致检测、homo+STR 区域覆盖率和Macebell reads比例</p>
     </div>
 
     <!-- File Source Toggle -->
