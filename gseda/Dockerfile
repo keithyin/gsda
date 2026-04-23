@@ -9,17 +9,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . /workspace/gseda
 WORKDIR /workspace/gseda
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir .
+
+# Install Rust with rsproxy mirror for faster downloads
+ENV RUSTUP_DIST_SERVER="https://rsproxy.cn" \
+    RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
+RUN mkdir -p ~/.cargo && \
+    cat > ~/.cargo/config.toml <<'CARGOEOF'
+[source.crates-io]
+replace-with = 'rsproxy-sparse'
+
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy]
+index = "https://rsproxy.cn/crates.io-index"
+
+[net]
+git-fetch-with-cli = true
+CARGOEOF
+RUN curl --proto '=https' --tlsv1.2 -sSf https://rsproxy.cn/rustup-init.sh | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Stage 2: runtime
-FROM ubuntu:24.04
+# FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip libbz2 liblzma libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /workspace/gseda /workspace/gseda
+# COPY --from=builder /workspace/gseda /workspace/gseda
 WORKDIR /workspace/gseda
 
 EXPOSE 8000
