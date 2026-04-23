@@ -4,8 +4,12 @@ FROM ubuntu:24.04 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev build-essential \
     libbz2-dev liblz4-dev liblzma-dev libgomp1 pkg-config \
-    gcc g++ cmake \
-    && rm -rf /var/lib/apt/lists/*
+    gcc g++ cmake curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get purge -y curl && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY . /workspace/gseda
 WORKDIR /workspace/gseda
@@ -32,6 +36,9 @@ git-fetch-with-cli = true
 CARGOEOF
 RUN curl --proto '=https' --tlsv1.2 -sSf https://rsproxy.cn/rustup-init.sh | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Claude Code via npm
+RUN npm install -g @anthropic-ai/claude-code
 
 # Stage 2: runtime
 # FROM ubuntu:24.04
