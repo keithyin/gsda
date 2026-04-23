@@ -294,17 +294,7 @@ ARGUMENT_SCHEMAS = {
             {"name": "min_rq", "type": "number", "required": False, "placeholder": "0.8"},
         ],
     },
-    "msa-view": {
-        "arguments": [
-            {"name": "bam", "type": "file", "required": True},
-            {"name": "ref_fasta", "type": "file", "required": True},
-            {"name": "ref_name", "type": "text", "required": True},
-            {"name": "start", "type": "number", "required": False},
-            {"name": "end", "type": "number", "required": False},
-            {"name": "o_fasta", "type": "file_output", "required": False},
-            {"name": "o_pic", "type": "file_output", "required": False},
-        ],
-    },
+
     "reads-quality-stats-v3": {
         "arguments": [
             {"name": "bams", "type": "file", "required": True, "multiple": True, "placeholder": "支持通配符 *, 例如：/path/to/*.bam"},

@@ -5,69 +5,21 @@
       <p class="description">使用 gsmm2-metric (hp-v2) 分析 BAM 中 poly-N 区域的质量</p>
     </div>
 
-    <!-- File Source Toggle -->
-    <div class="form-group">
+    <!-- BAM File - Unified Section -->
+    <div class="form-group bam-unity-section">
+      <label>BAM 文件来源</label>
       <el-radio-group v-model="fileSource" size="medium">
-        <el-radio-button label="local">本地文件</el-radio-button>
-        <el-radio-button label="remote">远程文件 (SCP)</el-radio-button>
+        <el-radio-button value="local">服务器本地</el-radio-button>
+        <el-radio-button value="upload">客户端上传</el-radio-button>
+        <el-radio-button value="scp">SCP 远程文件</el-radio-button>
       </el-radio-group>
-    </div>
 
-    <!-- Remote File Inputs -->
-    <div v-if="fileSource === 'remote'" class="remote-config">
-      <div class="form-group">
-        <label>SSH 服务器地址</label>
-        <el-input
-          v-model="sshConfig.server"
-          placeholder="格式: user@host"
-          clearable
-        >
-          <template #prepend>SSH</template>
-        </el-input>
-      </div>
-
-      <div class="form-group">
-        <label>SSH 密码</label>
-        <el-input
-          v-model="sshConfig.password"
-          type="password"
-          placeholder="SSH 密码"
-          show-password
-        ></el-input>
-      </div>
-
-      <div class="form-group">
-        <label>BAM 文件路径 (支持通配符*)</label>
-        <div v-for="(path, index) in formData.bams" :key="'remote-' + index" class="input-row">
-          <el-input
-            v-model="formData.bams[index]"
-            placeholder="/path/to/*.bam 或 /path/to/file.bam"
-            clearable
-          >
-            <template #append>
-              <el-button @click="removeBam(index)" :disabled="index === 0">
-                <el-icon><Minus /></el-icon>
-              </el-button>
-            </template>
-          </el-input>
-        </div>
-        <el-button type="primary" plain @click="addBam">
-          <el-icon><Plus /></el-icon> 添加 BAM 文件
-        </el-button>
-      </div>
-    </div>
-
-    <!-- Local File Inputs -->
-    <div v-else>
-      <!-- BAM File Paths -->
-      <div class="form-group">
-        <label>BAM 文件路径 (支持通配符*)</label>
+      <!-- Server Local -->
+      <div v-if="fileSource === 'local'" class="bam-input-area">
+        <label class="sub-label">BAM 文件路径 (支持通配符*)</label>
         <div v-for="(path, index) in formData.bams" :key="'local-' + index" class="input-row">
-          <el-input
-            v-model="formData.bams[index]"
-            placeholder="/path/to/*.bam 或 /path/to/file.bam"
-            clearable
-          >
+          <el-input v-model="formData.bams[index]"
+            placeholder="/path/to/*.bam 或 /path/to/file.bam" clearable>
             <template #append>
               <el-button @click="removeBam(index)" :disabled="index === 0">
                 <el-icon><Minus /></el-icon>
@@ -80,120 +32,116 @@
         </el-button>
       </div>
 
-      <!-- File Upload -->
-      <div class="form-group">
-        <label>或上传单个 BAM 文件</label>
-        <div
-          class="file-upload-zone"
-          @click="triggerUpload"
-        >
+      <!-- Client Upload -->
+      <div v-else-if="fileSource === 'upload'" class="bam-input-area">
+        <div class="file-upload-zone" @click="triggerUpload">
           <el-icon :size="48" color="#909399"><Upload /></el-icon>
           <p style="margin-top: 10px; color: #909399;">点击上传 BAM 文件</p>
         </div>
-        <input
-          ref="uploadInput"
-          type="file"
-          accept=".bam"
-          style="display: none"
-          @change="handleUpload"
-        />
+        <input ref="uploadInput" type="file" accept=".bam"
+          style="display: none" @change="handleUpload" />
+      </div>
+
+      <!-- SCP Remote -->
+      <div v-else-if="fileSource === 'scp'" class="bam-input-area bam-scp-area">
+        <div class="form-group">
+          <label>SSH 服务器地址</label>
+          <el-input v-model="sshConfig.server" placeholder="格式: user@host" clearable
+            autocomplete="url">
+            <template #prepend>SSH</template>
+          </el-input>
+        </div>
+        <div class="form-group">
+          <label>SSH 密码</label>
+          <el-input v-model="sshConfig.password" type="password" placeholder="SSH 密码" show-password
+            autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>BAM 文件路径 (支持通配符*)</label>
+          <div v-for="(path, index) in formData.bams" :key="'remote-' + index" class="input-row">
+            <el-input v-model="formData.bams[index]"
+              placeholder="/path/to/*.bam 或 /path/to/file.bam" clearable>
+              <template #append>
+                <el-button @click="removeBam(index)" :disabled="index === 0">
+                  <el-icon><Minus /></el-icon>
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+          <el-button type="primary" plain @click="addBam">
+            <el-icon><Plus /></el-icon> 添加 BAM 文件
+          </el-button>
+        </div>
       </div>
     </div>
 
-    <!-- Reference FASTA Files -->
-    <div class="form-group">
-      <label>Reference FASTA 文件 (必填)</label>
-      <div v-for="(path, index) in formData.refs" :key="'ref-' + index" class="input-row">
-        <el-input
-          v-model="formData.refs[index]"
-          placeholder="/path/to/reference.fa"
-          clearable
-        >
-          <template #append>
-            <el-button @click="removeRef(index)" :disabled="index === 0">
-              <el-icon><Minus /></el-icon>
-            </el-button>
-          </template>
-        </el-input>
-      </div>
-      <el-button type="primary" plain @click="addRef">
-        <el-icon><Plus /></el-icon> 添加 Reference
-      </el-button>
-      <p class="hint">如果不提供，则无法生成对齐相关的指标。单个 Reference 可自动对应多个 BAM 文件</p>
-    </div>
-
-    <!-- Reference FASTA Source Toggle -->
-    <div class="form-group">
+    <!-- Reference FASTA - Unified Section -->
+    <div class="form-group ref-unity-section">
       <label>Reference FASTA 文件来源</label>
       <el-radio-group v-model="refSource" size="medium">
-        <el-radio-button label="local">服务器本地</el-radio-button>
-        <el-radio-button label="upload">客户端上传</el-radio-button>
-        <el-radio-button label="scp">SCP 远程文件</el-radio-button>
+        <el-radio-button value="local">服务器本地</el-radio-button>
+        <el-radio-button value="upload">客户端上传</el-radio-button>
+        <el-radio-button value="scp">SCP 远程文件</el-radio-button>
       </el-radio-group>
-    </div>
 
-    <!-- Remote Reference Files (SCP) -->
-    <div v-if="refSource === 'scp'" class="remote-config">
-      <div class="form-group">
-        <label>SSH 服务器地址</label>
-        <el-input
-          v-model="scpRefConfig.server"
-          placeholder="格式：user@host"
-          clearable
-        >
-          <template #prepend>SSH</template>
-        </el-input>
-      </div>
-
-      <div class="form-group">
-        <label>SSH 密码</label>
-        <el-input
-          v-model="scpRefConfig.password"
-          type="password"
-          placeholder="SSH 密码"
-          show-password
-        ></el-input>
-      </div>
-
-      <div class="form-group">
-        <label>Reference FASTA 文件路径 (支持通配符*)</label>
-        <div v-for="(path, index) in formData.scp_refs" :key="'scp-ref-' + index" class="input-row">
-          <el-input
-            v-model="formData.scp_refs[index]"
-            placeholder="/path/to/*.fa 或 /path/to/file.fasta"
-            clearable
-          >
+      <!-- Server Local -->
+      <div v-if="refSource === 'local'" class="ref-input-area">
+        <label class="sub-label">Reference 文件路径</label>
+        <div v-for="(path, index) in formData.refs" :key="'ref-' + index" class="input-row">
+          <el-input v-model="formData.refs[index]" placeholder="/path/to/reference.fa" clearable>
             <template #append>
-              <el-button @click="removeScpRef(index)" :disabled="index === 0">
+              <el-button @click="removeRef(index)" :disabled="index === 0">
                 <el-icon><Minus /></el-icon>
               </el-button>
             </template>
           </el-input>
         </div>
-        <el-button type="primary" plain @click="addScpRef">
-          <el-icon><Plus /></el-icon> 添加 Reference 文件
+        <el-button type="primary" plain @click="addRef">
+          <el-icon><Plus /></el-icon> 添加 Reference
         </el-button>
+        <p class="hint">如果不提供，则无法生成对齐相关的指标。单个 Reference 可自动对应多个 BAM 文件</p>
       </div>
-    </div>
 
-    <!-- Local Reference Files (upload mode) -->
-    <div v-else-if="refSource === 'upload'">
-      <div class="form-group">
-        <label>或上传 Reference FASTA 文件</label>
-        <div
-          class="file-upload-zone"
-          @click="triggerRefUpload"
-        >
+      <!-- Client Upload -->
+      <div v-else-if="refSource === 'upload'" class="ref-input-area">
+        <div class="file-upload-zone" @click="triggerRefUpload">
           <el-icon :size="48" color="#909399"><Upload /></el-icon>
           <p style="margin-top: 10px; color: #909399;">点击上传 FASTA 文件</p>
         </div>
-        <input
-          ref="refUploadInput"
-          type="file"
-          accept=".fasta,.fa,.fna"
-          style="display: none"
-          @change="handleRefUpload"
-        />
+        <input ref="refUploadInput" type="file" accept=".fasta,.fa,.fna"
+          style="display: none" @change="handleRefUpload" />
+      </div>
+
+      <!-- SCP Remote -->
+      <div v-else-if="refSource === 'scp'" class="ref-input-area ref-scp-area">
+        <div class="form-group">
+          <label>SSH 服务器地址</label>
+          <el-input v-model="scpRefConfig.server" placeholder="格式: user@host" clearable
+            autocomplete="url">
+            <template #prepend>SSH</template>
+          </el-input>
+        </div>
+        <div class="form-group">
+          <label>SSH 密码</label>
+          <el-input v-model="scpRefConfig.password" type="password" placeholder="SSH 密码" show-password
+            autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>Reference FASTA 文件路径 (支持通配符*)</label>
+          <div v-for="(path, index) in formData.scp_refs" :key="'scp-ref-' + index" class="input-row">
+            <el-input v-model="formData.scp_refs[index]"
+              placeholder="/path/to/*.fa 或 /path/to/file.fasta" clearable>
+              <template #append>
+                <el-button @click="removeScpRef(index)" :disabled="index === 0">
+                  <el-icon><Minus /></el-icon>
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+          <el-button type="primary" plain @click="addScpRef">
+            <el-icon><Plus /></el-icon> 添加 Reference 文件
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -223,8 +171,8 @@
     <div class="form-group">
       <label>Short Alignment (可选)</label>
       <el-radio-group v-model="formData.short_aln">
-        <el-radio :label="0">不使用 Short Alignment</el-radio>
-        <el-radio :label="1">使用 Short Alignment</el-radio>
+        <el-radio :value="0">不使用 Short Alignment</el-radio>
+        <el-radio :value="1">使用 Short Alignment</el-radio>
       </el-radio-group>
       <p class="hint">
         Short Alignment 用于处理长度在 [30, 200] 范围内的Reference序列。<br>
@@ -267,7 +215,7 @@ const props = defineProps<{
   isExecuting?: boolean
 }>()
 
-const fileSource = ref<'local' | 'remote'>('local')
+const fileSource = ref<'local' | 'upload' | 'scp'>('local')
 const sshConfig = ref({
   server: '',
   password: ''
@@ -289,7 +237,7 @@ const formData = reactive({
   np_range: '',
   rq_range: '',
   short_aln: 0,
-  force: false
+  force: true
 })
 
 const loading = ref(false)
@@ -436,17 +384,15 @@ const execute = async () => {
     }
 
     // Add SSH config for remote BAM files
-    if (fileSource.value === 'remote') {
+    if (fileSource.value === 'scp') {
       request.ssh_server = sshConfig.value.server
       request.ssh_password = sshConfig.value.password
     }
 
     // Add SCP reference files config
     if (refSource.value === 'scp') {
-      if (!request.scp_refs) {
-        request.scp_refs = []
-      }
       request.scp_refs = formData.scp_refs
+      request.refs = []
 
       if (scpRefConfig.value.server && scpRefConfig.value.password) {
         request.ssh_server = scpRefConfig.value.server
@@ -547,14 +493,6 @@ h3 {
   background: #f5f7fa;
 }
 
-.remote-config {
-  background: #f0f9ff;
-  padding: 20px;
-  border-radius: 6px;
-  border: 1px solid #bae6fd;
-  margin-bottom: 20px;
-}
-
 .form-actions {
   margin-top: 30px;
   padding-top: 20px;
@@ -567,5 +505,41 @@ h3 {
   color: #909399;
   margin-top: 6px;
   margin-left: 1px;
+}
+
+.ref-unity-section,
+.bam-unity-section {
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fafbfc;
+}
+
+.ref-unity-section .el-radio-group,
+.bam-unity-section .el-radio-group {
+  margin-bottom: 16px;
+}
+
+.ref-input-area,
+.bam-input-area {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #e4e7ed;
+}
+
+.ref-input-area .sub-label,
+.bam-input-area .sub-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.ref-scp-area,
+.bam-scp-area {
+  background: #f0f9ff;
+  padding: 16px 20px;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
 }
 </style>

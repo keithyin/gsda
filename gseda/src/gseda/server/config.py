@@ -36,7 +36,7 @@ class Settings:
         ("reads-quality-stats-v3", "gseda.ppl.reads_quality_stats_v3:main_cli"),
         ("reads-quality-hp-tr", "gseda.ppl.reads_quality_stats_hp_tr:main_cli"),
         ("reads-quality-hp", "gseda.ppl.reads_quality_stats_hp:main_cli"),
-        ("sequencing-report-v2", "gseda.ppl.sequencing_report_v2:main_cli"),
+        # ("sequencing-report-v2", "gseda.ppl.sequencing_report_v2:main_cli"),
         ("bam-basic-stat", "gseda.bam_ana.bam_basic_stat:main_cli"),
         ("low-q-analysis", "gseda.ppl.low_q_analysis:main_cli"),
         ("homo-and-str-ratio", "gseda.ppl.homo_and_str_region_coverage:main_cli"),

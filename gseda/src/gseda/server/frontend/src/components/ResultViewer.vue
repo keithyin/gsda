@@ -87,11 +87,40 @@
         <div v-if="hasContent(result.stderr)" class="preview-section error-section">
           <div class="preview-header">
             <span class="preview-title">STDERR 预览</span>
-            <el-button link @click="switchTab('stderr')">
-              查看完整 <el-icon><ArrowRight /></el-icon>
-            </el-button>
+            <div class="preview-header-actions">
+              <el-button size="small" type="primary" link @click="askAIHelp" :loading="aiLoading">
+                <el-icon><QuestionFilled /></el-icon>
+                让 AI 分析错误
+              </el-button>
+              <el-button link @click="switchTab('stderr')">
+                查看完整 <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
           </div>
-          <pre class="preview-content">{{ formatOutputForPreview(result.stderr) }}</pre>
+          <pre class="preview-content">{{ formatOutputForPreview(result.stderr, result.tool_name) }}</pre>
+          <!-- AI Analysis Result -->
+          <div v-if="aiAnalysis === null" class="ai-analysis-section ai-analysis-loading">
+            <div class="ai-analysis-header">
+              <span class="ai-analysis-title">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+                AI 正在分析错误...
+              </span>
+              <span class="ai-analysis-status">请稍候，通常需 2-3 分钟</span>
+            </div>
+          </div>
+          <div v-else-if="aiAnalysis" class="ai-analysis-section">
+            <div class="ai-analysis-header">
+              <span class="ai-analysis-title">
+                <el-icon><QuestionFilled /></el-icon>
+                AI 分析结果
+              </span>
+              <el-button size="small" link @click="copyAIAnalysis">
+                <el-icon><DocumentCopy /></el-icon>
+                复制
+              </el-button>
+            </div>
+            <div v-if="aiAnalysis" class="ai-analysis-content" v-html="renderMarkdown(aiAnalysis)"></div>
+          </div>
         </div>
 
         <div v-if="!hasContent(result.stdout) && !hasContent(result.stderr)" class="empty-output">
@@ -168,6 +197,10 @@
             </el-button>
           </div>
           <div class="control-right">
+            <el-button size="small" type="primary" @click="askAIHelp" :loading="aiLoading">
+              <el-icon><QuestionFilled /></el-icon>
+              让 AI 分析错误
+            </el-button>
             <el-button size="small" @click="copySection('stderr')">
               <el-icon><DocumentCopy /></el-icon>
               复制
@@ -178,10 +211,33 @@
             </el-button>
           </div>
         </div>
-        <div class="output-content error-bg terminal-output">
+        <div class="output-content terminal-output">
           <pre ref="stderrPre" class="output-text">
-            {{ result.stderr }}
+            {{ stderrWithContext }}
           </pre>
+        </div>
+        <!-- AI Analysis Result -->
+        <div v-if="aiAnalysis === null" class="ai-analysis-section ai-analysis-loading">
+          <div class="ai-analysis-header">
+            <span class="ai-analysis-title">
+              <el-icon class="loading-icon"><Loading /></el-icon>
+              AI 正在分析错误...
+            </span>
+            <span class="ai-analysis-status">请稍候，通常需 2-3 分钟</span>
+          </div>
+        </div>
+        <div v-else-if="aiAnalysis" class="ai-analysis-section">
+          <div class="ai-analysis-header">
+            <span class="ai-analysis-title">
+              <el-icon><QuestionFilled /></el-icon>
+              AI 分析结果
+            </span>
+            <el-button size="small" link @click="copyAIAnalysis">
+              <el-icon><DocumentCopy /></el-icon>
+              复制
+            </el-button>
+          </div>
+          <div v-if="aiAnalysis" class="ai-analysis-content" v-html="renderMarkdown(aiAnalysis)"></div>
         </div>
       </div>
 
@@ -220,6 +276,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
 import {
   DocumentCopy,
   Download,
@@ -228,7 +285,9 @@ import {
   ArrowRight,
   Fold,
   Expand,
-  Document
+  Document,
+  QuestionFilled,
+  Loading
 } from '@element-plus/icons-vue'
 
 // Helper to get expand/collapse icon based on section and state
@@ -245,6 +304,12 @@ const hasContent = (text: string): boolean => {
 const formatOutput = (text: string): string => {
   return text || '(无输出)'
 }
+
+// stderr with tool name prefix for AI analysis context
+const stderrWithContext = computed(() => {
+  if (!hasContent(props.result.stderr)) return props.result.stderr
+  return `[工具: ${props.result.tool_name}]\n${props.result.stderr}`
+})
 
 const props = defineProps<{
   result: {
@@ -276,6 +341,10 @@ const isExpanded = ref({
 const searchQuery = ref('')
 const searchMatches = ref(0)
 const searchTotal = ref(0)
+
+// AI analysis state
+const aiAnalysis = ref('')
+const aiLoading = ref(false)
 
 // Pre references for scrolling
 const stdoutPre = ref<HTMLElement | null>(null)
@@ -348,8 +417,9 @@ const handleSearch = () => {
 }
 
 // Format output for preview (truncate long lines)
-const formatOutputForPreview = (output: string): string => {
-  const lines = output.split('\n')
+const formatOutputForPreview = (output: string, toolName?: string): string => {
+  const prefix = toolName ? `[工具: ${toolName}]\n` : ''
+  const lines = (prefix + output).split('\n')
   const maxLines = 10
   const preview = lines.slice(0, maxLines)
   const truncated = lines.length > maxLines
@@ -360,7 +430,14 @@ const formatOutputForPreview = (output: string): string => {
 
 // Copy section
 const copySection = async (section: 'stdout' | 'stderr') => {
-  const text = section === 'stdout' ? props.result.stdout : props.result.stderr
+  let text: string
+  if (section === 'stdout') {
+    text = props.result.stdout || ''
+  } else {
+    text = hasContent(props.result.stderr)
+      ? `[工具: ${props.result.tool_name}]\n${props.result.stderr}`
+      : props.result.stderr || ''
+  }
   if (!hasContent(text)) return
 
   try {
@@ -485,6 +562,104 @@ watch(() => props.result.stderr, (newVal) => {
 
 const scrollToBottom = () => {
   // No manual scrolling needed - page uses natural browser scrolling
+}
+
+// Ask AI for help analyzing stderr (async polling pattern)
+const askAIHelp = async () => {
+  if (!props.result.stderr || !hasContent(props.result.stderr)) return
+
+  aiLoading.value = true
+  aiAnalysis.value = ''
+  try {
+    // Step 1: Start the analysis job
+    const startRes = await fetch(
+      `/api/tools/${props.result.tool_name}/ai-analyze`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool_name: props.result.tool_name,
+          stderr: props.result.stderr,
+          stdout: props.result.stdout || ''
+        })
+      }
+    )
+    const startData = await startRes.json()
+    if (!startData.success || !startData.data?.job_id) {
+      ElMessage.error(startData.error || '无法启动 AI 分析')
+      return
+    }
+
+    const jobId = startData.data.job_id
+
+    // Step 2: Poll for the result
+    aiLoading.value = false
+    aiAnalysis.value = null  // null = showing loading indicator
+
+    const pollInterval = setInterval(async () => {
+      const pollRes = await fetch(
+        `/api/tools/${props.result.tool_name}/ai-analyze/${jobId}`
+      )
+      const pollData = await pollRes.json()
+
+      if (!pollData.success) {
+        // Job expired or error
+        clearInterval(pollInterval)
+        aiAnalysis.value = pollData.error || pollData.message || '分析已过期'
+        aiAnalysis.value = `[分析失败] ${aiAnalysis.value}`
+        ElMessage.warning('AI 分析超时，请稍后重试')
+        return
+      }
+
+      const status = pollData.data?.status
+      if (status === 'running') return  // Still running, keep polling
+
+      // Done or error — stop polling and display result
+      clearInterval(pollInterval)
+
+      if (status === 'done') {
+        aiAnalysis.value = pollData.data?.result || '(无结果)'
+        ElMessage.success('AI 分析完成')
+      } else {
+        aiAnalysis.value = pollData.data?.result || 'AI 分析失败'
+        ElMessage.error('AI 分析失败')
+      }
+    }, 2000)
+
+    // Step 3: Safety timeout (10 minutes)
+    setTimeout(() => {
+      clearInterval(pollInterval)
+      if (aiAnalysis.value === null) {
+        aiAnalysis.value = '[分析超时] AI 分析耗时过长，请稍后查看结果或重试。'
+        ElMessage.warning('AI 分析耗时较长，结果可能稍后可用')
+      }
+    }, 600_000)
+
+  } catch (err) {
+    aiAnalysis.value = 'AI 分析请求失败'
+    ElMessage.error('AI 分析请求失败')
+  }
+}
+
+const copyAIAnalysis = async () => {
+  if (!aiAnalysis.value) return
+  try {
+    await navigator.clipboard.writeText(aiAnalysis.value)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
+// Render markdown to HTML for AI analysis results
+const renderMarkdown = (text: string): string => {
+  if (!text) return ''
+  // Configure marked for safe rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+  })
+  return marked.parse(text) as string
 }
 
 // Initialize
@@ -618,8 +793,8 @@ nextTick(() => {
 }
 
 .preview-section.error-section {
-  background: #fef0f0;
-  border-color: #fde2e2;
+  background: #fff;
+  border-color: #e4e7ed;
 }
 
 .preview-header {
@@ -709,10 +884,6 @@ nextTick(() => {
   overflow-y: auto;
 }
 
-.output-content.error-bg {
-  background: #fef0f0;
-}
-
 /* Terminal-style styling for code output */
 .terminal-output {
   font-family: 'Courier New', 'Courier', monospace;
@@ -755,5 +926,189 @@ nextTick(() => {
 
 .action-buttons .el-button {
   flex: 0 0 auto;
+}
+
+/* AI Analysis Section */
+.ai-analysis-section {
+  margin-top: 15px;
+  padding: 15px;
+  border: 1px solid #409eff;
+  border-radius: 6px;
+  background: #ecf5ff;
+}
+
+.ai-analysis-section.ai-analysis-loading {
+  background: #f0f9ff;
+  border-color: #66b1ff;
+}
+
+.ai-analysis-status {
+  font-size: 12px;
+  color: #909399;
+  font-style: italic;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-icon {
+  animation: spin 1.5s linear infinite;
+  display: inline-block;
+}
+
+.ai-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ai-analysis-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #409eff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-analysis-content {
+  background: #fff;
+  border-radius: 4px;
+  padding: 16px;
+  max-height: 500px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Markdown rendering styles for rendered content */
+.ai-analysis-content :deep(h1),
+.ai-analysis-content :deep(h2),
+.ai-analysis-content :deep(h3),
+.ai-analysis-content :deep(h4),
+.ai-analysis-content :deep(h5),
+.ai-analysis-content :deep(h6) {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1.4;
+}
+
+.ai-analysis-content :deep(h1) { font-size: 1.4em; }
+.ai-analysis-content :deep(h2) { font-size: 1.25em; }
+.ai-analysis-content :deep(h3) { font-size: 1.1em; }
+
+.ai-analysis-content :deep(p) {
+  margin: 0 0 10px 0;
+  line-height: 1.8;
+}
+
+.ai-analysis-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.ai-analysis-content :deep(ul),
+.ai-analysis-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.ai-analysis-content :deep(li) {
+  margin-bottom: 4px;
+  line-height: 1.7;
+}
+
+.ai-analysis-content :deep(li > p) {
+  margin: 4px 0;
+}
+
+.ai-analysis-content :deep(code) {
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.9em;
+  color: #e83e8c;
+}
+
+.ai-analysis-content :deep(pre) {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 10px 0;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-analysis-content :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.ai-analysis-content :deep(blockquote) {
+  border-left: 4px solid #409eff;
+  margin: 10px 0;
+  padding: 8px 16px;
+  background: #f0f9ff;
+  color: #606266;
+}
+
+.ai-analysis-content :deep(blockquote > p) {
+  margin: 0;
+}
+
+.ai-analysis-content :deep(hr) {
+  border: none;
+  border-top: 1px solid #e4e7ed;
+  margin: 16px 0;
+}
+
+.ai-analysis-content :deep(strong) {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.ai-analysis-content :deep(a) {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.ai-analysis-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.ai-analysis-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.ai-analysis-content :deep(th),
+.ai-analysis-content :deep(td) {
+  border: 1px solid #e4e7ed;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.ai-analysis-content :deep(th) {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.preview-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

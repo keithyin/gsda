@@ -5,99 +5,56 @@
       <p class="description">检测 Macebell reads 比例</p>
     </div>
 
-    <!-- File Source Toggle -->
-    <div class="form-group">
+    <!-- BAM File - Unified Section -->
+    <div class="form-group bam-unity-section">
+      <label>BAM 文件来源</label>
       <el-radio-group v-model="fileSource" size="medium">
-        <el-radio-button label="local">本地文件</el-radio-button>
-        <el-radio-button label="remote">远程文件 (SCP)</el-radio-button>
+        <el-radio-button value="local">服务器本地</el-radio-button>
+        <el-radio-button value="upload">客户端上传</el-radio-button>
+        <el-radio-button value="scp">SCP 远程文件</el-radio-button>
       </el-radio-group>
-    </div>
 
-    <!-- Remote File Inputs -->
-    <div v-if="fileSource === 'remote'" class="remote-config">
-      <div class="form-group">
-        <label>SSH 服务器地址</label>
-        <el-input
-          v-model="sshConfig.server"
-          placeholder="格式: user@host"
-          clearable
-        >
-          <template #prepend>SSH</template>
-        </el-input>
+      <!-- Server Local -->
+      <div v-if="fileSource === 'local'" class="bam-input-area">
+        <label class="sub-label">BAM 文件路径</label>
+        <div class="input-row">
+          <el-input v-model="formData.input_bam"
+            placeholder="/path/to/file.bam" clearable>
+            <template #prepend>文件</template>
+          </el-input>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label>SSH 密码</label>
-        <el-input
-          v-model="sshConfig.password"
-          type="password"
-          placeholder="SSH 密码"
-          show-password
-        ></el-input>
+      <!-- Client Upload -->
+      <div v-else-if="fileSource === 'upload'" class="bam-input-area">
+        <div class="file-upload-zone" @click="triggerUpload">
+          <el-icon :size="48" color="#909399"><Upload /></el-icon>
+          <p style="margin-top: 10px; color: #909399;">点击上传 BAM 文件</p>
+        </div>
+        <input ref="uploadInput" type="file" accept=".bam"
+          style="display: none" @change="handleUpload" />
       </div>
 
-      <div class="form-group">
-        <label>BAM 文件路径 (远程)</label>
-        <el-input
-          v-model="formData.input_bam"
-          placeholder="user@host:/path/to/file.bam"
-          clearable
-        >
-          <template #prepend>文件</template>
-        </el-input>
-      </div>
-    </div>
-
-    <!-- Local File Inputs -->
-    <div v-else>
-      <!-- File Path -->
-      <div class="form-group">
-        <label>BAM 文件路径 (本地)</label>
-        <el-input
-          v-model="formData.input_bam"
-          placeholder="/path/to/file.bam"
-          clearable
-        >
-          <template #prepend>文件</template>
-        </el-input>
-      </div>
-
-      <!-- File Upload -->
-      <div class="form-group">
-        <label>或上传文件</label>
-        <div
-          class="file-upload-zone"
-          @dragover="handleDragOver"
-          @dragleave="handleDragLeave"
-          @drop="handleDrop"
-          @click="triggerUpload"
-        >
-          <div v-if="uploadedFiles.length === 0">
-            <el-icon :size="48" color="#909399"><Upload /></el-icon>
-            <p style="margin-top: 10px; color: #909399;">拖拽 .bam 文件到此处，或点击上传</p>
-          </div>
-          <div v-else>
-            <el-tag
-              v-for="(file, index) in uploadedFiles"
-              :key="index"
-              closable
-              @close="removeUploadedFile(index)"
-              type="success"
-              style="margin-right: 8px; margin-bottom: 8px;"
-            >
-              {{ file.name }}
-            </el-tag>
-            <el-button size="small" type="primary" @click="triggerUpload">
-              <el-icon><Plus /></el-icon> 添加文件
-            </el-button>
-          </div>
-          <input
-            ref="uploadInput"
-            type="file"
-            accept=".bam"
-            style="display: none"
-            @change="handleUpload"
-          />
+      <!-- SCP Remote -->
+      <div v-else-if="fileSource === 'scp'" class="bam-input-area bam-scp-area">
+        <div class="form-group">
+          <label>SSH 服务器地址</label>
+          <el-input v-model="sshConfig.server" placeholder="格式: user@host" clearable
+            autocomplete="url">
+            <template #prepend>SSH</template>
+          </el-input>
+        </div>
+        <div class="form-group">
+          <label>SSH 密码</label>
+          <el-input v-model="sshConfig.password" type="password" placeholder="SSH 密码" show-password
+            autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>BAM 文件路径</label>
+          <el-input v-model="formData.input_bam"
+            placeholder="user@host:/path/to/file.bam" clearable>
+            <template #prepend>文件</template>
+          </el-input>
         </div>
       </div>
     </div>
@@ -134,7 +91,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, nextTick } from 'vue'
-import { Plus, Upload } from '@element-plus/icons-vue'
+import { Upload } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
@@ -146,12 +103,11 @@ const props = defineProps<{
   isExecuting?: boolean
 }>()
 
-const fileSource = ref<'local' | 'remote'>('local')
+const fileSource = ref<'local' | 'upload' | 'scp'>('local')
 const sshConfig = ref({
   server: '',
   password: ''
 })
-const uploadedFiles = ref<{name: string, localPath: string}[]>([])
 const uploadInput = ref<HTMLInputElement | null>(null)
 
 const formData = reactive({
@@ -161,14 +117,11 @@ const formData = reactive({
 
 const loading = ref(false)
 
-// Sync loading state with parent's isExecuting prop
 watch(() => props.isExecuting, (newVal) => {
   loading.value = newVal
 })
 
-const triggerUpload = () => {
-  uploadInput.value?.click()
-}
+const triggerUpload = () => uploadInput.value?.click()
 
 const handleUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -188,10 +141,6 @@ const handleUpload = async (event: Event) => {
 
       const response = await axios.post('/api/files/upload', formDataObj)
       if (response.data.success) {
-        uploadedFiles.value.push({
-          name: file.name,
-          localPath: response.data.data.local_path
-        })
         formData.input_bam = response.data.data.local_path
       }
     } catch (error: any) {
@@ -199,51 +148,7 @@ const handleUpload = async (event: Event) => {
     }
   }
 
-  if (uploadInput.value) {
-    uploadInput.value.value = ''
-  }
-}
-
-const removeUploadedFile = (index: number) => {
-  const file = uploadedFiles.value[index]
-  uploadedFiles.value.splice(index, 1)
-  formData.input_bam = '/path/to/file.bam'
-}
-
-const handleDragOver = (e: DragEvent) => {
-  e.preventDefault()
-}
-
-const handleDragLeave = (e: DragEvent) => {
-  e.preventDefault()
-}
-
-const handleDrop = async (e: DragEvent) => {
-  e.preventDefault()
-  const files = e.dataTransfer?.files
-  if (!files) return
-
-  const file = files[0]
-  if (!file.name.toLowerCase().endsWith('.bam')) {
-    ElMessage.warning('只支持 .bam 文件')
-    return
-  }
-
-  try {
-    const formDataObj = new FormData()
-    formDataObj.append('file', file)
-
-    const response = await axios.post('/api/files/upload', formDataObj)
-    if (response.data.success) {
-      uploadedFiles.value.push({
-        name: file.name,
-        localPath: response.data.data.local_path
-      })
-      formData.input_bam = response.data.data.local_path
-    }
-  } catch (error: any) {
-    ElMessage.error('上传失败: ' + (error.message || '未知错误'))
-  }
+  if (uploadInput.value) uploadInput.value.value = ''
 }
 
 const scrollToActions = () => {
@@ -268,7 +173,7 @@ const execute = async () => {
       threads: formData.threads
     }
 
-    if (fileSource.value === 'remote') {
+    if (fileSource.value === 'scp') {
       request.ssh_server = sshConfig.value.server
       request.ssh_password = sshConfig.value.password
     }
@@ -293,6 +198,7 @@ const execute = async () => {
   min-height: 0;
   flex: 1;
   max-height: calc(100vh - 400px);
+  z-index: 1;
 }
 
 .form-container.is-loading {
@@ -346,6 +252,10 @@ h3 {
   font-weight: 500;
 }
 
+.input-row {
+  margin-bottom: 10px;
+}
+
 .file-upload-zone {
   border: 2px dashed #d9d9d9;
   border-radius: 6px;
@@ -361,19 +271,6 @@ h3 {
   background: #f5f7fa;
 }
 
-.file-upload-zone.drag-over {
-  border-color: #409eff;
-  background: #ecf5ff;
-}
-
-.remote-config {
-  background: #f0f9ff;
-  padding: 20px;
-  border-radius: 6px;
-  border: 1px solid #bae6fd;
-  margin-bottom: 20px;
-}
-
 .form-actions {
   margin-top: 30px;
   padding-top: 20px;
@@ -386,5 +283,36 @@ h3 {
   color: #909399;
   margin-top: 6px;
   margin-left: 1px;
+}
+
+.bam-unity-section {
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fafbfc;
+}
+
+.bam-unity-section .el-radio-group {
+  margin-bottom: 16px;
+}
+
+.bam-input-area {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #e4e7ed;
+}
+
+.bam-input-area .sub-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.bam-scp-area {
+  background: #f0f9ff;
+  padding: 16px 20px;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
 }
 </style>

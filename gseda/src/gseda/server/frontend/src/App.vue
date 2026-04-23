@@ -45,8 +45,14 @@
         <!-- Tool Form -->
         <div v-else class="tool-panel">
           <div class="panel-header">
-            <h1>{{ selectedTool.name }}</h1>
-            <el-tag size="small" type="info">{{ selectedTool.module_path }}</el-tag>
+            <div class="panel-header-left">
+              <h1>{{ selectedTool.name }}</h1>
+              <el-tag size="small" type="info">{{ selectedTool.module_path }}</el-tag>
+            </div>
+            <el-button type="primary" plain @click="showDocs = true">
+              <el-icon><Document /></el-icon>
+              使用文档
+            </el-button>
           </div>
 
           <!-- Tool-specific form -->
@@ -66,16 +72,29 @@
           />
         </div>
       </el-main>
+
+      <!-- Documentation Dialog -->
+      <el-dialog
+        v-model="showDocs"
+        :title="selectedTool?.name + ' - 使用文档'"
+        width="75%"
+        top="3vh"
+        :close-on-click-modal="false"
+      >
+        <ToolDocumentation :doc="doc" />
+      </el-dialog>
     </el-container>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { Document } from '@element-plus/icons-vue'
+import ToolDocumentation from './components/ToolDocumentation.vue'
 
 // Components
 import ToolForm from './components/ToolForm.vue'
@@ -102,6 +121,8 @@ const searchQuery = ref('')
 const selectedTool = ref<Tool | null>(null)
 const result = ref<Result | null>(null)
 const isExecuting = ref(false)
+const showDocs = ref(false)
+const doc = ref<any>(null)
 
 
 // Load tools
@@ -126,7 +147,22 @@ const filteredTools = computed(() => {
 const selectTool = (tool: Tool) => {
   selectedTool.value = tool
   result.value = null
+  doc.value = null
 }
+
+// Load documentation when selected tool changes
+watch(selectedTool, async (tool) => {
+  if (!tool) {
+    doc.value = null
+    return
+  }
+  try {
+    const resp = await axios.get(`/static/docs/${tool.name}.json`)
+    doc.value = resp.data
+  } catch {
+    doc.value = null
+  }
+})
 
 // Get form component for current tool
 const getFormComponent = () => {
@@ -314,6 +350,12 @@ loadTools()
   margin-bottom: 20px;
   padding-bottom: 15px;
   border-bottom: 1px solid #e4e7ed;
+}
+
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .panel-header h1 {

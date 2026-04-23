@@ -9,8 +9,8 @@
     <div class="form-group">
       <label>运行模式</label>
       <el-radio-group v-model="mode" size="medium">
-        <el-radio-button label="normal">正常分析</el-radio-button>
-        <el-radio-button label="merge">合并已有CSV</el-radio-button>
+        <el-radio-button value="normal">正常分析</el-radio-button>
+        <el-radio-button value="merge">合并已有CSV</el-radio-button>
       </el-radio-group>
     </div>
 
@@ -19,8 +19,8 @@
       <div class="form-group">
         <label>BAM 文件来源</label>
         <el-radio-group v-model="fileSource" size="medium">
-          <el-radio-button label="local">本地文件</el-radio-button>
-          <el-radio-button label="remote">远程文件 (SCP)</el-radio-button>
+          <el-radio-button value="local">本地文件</el-radio-button>
+          <el-radio-button value="remote">远程文件 (SCP)</el-radio-button>
         </el-radio-group>
       </div>
 
@@ -32,6 +32,7 @@
             v-model="sshConfig.server"
             placeholder="格式: user@host"
             clearable
+            autocomplete="url"
           >
             <template #prepend>SSH</template>
           </el-input>
@@ -44,6 +45,7 @@
             type="password"
             placeholder="SSH 密码"
             show-password
+            autocomplete="current-password"
           ></el-input>
         </div>
 
@@ -180,9 +182,9 @@
       <div class="form-group">
         <label>Reference FASTA 文件来源</label>
         <el-radio-group v-model="refSource" size="medium">
-          <el-radio-button label="local">服务器本地</el-radio-button>
-          <el-radio-button label="upload">客户端上传</el-radio-button>
-          <el-radio-button label="scp">SCP 远程文件</el-radio-button>
+          <el-radio-button value="local">服务器本地</el-radio-button>
+          <el-radio-button value="upload">客户端上传</el-radio-button>
+          <el-radio-button value="scp">SCP 远程文件</el-radio-button>
         </el-radio-group>
       </div>
 
@@ -194,6 +196,7 @@
             v-model="scpRefConfig.server"
             placeholder="格式：user@host"
             clearable
+            autocomplete="url"
           >
             <template #prepend>SSH</template>
           </el-input>
@@ -206,6 +209,7 @@
             type="password"
             placeholder="SSH 密码"
             show-password
+            autocomplete="current-password"
           ></el-input>
         </div>
 
@@ -256,8 +260,8 @@
     <div class="form-group">
       <label>Short Alignment (可选)</label>
       <el-radio-group v-model="formData.short_aln">
-        <el-radio :label="0">不使用 Short Alignment</el-radio>
-        <el-radio :label="1">使用 Short Alignment</el-radio>
+        <el-radio :value="0">不使用 Short Alignment</el-radio>
+        <el-radio :value="1">使用 Short Alignment</el-radio>
       </el-radio-group>
       <p class="hint">
         Short Alignment 用于处理长度在 [30, 200] 范围内的Reference序列。<br>
@@ -361,7 +365,7 @@ const formData = reactive({
   disable_align_stat: false as boolean,
   np_range: '' as string,
   rq_range: '' as string,
-  force: false as boolean
+  force: true as boolean
 })
 
 const loading = ref(false)

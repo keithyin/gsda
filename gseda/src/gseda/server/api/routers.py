@@ -5,7 +5,7 @@ import os
 import sys
 import tempfile
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from gseda.server.core.schema import (
     APIResponse,
 )
 from gseda.server.core.files import FileManager
+from gseda.server.api.error_analysis_using_cc import run_claude_code
 
 
 def print_log(message: str):
@@ -28,6 +29,7 @@ def print_log(message: str):
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
+
 
 # Create router
 api_router = APIRouter(prefix="/tools", tags=["tools"])
@@ -175,7 +177,8 @@ async def download_tool_file(filename: str) -> FastAPIFileResponse:
             break
 
     if not entry:
-        raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"File '{filename}' not found")
 
     return FastAPIFileResponse(
         path=entry["path"],
@@ -236,6 +239,165 @@ async def get_tool_info(tool_name: str) -> APIResponse:
     )
 
     return APIResponse(success=True, data=tool_info.dict())
+
+
+# ============================================================================
+# AI Analysis Endpoint
+# ============================================================================
+
+import asyncio
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+
+# In-memory job store for async AI analysis
+# key: job_id, value: { "status": "running"|"done"|"error", "result": str, "created_at": float }
+AI_ANALYSIS_JOBS: Dict[str, dict] = {}
+AI_ANALYSIS_TTL = 300  # jobs expire after 5 minutes
+_analysis_thread_pool = ThreadPoolExecutor(max_workers=4)
+
+
+def _cleanup_expired_jobs():
+    """Remove jobs older than TTL."""
+    now = time.time()
+    expired = [k for k, v in AI_ANALYSIS_JOBS.items() if now - v["created_at"] > AI_ANALYSIS_TTL]
+    for k in expired:
+        del AI_ANALYSIS_JOBS[k]
+
+
+def _run_analysis_in_thread(job_id: str, tool_name: str, stderr: str, stdout: str):
+    """Background thread that runs the AI analysis for a job."""
+    try:
+        analysis = f"[工具: {tool_name}]\n\nSTDERR:\n{stderr}"
+        if stdout:
+            analysis += f"\n\nSTDOUT:\n{stdout}"
+        analysis_res = run_claude_code(analysis)
+        AI_ANALYSIS_JOBS[job_id] = {
+            "status": "done",
+            "result": analysis_res or "(AI 未返回结果)",
+            "created_at": AI_ANALYSIS_JOBS[job_id]["created_at"],
+        }
+    except Exception as e:
+        AI_ANALYSIS_JOBS[job_id] = {
+            "status": "error",
+            "result": f"AI 分析失败: {str(e)}",
+            "created_at": AI_ANALYSIS_JOBS[job_id]["created_at"],
+        }
+
+
+def _start_analysis_async(job_id: str, tool_name: str, stderr: str, stdout: str):
+    """Schedule analysis in the thread pool (non-blocking)."""
+    _analysis_thread_pool.submit(_run_analysis_in_thread, job_id, tool_name, stderr, stdout)
+
+
+class AIAnalyzeRequest(BaseModel):
+    """Request for AI analysis of CLI tool stderr"""
+    stderr: str
+    stdout: Optional[str] = ""
+    tool_name: Optional[str] = ""
+
+
+class AIJobResponse(BaseModel):
+    """Response containing a job ID"""
+    job_id: str
+
+
+class AIAnalysisPollResponse(BaseModel):
+    """Response for polling AI analysis status"""
+    status: str  # "running", "done", "error"
+    result: Optional[str] = None
+
+
+@api_router.post(
+    "/{tool_name}/ai-analyze",
+    response_model=APIResponse,
+    summary="Start AI analysis of CLI error",
+    description="Create an AI analysis job for the given stderr/stdout and return a job_id for polling.",
+)
+async def ai_analyze_start(
+    tool_name: str,
+    request: AIAnalyzeRequest,
+) -> APIResponse:
+    """Start async AI analysis of CLI tool stderr. Returns job_id for polling."""
+    try:
+        # Normalize stderr input: prepend tool name context
+        stderr_text = request.stderr or ""
+        if request.tool_name:
+            stderr_text = f"[工具: {request.tool_name}]\n{stderr_text}"
+        else:
+            stderr_text = f"[工具: {tool_name}]\n{stderr_text}"
+
+        if request.stdout:
+            stderr_text += f"\n\nSTDOUT:\n{request.stdout}"
+
+        # Clean up expired jobs periodically
+        _cleanup_expired_jobs()
+
+        # Create job
+        job_id = uuid.uuid4().hex[:12]
+        AI_ANALYSIS_JOBS[job_id] = {
+            "status": "running",
+            "result": None,
+            "created_at": time.time(),
+        }
+
+        # Start analysis in background thread (non-blocking)
+        _start_analysis_async(job_id, tool_name, request.stderr or "", request.stdout or "")
+
+        return APIResponse(
+            success=True,
+            data=AIJobResponse(job_id=job_id).dict(),
+        )
+    except Exception as e:
+        return APIResponse(
+            success=False,
+            error="Failed to start AI analysis",
+            message=str(e),
+        )
+
+
+@api_router.get(
+    "/{tool_name}/ai-analyze/{job_id}",
+    response_model=APIResponse,
+    summary="Poll AI analysis status and result",
+    description="Poll the status of an AI analysis job. Returns the result when analysis completes.",
+)
+async def ai_analyze_poll(
+    tool_name: str,
+    job_id: str,
+) -> APIResponse:
+    """Poll the status and result of an AI analysis job."""
+    try:
+        # Clean up expired jobs on each poll
+        _cleanup_expired_jobs()
+
+        job = AI_ANALYSIS_JOBS.get(job_id)
+        if not job:
+            return APIResponse(
+                success=False,
+                error="Job not found",
+                message=f"Job '{job_id}' not found or has expired.",
+            )
+
+        return APIResponse(
+            success=True,
+            data=AIAnalysisPollResponse(
+                status=job["status"],
+                result=job["result"],
+            ).dict(),
+        )
+    except Exception as e:
+        return APIResponse(
+            success=False,
+            error="Polling failed",
+            message=str(e),
+        )
+
+
+# ============================================================================
+# Tool File Download Endpoints
+# ============================================================================
 
 
 def _is_remote_path(path: str) -> bool:
@@ -307,7 +469,8 @@ def _prepare_bam_files(
             remote_path = f"{ssh_server}:{bam_path}"
             print_log(f"Constructing SCP path from ssh_server: {remote_path}")
             if not ssh_password:
-                raise ValueError(f"SSH password required for remote file: {remote_path}")
+                raise ValueError(
+                    f"SSH password required for remote file: {remote_path}")
             local_path = file_manager.fetch_remote_file(
                 remote_path=remote_path,
                 ssh_password=ssh_password,
@@ -318,7 +481,8 @@ def _prepare_bam_files(
             print_log(f"Detected as remote path, fetching via SCP: {bam_path}")
             # Remote file in user@host:/path format - fetch via SCP
             if not ssh_password:
-                raise ValueError(f"SSH password required for remote file: {bam_path}")
+                raise ValueError(
+                    f"SSH password required for remote file: {bam_path}")
             local_path = file_manager.fetch_remote_file(
                 remote_path=bam_path,
                 ssh_password=ssh_password,
@@ -378,18 +542,22 @@ async def execute_tool(
 
     # Get all fields that are not tool_name and not in the base model
     # Note: In Pydantic v2, extra fields are stored in __pydantic_extra__, not __dict__
-    non_default_fields = {k: v for k, v in request.__dict__.items() if k not in ('tool_name', 'args')}
+    non_default_fields = {
+        k: v for k, v in request.__dict__.items() if k not in ('tool_name', 'args')}
 
     # Check __pydantic_extra__ for top-level format (Pydantic v2 extra fields)
     if hasattr(request, '__pydantic_extra__') and request.__pydantic_extra__:
         # Top-level format: extra fields were provided directly
-        print_log(f"Request format: top-level fields format (via __pydantic_extra__)")
-        print_log(f"Top-level fields: {json.dumps(request.__pydantic_extra__, indent=2)}")
+        print_log(
+            f"Request format: top-level fields format (via __pydantic_extra__)")
+        print_log(
+            f"Top-level fields: {json.dumps(request.__pydantic_extra__, indent=2)}")
         args_dict = dict(request.__pydantic_extra__)
     elif non_default_fields:
         # Fallback for Pydantic v1 behavior or if extra fields somehow in __dict__
         print_log(f"Request format: top-level fields format")
-        print_log(f"Top-level fields: {json.dumps(non_default_fields, indent=2)}")
+        print_log(
+            f"Top-level fields: {json.dumps(non_default_fields, indent=2)}")
         args_dict = dict(non_default_fields)
     elif hasattr(request, 'args') and request.args:
         # Args dict format: args contains data
@@ -413,7 +581,8 @@ async def execute_tool(
     if "bams" in args_dict:
         print_log(f"Processing BAM files: {args_dict['bams']}")
         try:
-            args_dict["bams"] = _prepare_bam_files(args_dict["bams"], ssh_password, ssh_server)
+            args_dict["bams"] = _prepare_bam_files(
+                args_dict["bams"], ssh_password, ssh_server)
             print_log(f"Local BAM files after SCP fetch: {args_dict['bams']}")
         except Exception as e:
             print_log(f"BAM preparation failed: {str(e)}")
@@ -489,7 +658,8 @@ async def execute_tool_get(
     print_log(f"=== routers.py - execute_tool_get (GET) START ===")
     print_log(f"HTTP Method: GET")
     print_log(f"Tool name: {tool_name}")
-    print_log(f"Query params: bams={bams}, channel_tag={channel_tag}, min_rq={min_rq}, ssh_server={ssh_server}")
+    print_log(
+        f"Query params: bams={bams}, channel_tag={channel_tag}, min_rq={min_rq}, ssh_server={ssh_server}")
     # Find the module path for the tool
     module_path = None
     for name, module in settings.TOOLS_CONFIG:

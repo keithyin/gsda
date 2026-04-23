@@ -5,69 +5,21 @@
       <p class="description">统计 BAM/FASTQ/FASTA 文件中同源重复（homo）和串联重复（str）区域的比率。</p>
     </div>
 
-    <!-- File Source Toggle -->
-    <div class="form-group">
+    <!-- File Source - Unified Section -->
+    <div class="form-group bam-unity-section">
+      <label>文件来源</label>
       <el-radio-group v-model="fileSource" size="medium">
-        <el-radio-button label="local">本地文件</el-radio-button>
-        <el-radio-button label="remote">远程文件 (SCP)</el-radio-button>
+        <el-radio-button value="local">服务器本地</el-radio-button>
+        <el-radio-button value="upload">客户端上传</el-radio-button>
+        <el-radio-button value="scp">SCP 远程文件</el-radio-button>
       </el-radio-group>
-    </div>
 
-    <!-- Remote File Inputs -->
-    <div v-if="fileSource === 'remote'" class="remote-config">
-      <div class="form-group">
-        <label>SSH 服务器地址</label>
-        <el-input
-          v-model="sshConfig.server"
-          placeholder="格式: user@host"
-          clearable
-        >
-          <template #prepend>SSH</template>
-        </el-input>
-      </div>
-
-      <div class="form-group">
-        <label>SSH 密码</label>
-        <el-input
-          v-model="sshConfig.password"
-          type="password"
-          placeholder="SSH 密码"
-          show-password
-        ></el-input>
-      </div>
-
-      <div class="form-group">
-        <label>文件路径 (远程)</label>
-        <div v-for="(path, index) in formData.files" :key="'remote-' + index" class="input-row">
-          <el-input
-            v-model="formData.files[index]"
-            placeholder="user@host:/path/to/file.bam 或 /path/to/*.fq"
-            clearable
-          >
-            <template #append>
-              <el-button @click="removeFile(index)" :disabled="index === 0">
-                <el-icon><Minus /></el-icon>
-              </el-button>
-            </template>
-          </el-input>
-        </div>
-        <el-button type="primary" plain @click="addFile">
-          <el-icon><Plus /></el-icon> 添加文件
-        </el-button>
-      </div>
-    </div>
-
-    <!-- Local File Inputs -->
-    <div v-else>
-      <!-- File Paths -->
-      <div class="form-group">
-        <label>文件路径 (本地)</label>
+      <!-- Server Local -->
+      <div v-if="fileSource === 'local'" class="bam-input-area">
+        <label class="sub-label">文件路径</label>
         <div v-for="(path, index) in formData.files" :key="'local-' + index" class="input-row">
-          <el-input
-            v-model="formData.files[index]"
-            placeholder="/path/to/file.bam 或 /path/to/*.fq"
-            clearable
-          >
+          <el-input v-model="formData.files[index]"
+            placeholder="/path/to/file.bam 或 /path/to/*.fq" clearable>
             <template #append>
               <el-button @click="removeFile(index)" :disabled="index === 0">
                 <el-icon><Minus /></el-icon>
@@ -80,43 +32,45 @@
         </el-button>
       </div>
 
-      <!-- File Upload -->
-      <div class="form-group">
-        <label>或上传文件</label>
-        <div
-          class="file-upload-zone"
-          @dragover="handleDragOver"
-          @dragleave="handleDragLeave"
-          @drop="handleDrop"
-          @click="triggerUpload"
-        >
-          <div v-if="uploadedFiles.length === 0">
-            <el-icon :size="48" color="#909399"><Upload /></el-icon>
-            <p style="margin-top: 10px; color: #909399;">拖拽 .bam/.fq/.fastq/.fa/.fasta 文件到此处，或点击上传</p>
+      <!-- Client Upload -->
+      <div v-else-if="fileSource === 'upload'" class="bam-input-area">
+        <div class="file-upload-zone" @click="triggerUpload">
+          <el-icon :size="48" color="#909399"><Upload /></el-icon>
+          <p style="margin-top: 10px; color: #909399;">点击上传文件 (.bam/.fq/.fastq/.fa/.fasta)</p>
+        </div>
+        <input ref="uploadInput" type="file" accept=".bam,.fq,.fastq,.fa,.fasta"
+          style="display: none" @change="handleUpload" />
+      </div>
+
+      <!-- SCP Remote -->
+      <div v-else-if="fileSource === 'scp'" class="bam-input-area bam-scp-area">
+        <div class="form-group">
+          <label>SSH 服务器地址</label>
+          <el-input v-model="sshConfig.server" placeholder="格式: user@host" clearable
+            autocomplete="url">
+            <template #prepend>SSH</template>
+          </el-input>
+        </div>
+        <div class="form-group">
+          <label>SSH 密码</label>
+          <el-input v-model="sshConfig.password" type="password" placeholder="SSH 密码" show-password
+            autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>文件路径 (支持通配符*)</label>
+          <div v-for="(path, index) in formData.files" :key="'remote-' + index" class="input-row">
+            <el-input v-model="formData.files[index]"
+              placeholder="user@host:/path/to/file.bam 或 /path/to/*.fq" clearable>
+              <template #append>
+                <el-button @click="removeFile(index)" :disabled="index === 0">
+                  <el-icon><Minus /></el-icon>
+                </el-button>
+              </template>
+            </el-input>
           </div>
-          <div v-else>
-            <el-tag
-              v-for="(file, index) in uploadedFiles"
-              :key="index"
-              closable
-              @close="removeUploadedFile(index)"
-              type="success"
-              style="margin-right: 8px; margin-bottom: 8px;"
-            >
-              {{ file.name }}
-            </el-tag>
-            <el-button size="small" type="primary" @click="triggerUpload">
-              <el-icon><Plus /></el-icon> 添加文件
-            </el-button>
-          </div>
-          <input
-            ref="uploadInput"
-            type="file"
-            accept=".bam,.fq,.fastq,.fa,.fasta"
-            style="display: none"
-            @change="handleUpload"
-            multiple
-          />
+          <el-button type="primary" plain @click="addFile">
+            <el-icon><Plus /></el-icon> 添加文件
+          </el-button>
         </div>
       </div>
     </div>
@@ -167,12 +121,11 @@ const props = defineProps<{
   isExecuting?: boolean
 }>()
 
-const fileSource = ref<'local' | 'remote'>('local')
+const fileSource = ref<'local' | 'upload' | 'scp'>('local')
 const sshConfig = ref({
   server: '',
   password: ''
 })
-const uploadedFiles = ref<{name: string, localPath: string}[]>([])
 const uploadInput = ref<HTMLInputElement | null>(null)
 
 const formData = reactive({
@@ -182,25 +135,16 @@ const formData = reactive({
 
 const loading = ref(false)
 
-// Sync loading state with parent's isExecuting prop
 watch(() => props.isExecuting, (newVal) => {
   loading.value = newVal
 })
 
-const addFile = () => {
-  formData.files.push('/path/to/file.bam')
-}
-
+const addFile = () => formData.files.push('/path/to/file.bam')
 const removeFile = (index: number) => {
-  if (formData.files.length > 1) {
-    formData.files.splice(index, 1)
-  }
+  if (formData.files.length > 1) formData.files.splice(index, 1)
 }
 
-// File upload handlers
-const triggerUpload = () => {
-  uploadInput.value?.click()
-}
+const triggerUpload = () => uploadInput.value?.click()
 
 const handleUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -224,10 +168,6 @@ const handleUpload = async (event: Event) => {
 
       const response = await axios.post('/api/files/upload', formDataObj)
       if (response.data.success) {
-        uploadedFiles.value.push({
-          name: file.name,
-          localPath: response.data.data.local_path
-        })
         formData.files.push(response.data.data.local_path)
       }
     } catch (error: any) {
@@ -235,63 +175,9 @@ const handleUpload = async (event: Event) => {
     }
   }
 
-  // Reset input
-  if (uploadInput.value) {
-    uploadInput.value.value = ''
-  }
+  if (uploadInput.value) uploadInput.value.value = ''
 }
 
-const removeUploadedFile = (index: number) => {
-  const file = uploadedFiles.value[index]
-  uploadedFiles.value.splice(index, 1)
-  // Remove from files array
-  formData.files = formData.files.filter(p => p !== file.localPath)
-}
-
-// Drag and drop handlers
-const handleDragOver = (e: DragEvent) => {
-  e.preventDefault()
-}
-
-const handleDragLeave = (e: DragEvent) => {
-  e.preventDefault()
-}
-
-const handleDrop = async (e: DragEvent) => {
-  e.preventDefault()
-  const files = e.dataTransfer?.files
-  if (!files) return
-
-  const validExtensions = ['.bam', '.fq', '.fastq', '.fa', '.fasta']
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
-
-    if (!hasValidExt) {
-      ElMessage.warning(`只支持 .bam, .fq, .fastq, .fa, .fasta 文件: ${file.name}`)
-      continue
-    }
-
-    try {
-      const formDataObj = new FormData()
-      formDataObj.append('file', file)
-
-      const response = await axios.post('/api/files/upload', formDataObj)
-      if (response.data.success) {
-        uploadedFiles.value.push({
-          name: file.name,
-          localPath: response.data.data.local_path
-        })
-        formData.files.push(response.data.data.local_path)
-      }
-    } catch (error: any) {
-      ElMessage.error(`上传失败: ${error.message || '未知错误'}`)
-    }
-  }
-}
-
-// Helper to scroll to form actions
 const scrollToActions = () => {
   const formContainer = document.querySelector('.form-container') as HTMLElement
   if (formContainer) {
@@ -303,37 +189,23 @@ const scrollToActions = () => {
 }
 
 const execute = async () => {
-  console.log('=== HomoAndStrRatioForm - execute() START ===')
-  console.log('formData:', formData)
-  console.log('fileSource:', fileSource.value)
-  console.log('sshConfig:', sshConfig.value)
-
-  // Scroll to ensure button is visible
   await nextTick()
   scrollToActions()
 
   loading.value = true
   try {
-    // Build request body
     const request: any = {
       tool_name: 'homo-and-str-ratio',
       files: formData.files,
       rq_thr: formData.rq_thr
     }
 
-    // Add SSH config for remote files
-    if (fileSource.value === 'remote') {
+    if (fileSource.value === 'scp') {
       request.ssh_server = sshConfig.value.server
       request.ssh_password = sshConfig.value.password
     }
 
-    console.log('=== Emitting execute event ===')
-    console.log('Full request object:', JSON.stringify(request, null, 2))
-
     emit('execute', request)
-  } catch (error) {
-    console.error('=== execute() ERROR ===', error)
-    throw error
   } finally {
     loading.value = false
   }
@@ -353,6 +225,7 @@ const execute = async () => {
   min-height: 0;
   flex: 1;
   max-height: calc(100vh - 400px);
+  z-index: 1;
 }
 
 .form-container.is-loading {
@@ -406,11 +279,6 @@ h3 {
   font-weight: 500;
 }
 
-.required {
-  color: #f56c6c;
-  margin-left: 4px;
-}
-
 .input-row {
   margin-bottom: 10px;
 }
@@ -430,19 +298,6 @@ h3 {
   background: #f5f7fa;
 }
 
-.file-upload-zone.drag-over {
-  border-color: #409eff;
-  background: #ecf5ff;
-}
-
-.remote-config {
-  background: #f0f9ff;
-  padding: 20px;
-  border-radius: 6px;
-  border: 1px solid #bae6fd;
-  margin-bottom: 20px;
-}
-
 .form-actions {
   margin-top: 30px;
   padding-top: 20px;
@@ -455,5 +310,36 @@ h3 {
   color: #909399;
   margin-top: 6px;
   margin-left: 1px;
+}
+
+.bam-unity-section {
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fafbfc;
+}
+
+.bam-unity-section .el-radio-group {
+  margin-bottom: 16px;
+}
+
+.bam-input-area {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #e4e7ed;
+}
+
+.bam-input-area .sub-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.bam-scp-area {
+  background: #f0f9ff;
+  padding: 16px 20px;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
 }
 </style>

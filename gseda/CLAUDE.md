@@ -15,7 +15,6 @@ gsda/
 │   ├── bam_filter/               # BAM filtering tools
 │   ├── bam_surgery/              # BAM manipulation tools
 │   ├── fastx_ana/                # FASTX analysis tools
-│   ├── msa_view/                 # Multiple sequence alignment viewer
 │   ├── ppl/                      # Population genetics analysis tools
 │   └── ...
 └── src/gseda/server/             # Web service (FastAPI + Vue 3)
@@ -23,12 +22,41 @@ gsda/
     ├── config.py                 # Configuration (lists all CLI tools)
     ├── api/routers.py            # REST API endpoints
     ├── core/                     # Core functionality
-    │   ├── runners.py            # CLI module executors
+    │   ├── runners.py            # CLI module executors + FileRegistry
     │   ├── schema.py             # Pydantic validation models
     │   └── files.py              # File management (SCP, uploads)
     ├── frontend/                 # Vue 3 source
     └── templates/                # HTML templates (CDN fallback)
 ```
+
+## Active CLI Tools (7)
+
+Tools are defined in `src/gseda/server/config.py` `TOOLS_CONFIG`:
+
+| Tool Name | Module Path |
+|---|---|
+| `reads-quality-stats-v3` | `gseda.ppl.reads_quality_stats_v3:main_cli` |
+| `reads-quality-hp-tr` | `gseda.ppl.reads_quality_stats_hp_tr:main_cli` |
+| `reads-quality-hp` | `gseda.ppl.reads_quality_stats_hp:main_cli` |
+| `bam-basic-stat` | `gseda.bam_ana.bam_basic_stat:main_cli` |
+| `low-q-analysis` | `gseda.ppl.low_q_analysis:main_cli` |
+| `homo-and-str-ratio` | `gseda.ppl.homo_and_str_region_coverage:main_cli` |
+| `macebell-ratio` | `gseda.ppl.macebell_ratio:main_cli` |
+
+> `sequencing-report-v2` is currently commented out in config.
+
+## Frontend Form Components
+
+Located in `src/gseda/server/frontend/src/components/forms/`:
+
+- `BAMBasicStatForm.vue`
+- `LowQAnalysisForm.vue`
+- `MacebellRatioForm.vue`
+- `HomoAndStrRatioForm.vue`
+- `ReadsQualityStatsV3Form.vue`
+- `ReadsQualityStatsHPForm.vue`
+- `ReadsQualityStatsHPTrForm.vue`
+- `SequencingReportV2Form.vue`
 
 ## Development Commands
 
@@ -76,13 +104,6 @@ pytest tests/test_api_routers.py -v
 pytest tests/ --cov=gseda
 ```
 
-### Linting (if configured)
-
-```bash
-# Check for any linting or formatting tools
-# (No linting tools currently configured in this project)
-```
-
 ## API Documentation
 
 Interactive API docs are available at:
@@ -97,6 +118,9 @@ Interactive API docs are available at:
 | GET | `/api/tools/{name}/info` | Get tool metadata and argument schema |
 | POST | `/api/tools/{name}/execute` | Execute a CLI tool (JSON body) |
 | GET | `/api/tools/{name}/execute` | Execute a CLI tool (query params) |
+| GET | `/api/tools/files/download/{filename}` | Download tool output file |
+| POST | `/api/tools/files/remote-fetch` | Fetch remote file via SCP |
+| POST | `/api/tools/files/upload` | Upload file from client |
 
 ### Example API Call
 
@@ -105,11 +129,9 @@ curl -X POST "http://localhost:8000/api/tools/bam-basic-stat/execute" \
   -H "Content-Type: application/json" \
   -d '{
     "tool_name": "bam-basic-stat",
-    "args": {
-      "bams": ["/path/to/file.bam"],
-      "channel_tag": "ch",
-      "min_rq": 0.8
-    }
+    "bams": ["/path/to/file.bam"],
+    "channel_tag": "ch",
+    "min_rq": 0.8
   }'
 ```
 
@@ -120,11 +142,14 @@ curl -X POST "http://localhost:8000/api/tools/bam-basic-stat/execute" \
    ("tool-name", "gseda.module.path:main_cli"),
    ```
 
-2. **Optional - Add form schema**: In `core/schema.py`, define a request model if needed:
+2. **Optional - Add argument schema**: In `core/runners.py` `ARGUMENT_SCHEMAS`, define the argument mapping:
    ```python
-   class NewToolRequest(ToolRequestBase):
-       param1: str
-       param2: int
+   "tool-name": {
+       "arguments": [
+           {"name": "bams", "type": "file", "required": True, "multiple": True, "positional": True},
+           {"name": "min_rq", "type": "number", "required": False, "placeholder": "0.8"},
+       ],
+   },
    ```
 
 3. **Optional - Add form component**: Create `src/gseda/server/frontend/src/components/forms/NewToolForm.vue` and register it in `ToolForm.vue`.
@@ -134,11 +159,19 @@ curl -X POST "http://localhost:8000/api/tools/bam-basic-stat/execute" \
 ### CLI Tool Execution Flow
 
 1. Frontend sends request to `/api/tools/{name}/execute`
-2. `routers.py` receives the request and extracts arguments
+2. `routers.py` receives the request and extracts arguments (supports both `args` dict and top-level field formats)
 3. `_prepare_bam_files()` handles remote file fetching via SCP if needed
-4. `CLIRunner.run_cli_with_json()` converts JSON args to CLI format
+4. `CLIRunner.run_cli_with_json()` converts JSON args to CLI format using `ARGUMENT_SCHEMAS`
 5. `subprocess.run()` executes the CLI module
-6. Output is returned as JSON response
+6. `FileRegistry` tracks output files for download
+7. Output (stdout, stderr, exit_code, file_outputs) is returned as JSON response
+
+### File Registry (Output File Downloads)
+
+- CLI tools register output files via `FileRegistry.register()` (signaled by `GSEDA_FILE_INDEX_PATH` env var)
+- Files are indexed in a stable JSON file at `/tmp/gseda_current_file_index.json`
+- Download endpoint `/api/tools/files/download/{filename}` serves registered files
+- Entries are cleaned up after TTL (3600s) via `FileRegistry.cleanup()`
 
 ### SSH/SCP Remote File Handling
 
@@ -149,22 +182,22 @@ curl -X POST "http://localhost:8000/api/tools/bam-basic-stat/execute" \
 ### Vue 3 Frontend Architecture
 
 - `App.vue` - Main layout with sidebar (tool list) and content area
-- `ToolForm.vue` - Container that dynamically renders tool-specific forms
-- `ResultViewer.vue` - Displays execution results with copy-to-clipboard
-- Forms for specific tools live in `components/forms/` (e.g., `BAMBasicStatForm.vue`)
+- `ToolForm.vue` - Container that dynamically renders tool-specific forms (supports file source toggle: local, upload, SCP)
+- `ResultViewer.vue` - Displays execution results with copy-to-clipboard and file download links
+- Forms for specific tools live in `components/forms/`
 
 ## Configuration
 
 Environment variables for `gseda/server`:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+|---|---|---|
 | `DEBUG` | `false` | Enable debug mode |
 | `CLI_TOOL_TIMEOUT` | `3600` | Timeout for CLI execution in seconds |
 
 ## Known Limitations
 
-1. **File Uploads**: Uses file paths as parameters; no file upload UI yet
+1. **File Uploads**: Uses file paths as parameters; upload UI exists but limited integration
 2. **Long-Running Tasks**: No task queue; long tasks may timeout
 3. **Authentication**: No user authentication or permissions
 4. **Form Coverage**: Only some tools have dedicated frontend forms; all are API-accessible
@@ -178,21 +211,8 @@ Environment variables for `gseda/server`:
 
 ## Project Metadata
 
-- **Package**: `gseda` (version 1.21.10)
-- **CLI tools**: 22 tools covering BAM analysis, sequencing reports, quality stats, etc.
+- **Package**: `gseda` (APP_VERSION: 1.0.0 in config.py)
+- **CLI tools**: 7 active tools (BAM analysis, sequencing reports, quality stats, etc.)
 - **Backend**: FastAPI + Uvicorn
 - **Frontend**: Vue 3 + Element Plus + Vite
 - **Python**: >=3.8
-
-
-# claude 权限
-
-1. cluade 在执行的过程中 允许所有的文件编辑操作，无需请求授权
-
-# cluade 说明
-
-Although you are a LLM, you can't perform computer operations by yourself. However, you are powering Claude code, and you can use its tools and skills to operate the current computer and external entities.
-
-# cluade 运行说明
-
-cluade 每次运行前，要阅读

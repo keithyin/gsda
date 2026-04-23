@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.venv
+node_modules
+.env
+.git
+docker-compose*.yml
+*.md
+tests/
+src/gseda/server/frontend/dist/
+src/gseda/server/static/
