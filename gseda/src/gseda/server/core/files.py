@@ -1,6 +1,7 @@
 """File Manager - Handle remote and uploaded files for GSEDA Server"""
 
 import os
+import threading
 import uuid
 import tempfile
 import logging
@@ -24,6 +25,9 @@ class FileManager:
 
     # Class-level storage for uploaded file paths
     _uploaded_files: List[str] = []
+
+    # Class-level lock to serialize SSH connections (paramiko is not thread-safe)
+    _scp_lock = threading.Lock()
 
     def __init__(self, temp_dir: Optional[str] = None):
         """
@@ -84,17 +88,19 @@ class FileManager:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-            # Connect with password
+            # Connect with password (serialized to avoid paramiko conflicts)
             logger.info(f"[SCP] Authenticating...")
-            ssh.connect(hostname=host, username=user, password=ssh_password)
+            with self._scp_lock:
+                ssh.connect(hostname=host, username=user, password=ssh_password)
+                sftp = ssh.open_sftp()
             logger.info(f"[SCP] Authentication successful")
 
-            # SCP transfer
+            # SCP transfer (serialized)
             logger.info(f"[SCP] Starting file transfer...")
-            sftp = ssh.open_sftp()
-            sftp.get(remote_file, local_path)
-            sftp.close()
-            ssh.close()
+            with self._scp_lock:
+                sftp.get(remote_file, local_path)
+                sftp.close()
+                ssh.close()
             logger.info(f"[SCP] File transfer completed successfully")
 
             # Track for cleanup

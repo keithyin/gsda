@@ -1,13 +1,39 @@
 """CLI Module Runners - Execute CLI commands via subprocess"""
 
-import subprocess
+import asyncio
 import json
 import logging
 import os
+import subprocess
 import tempfile
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Any, Dict, Optional
 from gseda.server.config import settings
+
+# Thread pool for non-blocking CLI execution
+_cli_executor: Optional[ThreadPoolExecutor] = None
+_cli_executor_lock = threading.Lock()
+
+
+def get_cli_executor() -> ThreadPoolExecutor:
+    """Get or create the shared CLI executor (lazy init, thread-safe)."""
+    global _cli_executor
+    if _cli_executor is None:
+        with _cli_executor_lock:
+            if _cli_executor is None:
+                _cli_executor = ThreadPoolExecutor(max_workers=8)
+    return _cli_executor
+
+
+def shutdown_cli_executor():
+    """Shutdown the shared CLI executor on server stop."""
+    global _cli_executor
+    if _cli_executor is not None:
+        _cli_executor.shutdown(wait=True)
+        _cli_executor = None
+
 
 # Configure logging for console output
 logging.basicConfig(
@@ -240,23 +266,123 @@ class CLIRunner:
         args_dict = json.loads(json_args)
         args_list = CLIRunner._dict_to_args(tool_name, args_dict)
         print(f"[CLI RUNNER] Converted to CLI args: {args_list}")
+
+        # Dispatch to binary if this is a binary tool
+        if tool_name and tool_name in settings.TOOL_BINARIES:
+            return CLIRunner.run_binary(
+                settings.TOOL_BINARIES[tool_name], args_list, timeout
+            )
+
         return CLIRunner.run_cli_module(module_path, args_list, timeout)
+
+    @staticmethod
+    async def run_cli_module_async(
+        module_path: str, args: List[str], timeout: int = None
+    ) -> Tuple[int, str, str, List[str]]:
+        """Non-blocking wrapper for run_cli_module using ThreadPoolExecutor."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            get_cli_executor(),
+            lambda: CLIRunner.run_cli_module(module_path, args, timeout)
+        )
+
+    @staticmethod
+    async def run_cli_with_json_async(
+        module_path: str, json_args: str, timeout: int = None
+    ) -> Tuple[int, str, str, List[str]]:
+        """Non-blocking wrapper for run_cli_with_json using ThreadPoolExecutor."""
+        # Resolve tool_name first (outside executor to avoid closure issue)
+        tool_name = next((name for name, path in settings.TOOLS_CONFIG if path == module_path), None)
+
+        def convert():
+            return CLIRunner._dict_to_args(
+                tool_name,
+                json.loads(json_args)
+            )
+
+        loop = asyncio.get_event_loop()
+        args_list = await loop.run_in_executor(get_cli_executor(), convert)
+
+        # Dispatch to binary if this is a binary tool
+        if tool_name and tool_name in settings.TOOL_BINARIES:
+            return await CLIRunner.run_binary_async(
+                settings.TOOL_BINARIES[tool_name], args_list, timeout
+            )
+
+        return await CLIRunner.run_cli_module_async(module_path, args_list, timeout)
+
+    @staticmethod
+    def run_binary(
+        bin_path: str, args: List[str], timeout: int = None
+    ) -> Tuple[int, str, str, List[str]]:
+        """
+        Run an external binary (non-Python) with given args.
+
+        Returns:
+            Tuple of (exit_code, stdout, stderr, command)
+        """
+        if timeout is None:
+            timeout = settings.CLI_TOOL_TIMEOUT
+
+        cmd = [bin_path] + args
+
+        try:
+            env = CLIRunner._build_env()
+            env.pop("PYTHONPATH", None)
+            print("\n" + "="*60, flush=True)
+            print(f"[BINARY] EXECUTING: {' '.join(cmd)}", flush=True)
+            print("="*60 + "\n", flush=True)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=settings.PROJECT_ROOT,
+                env=env,
+            )
+            print(f"[BINARY] EXIT CODE: {result.returncode}", flush=True)
+            if result.stdout:
+                print(f"[BINARY] STDOUT:\n{result.stdout}", flush=True)
+            if result.stderr:
+                print(f"[BINARY] STDERR:\n{result.stderr}", flush=True)
+            print("="*60 + "\n", flush=True)
+            return result.returncode, result.stdout, result.stderr, cmd
+        except subprocess.TimeoutExpired:
+            print(f"[BINARY] TIMEOUT: Command timed out after {timeout} seconds", flush=True)
+            return -1, "", f"Command timed out after {timeout} seconds", cmd
+        except Exception as e:
+            print(f"[BINARY] EXCEPTION: {str(e)}", flush=True)
+            return -1, "", str(e), cmd
+
+    @staticmethod
+    async def run_binary_async(
+        bin_path: str, args: List[str], timeout: int = None
+    ) -> Tuple[int, str, str, List[str]]:
+        """Non-blocking wrapper for run_binary using ThreadPoolExecutor."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            get_cli_executor(),
+            lambda: CLIRunner.run_binary(bin_path, args, timeout)
+        )
 
     @staticmethod
     def _dict_to_args(tool_name: str, args_dict: Dict[str, Any]) -> List[str]:
         """Convert a dict of arguments to command-line format."""
         args = []
         for key, value in args_dict.items():
-            # Determine if the argument is defined as positional for this specific tool.
+            # Determine if the argument is defined as positional or has a short flag
             is_positional = False
+            short_flag = None
             if tool_name and tool_name in ARGUMENT_SCHEMAS:
                 for arg in ARGUMENT_SCHEMAS[tool_name].get("arguments", []):
-                    if arg.get("name") == key and arg.get("positional"):
-                        is_positional = True
+                    if arg.get("name") == key:
+                        if arg.get("positional"):
+                            is_positional = True
+                        if "short" in arg:
+                            short_flag = arg["short"]
                         break
 
             if is_positional:
-                # Positional arguments are added without a flag.
                 if isinstance(value, list):
                     for item in value:
                         args.append(str(item))
@@ -264,9 +390,7 @@ class CLIRunner:
                     args.append(str(value))
                 continue
 
-            # Convert key to CLI format (snake_case to kebab-case)
-            cli_key = f"--{key.replace('_', '-') }"
-            # Add the key-value pair to args
+            cli_key = short_flag if short_flag else f"--{key.replace('_', '-')}"
             if value is not None:
                 if isinstance(value, bool):
                     if value:
@@ -327,6 +451,16 @@ ARGUMENT_SCHEMAS = {
         "arguments": [
             {"name": "files", "type": "file", "required": True, "multiple": True, "positional": True, "placeholder": "支持多文件: .bam, .fq, .fastq, .fa, .fasta"},
             {"name": "rq_thr", "type": "number", "required": False, "default": 0.95, "placeholder": "0.0-1.0, 默认 0.95"},
+        ],
+    },
+    "asrtc": {
+        "arguments": [
+            {"name": "ref_fa", "type": "file", "required": True, "placeholder": "参考序列 FASTA 文件"},
+            {"name": "sbr", "type": "file", "required": True, "placeholder": "subreads BAM 文件", "short": "-q"},
+            {"name": "smc", "type": "file", "required": True, "placeholder": "SMC BAM/FASTA 文件", "short": "-t"},
+            {"name": "prefix", "type": "text", "required": True, "placeholder": "输出前缀 (输出文件: {prefix}.asrtc.txt)", "short": "-p"},
+            {"name": "rq_range", "type": "text", "required": False, "placeholder": "rq 范围过滤, 例如: 0.8:1.0"},
+            {"name": "np_range", "type": "text", "required": False, "placeholder": "np 范围过滤, 例如: 1:3,5,7:9"},
         ],
     },
 }

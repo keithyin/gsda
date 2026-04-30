@@ -1,5 +1,6 @@
 """API Routers - Define all API endpoints for CLI tools"""
 
+import asyncio
 import json
 import os
 import sys
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from gseda.server.config import settings
-from gseda.server.core.runners import CLIRunner, ARGUMENT_SCHEMAS
+from gseda.server.core.runners import CLIRunner, ARGUMENT_SCHEMAS, get_cli_executor, FileRegistry
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from gseda.server.core.schema import (
     ToolExecutionRequest,
@@ -204,6 +205,9 @@ async def list_tools() -> APIResponse:
         {"name": name, "module_path": module_path}
         for name, module_path in settings.TOOLS_CONFIG
     ]
+    # Add binary tools to the list
+    for name, bin_path in settings.TOOL_BINARIES.items():
+        tools.append({"name": name, "module_path": bin_path})
     return APIResponse(success=True, data={"tools": tools})
 
 
@@ -221,6 +225,9 @@ async def get_tool_info(tool_name: str) -> APIResponse:
         if name == tool_name:
             module_path = module
             break
+    # Check binary tools
+    if not module_path and tool_name in settings.TOOL_BINARIES:
+        module_path = settings.TOOL_BINARIES[tool_name]
 
     if not module_path:
         raise HTTPException(
@@ -434,6 +441,46 @@ def _is_remote_path(path: str) -> bool:
     return False
 
 
+async def _prepare_bam_files_async(
+    bams: List[str],
+    ssh_password: Optional[str] = None,
+    ssh_server: Optional[str] = None
+) -> List[str]:
+    """Async version: fetches remote files via thread pool, leaves local paths untouched."""
+    result = []
+    fm = FileManager()
+
+    for bam_path in bams:
+        # If ssh_server is provided, construct the full SCP path
+        if ssh_server and not _is_remote_path(bam_path):
+            remote_path = f"{ssh_server}:{bam_path}"
+            if not ssh_password:
+                raise ValueError(f"SSH password required for remote file: {remote_path}")
+            print_log(f"Constructing SCP path: {remote_path}")
+            local_path = await asyncio.get_event_loop().run_in_executor(
+                get_cli_executor(),
+                lambda p=remote_path, sp=ssh_password: fm.fetch_remote_file(p, sp)
+            )
+            print_log(f"Successfully fetched remote file to: {local_path}")
+            result.append(local_path)
+        elif _is_remote_path(bam_path):
+            print_log(f"Detected as remote path, fetching via SCP: {bam_path}")
+            if not ssh_password:
+                raise ValueError(f"SSH password required for remote file: {bam_path}")
+            local_path = await asyncio.get_event_loop().run_in_executor(
+                get_cli_executor(),
+                lambda p=bam_path, sp=ssh_password: fm.fetch_remote_file(p, sp)
+            )
+            print_log(f"Successfully fetched remote file to: {local_path}")
+            result.append(local_path)
+        else:
+            print_log(f"Local path, using as-is: {bam_path}")
+            result.append(bam_path)
+
+    print_log(f"Final prepared BAM files: {result}")
+    return result
+
+
 def _prepare_bam_files(
     bams: List[str],
     ssh_password: Optional[str] = None,
@@ -522,6 +569,10 @@ async def execute_tool(
             module_path = module
             break
 
+    # Check binary tools as fallback
+    if not module_path and tool_name in settings.TOOL_BINARIES:
+        module_path = settings.TOOL_BINARIES[tool_name]
+
     if not module_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -578,29 +629,56 @@ async def execute_tool(
     print_log(f"SSH password: {'SET' if ssh_password else 'NOT SET'}")
     print_log(f"SSH server: {ssh_server or 'NOT SET'}")
 
-    if "bams" in args_dict:
-        print_log(f"Processing BAM files: {args_dict['bams']}")
-        try:
-            args_dict["bams"] = _prepare_bam_files(
-                args_dict["bams"], ssh_password, ssh_server)
-            print_log(f"Local BAM files after SCP fetch: {args_dict['bams']}")
-        except Exception as e:
-            print_log(f"BAM preparation failed: {str(e)}")
-            return APIResponse(
-                success=False,
-                error="BAM preparation failed",
-                message=str(e),
-            )
+    # Prepare file-type arguments (fetch remote if needed)
+    # Dynamically detect file-type args from ARGUMENT_SCHEMAS
+    file_arg_keys = []
+    if tool_name and tool_name in ARGUMENT_SCHEMAS:
+        for arg in ARGUMENT_SCHEMAS[tool_name].get("arguments", []):
+            if arg.get("type") == "file":
+                file_arg_keys.append(arg["name"])
+
+    # Also handle legacy "bams" key for existing Python tools
+    if "bams" in args_dict and "bams" not in file_arg_keys:
+        file_arg_keys.append("bams")
+
+    if file_arg_keys:
+        for key in file_arg_keys:
+            if key in args_dict:
+                val = args_dict[key]
+                if not isinstance(val, list):
+                    val = [val]
+                try:
+                    prepared = await _prepare_bam_files_async(val, ssh_password, ssh_server)
+                    args_dict[key] = prepared[0] if len(prepared) == 1 and not isinstance(args_dict.get(key), list) else prepared
+                    print_log(f"Prepared {key}: {args_dict[key]}")
+                except Exception as e:
+                    print_log(f"File preparation failed for {key}: {str(e)}")
+                    return APIResponse(
+                        success=False,
+                        error="File preparation failed",
+                        message=str(e),
+                    )
 
     # Clean up old file outputs
     CLIRunner.cleanup_file_outputs()
 
-    # Execute the CLI module
+    # Execute the CLI module (non-blocking via thread pool)
     print_log(f"Executing CLI with args: {json.dumps(args_dict, indent=2)}")
-    returncode, stdout, stderr, command = CLIRunner.run_cli_with_json(
-        module_path=module_path,
-        json_args=json.dumps(args_dict),
-    )
+
+    # For binary tools, dispatch via run_binary instead of run_cli_module
+    if tool_name in settings.TOOL_BINARIES:
+        bin_path = settings.TOOL_BINARIES[tool_name]
+        args_list = CLIRunner._dict_to_args(tool_name, args_dict)
+        print_log(f"Executing binary: {' '.join([bin_path] + args_list)}")
+        returncode, stdout, stderr, command = await CLIRunner.run_binary_async(
+            bin_path, args_list, timeout=settings.CLI_TOOL_TIMEOUT,
+        )
+    else:
+        returncode, stdout, stderr, command = await CLIRunner.run_cli_with_json_async(
+            module_path=module_path,
+            json_args=json.dumps(args_dict),
+            timeout=settings.CLI_TOOL_TIMEOUT,
+        )
     print_log(f"CLI command executed: {' '.join(command)}")
     print_log(f"CLI exit code: {returncode}")
     if stdout:
@@ -610,6 +688,17 @@ async def execute_tool(
 
     # Clean up temporary files
     FileManager.cleanup_temp_files()
+
+    # Auto-register output files for asrtc tool
+    if tool_name == "asrtc" and args_dict.get("prefix"):
+        prefix = args_dict["prefix"]
+        if isinstance(prefix, list):
+            prefix = prefix[0] if prefix else ""
+        if prefix:
+            output_file = f"{prefix}.asrtc.txt"
+            if os.path.exists(output_file):
+                FileRegistry.register([{"name": output_file, "path": output_file}])
+                print_log(f"Auto-registered output file: {output_file}")
 
     # Get file outputs if available
     file_outputs = CLIRunner.get_registered_files()
@@ -676,19 +765,20 @@ async def execute_tool_get(
     # Clean up old file outputs
     CLIRunner.cleanup_file_outputs()
 
-    # Build arguments from query parameters
+    # Build arguments from query parameters (non-blocking)
     args_dict = {}
     if bams:
-        args_dict["bams"] = _prepare_bam_files(bams, ssh_password, ssh_server)
+        args_dict["bams"] = await _prepare_bam_files_async(bams, ssh_password, ssh_server)
     if channel_tag:
         args_dict["channel_tag"] = channel_tag
     if min_rq is not None:
         args_dict["min_rq"] = min_rq
 
-    # Execute the CLI module
-    returncode, stdout, stderr, command = CLIRunner.run_cli_with_json(
+    # Execute the CLI module (non-blocking via thread pool)
+    returncode, stdout, stderr, command = await CLIRunner.run_cli_with_json_async(
         module_path=module_path,
         json_args=json.dumps(args_dict),
+        timeout=settings.CLI_TOOL_TIMEOUT,
     )
 
     # Clean up temporary files

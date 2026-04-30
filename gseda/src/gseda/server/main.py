@@ -135,6 +135,14 @@ async def startup_event():
         print(f"  - {name}")
 
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Run on server shutdown"""
+    from gseda.server.core.runners import shutdown_cli_executor
+    shutdown_cli_executor()
+    print(f"Shutting down {settings.APP_NAME}")
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

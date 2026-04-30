@@ -1,7 +1,7 @@
 """Configuration for GSEDA Server"""
 
 import os
-from typing import List
+from typing import Dict, List
 
 
 class Settings:
@@ -17,7 +17,7 @@ class Settings:
 
     # CLI tools configuration
     GSADA_PACKAGE = "gseda"
-    CLI_TOOL_TIMEOUT = 3600  # 1 hour in seconds
+    CLI_TOOL_TIMEOUT = 7200  # 2 hour in seconds
 
     # Paths
     SERVER_ROOT = os.path.dirname(__file__)
@@ -42,6 +42,11 @@ class Settings:
         ("homo-and-str-ratio", "gseda.ppl.homo_and_str_region_coverage:main_cli"),
         ("macebell-ratio", "gseda.ppl.macebell_ratio:main_cli"),
     ]
+
+    # Binary tool executables - tools that are pre-compiled binaries (Rust, C, etc.)
+    TOOL_BINARIES: Dict[str, str] = {
+        "asrtc": "/root/.cargo/bin/asrtc",
+    }
 
 
 settings = Settings()

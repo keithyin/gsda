@@ -58,7 +58,7 @@ def try_split_seq_2(seq: str):
         identity = calculate_identity_from_cigar(hit.cigar_str)
         coverage1 = (hit.r_en - hit.r_st) / len(seq1)
         coverage2 = (hit.q_en - hit.q_st) / len(seq2)
-        if identity > 0.80 and coverage1 > 0.85 and coverage2 > 0.85:
+        if identity > 0.80 and coverage1 > 0.85 and coverage2 > 0.85 and hit.strand == -1:
             return True
     return False
 
@@ -91,11 +91,13 @@ def consumer(queue):
 # =========================
 # 生产者：从 BAM 读取并放入队列
 # =========================
-def producer(path: str, queue):
-    if path.endswith("bam"):
-        bam_record_producer(path, queue=queue)
-    else:
-        fastx_record_producer(path=path, queue=queue)
+def producer(paths, queue):
+    
+    for path in paths:
+        if path.endswith("bam"):
+            bam_record_producer(path, queue=queue)
+        else:
+            fastx_record_producer(path=path, queue=queue)
 
 
 def bam_record_producer(path, queue):
@@ -117,6 +119,10 @@ def fastx_record_producer(path, queue):
     with pysam.FastxFile(path) as in_file:
         for read in in_file:
             seq = read.sequence
+            
+            if len(seq) < 2500:
+                continue
+            
             if seq:
                 queue.put(seq)
                 count += 1
@@ -177,6 +183,7 @@ def main_cli():
     parser.add_argument(
         "-i", "--input-bam",
         required=True,
+        nargs="+",
         help="Input BAM file"
     )
     parser.add_argument(
@@ -187,8 +194,8 @@ def main_cli():
     )
     args = parser.parse_args()
 
-    if not os.path.exists(args.input_bam):
-        raise FileNotFoundError(f"BAM file not found: {args.input_bam}")
+    # if not os.path.exists(args.input_bam):
+    #     raise FileNotFoundError(f"BAM file not found: {args.input_bam}")
 
     # Handle Ctrl+C gracefully
     def signal_handler(sig, frame):

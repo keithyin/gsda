@@ -27,6 +27,9 @@
     <!-- Macebell Ratio Form -->
     <MacebellRatioForm v-else-if="selectedTool?.name === 'macebell-ratio'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
 
+    <!-- Asrtc Form -->
+    <AsrtcForm v-else-if="selectedTool?.name === 'asrtc'" :is-executing="isExecuting" @execute="$emit('execute', $event)" />
+
     <!-- Dynamic form for other tools -->
     <div v-else class="dynamic-form" :class="{ 'is-loading': isExecuting }">
       <el-form :model="formData" label-width="120px" @submit.native.prevent="onSubmit">
@@ -56,6 +59,7 @@ import ReadsQualityStatsHPTrForm from './forms/ReadsQualityStatsHPTrForm.vue'
 import ReadsQualityStatsHPForm from './forms/ReadsQualityStatsHPForm.vue'
 import HomoAndStrRatioForm from './forms/HomoAndStrRatioForm.vue'
 import MacebellRatioForm from './forms/MacebellRatioForm.vue'
+import AsrtcForm from './forms/AsrtcForm.vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps<{

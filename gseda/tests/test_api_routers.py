@@ -60,8 +60,8 @@ class TestBAMBasicStatSSH:
             assert response.status_code != 422, f"Expected success, got {response.status_code}: {response.text}"
             # Verify fetch_remote_file was called with correct password
             mock_instance.fetch_remote_file.assert_called_once()
-            call_kwargs = mock_instance.fetch_remote_file.call_args[1]
-            assert call_kwargs['ssh_password'] == "test_password"
+            call_args = mock_instance.fetch_remote_file.call_args[0]
+            assert call_args[1] == "test_password"
 
 
 class TestPrepareBamFiles:
