@@ -202,7 +202,7 @@ def generate_metric_file(
 
     if np_range:
         cmd += f" --np-range {np_range}"
-    
+
     if rq_range:
         cmd += f" --rq-range {rq_range}"
 
@@ -575,16 +575,11 @@ def main_cli():
                         action="store_true", dest="disable_basic_stat")
     parser.add_argument("--disable-align-stat",
                         action="store_true", dest="disable_align_stat")
-    
-    parser.add_argument("--np-range", type=str, default=None, dest="np_range", help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
-    parser.add_argument("--rq-range", type=str, default=None, dest="rq_range", help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
 
-    parser.add_argument(
-        "-f", "--force",
-        action="store_true",
-        default=False,
-        help="regenerate the metric file if exists",
-    )
+    parser.add_argument("--np-range", type=str, default=None, dest="np_range",
+                        help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
+    parser.add_argument("--rq-range", type=str, default=None, dest="rq_range",
+                        help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
 
     args = parser.parse_args()
 
@@ -618,7 +613,7 @@ def main_cli():
         assert len(bam_files) == len(refs)
 
         for bam, ref in zip(bam_files, refs):
-            print(main(bam_file=bam, ref_fa=ref, force=args.force,
+            print(main(bam_file=bam, ref_fa=ref, force=True,
                        short_aln=args.short_aln == 1,
                        disable_basic_stat=args.disable_basic_stat,
                        disable_align_stat=args.disable_align_stat,

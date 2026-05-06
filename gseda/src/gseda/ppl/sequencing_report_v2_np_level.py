@@ -574,22 +574,10 @@ def main_cli():
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
 
-    parser.add_argument("--disable-basic-stat",
-                        action="store_true", dest="disable_basic_stat")
-    parser.add_argument("--disable-align-stat",
-                        action="store_true", dest="disable_align_stat")
-
     parser.add_argument("--np-range", type=str, default=None, dest="np_range",
                         help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
     parser.add_argument("--rq-range", type=str, default=None, dest="rq_range",
                         help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
-
-    parser.add_argument(
-        "-f", "--force",
-        action="store_true",
-        default=False,
-        help="regenerate the metric file if exists",
-    )
 
     args = parser.parse_args()
 
@@ -612,18 +600,13 @@ def main_cli():
                         basic_csvs=basic_csvs)
     else:
 
-        if not args.disable_align_stat and refs is not None:
-            assert len(refs) > 0
-        else:
-            refs = [""]
-
         if len(refs) == 1:
             refs = refs * len(bam_files)
 
         assert len(bam_files) == len(refs)
 
         for bam, ref in zip(bam_files, refs):
-            print(main(bam_file=bam, ref_fa=ref, force=args.force,
+            print(main(bam_file=bam, ref_fa=ref, force=True,
                        short_aln=args.short_aln == 1,
                        np_range=args.np_range,
                        rq_range=args.rq_range
