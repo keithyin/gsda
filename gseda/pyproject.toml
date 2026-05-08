@@ -55,6 +55,7 @@ homo-and-str-ratio = "gseda.ppl.homo_and_str_region_coverage:main_cli"
 macebell-ratio-cli = "gseda.ppl.macebell_ratio:main_cli"
 
 dump-specified-barcode-sbr = "gseda.bam_filter.dump_sbr_according_barcode:main_cli"
+subreads-smc-funnel-stat = "gseda.ppl.subreads_smc_funnel_stat:main_cli"
 
 # Server web service entry point
 gseda-server = "gseda.server.start_server:main"

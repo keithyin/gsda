@@ -197,12 +197,6 @@
       </div>
     </div>
 
-    <!-- prefix -->
-    <div class="form-group">
-      <label>输出前缀 <span class="required">*</span></label>
-      <el-input v-model="formData.prefix" placeholder="输出前缀 (输出文件: {prefix}.asrtc.txt)" />
-    </div>
-
     <!-- rq_range -->
     <div class="form-group">
       <label>RQ 范围过滤</label>
@@ -261,7 +255,6 @@ const formData = reactive({
   ref_fa: '',
   sbr: '',
   smc: '',
-  prefix: '',
   rq_range: '',
   np_range: ''
 })
@@ -370,7 +363,6 @@ const execute = async () => {
       ref_fa: formData.ref_fa,
       sbr: formData.sbr,
       smc: formData.smc,
-      prefix: formData.prefix,
     }
     if (formData.rq_range) request.rq_range = formData.rq_range
     if (formData.np_range) request.np_range = formData.np_range

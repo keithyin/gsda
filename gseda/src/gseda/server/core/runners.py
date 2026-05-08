@@ -458,7 +458,7 @@ ARGUMENT_SCHEMAS = {
             {"name": "ref_fa", "type": "file", "required": True, "placeholder": "参考序列 FASTA 文件"},
             {"name": "sbr", "type": "file", "required": True, "placeholder": "subreads BAM 文件", "short": "-q"},
             {"name": "smc", "type": "file", "required": True, "placeholder": "SMC BAM/FASTA 文件", "short": "-t"},
-            {"name": "prefix", "type": "text", "required": True, "placeholder": "输出前缀 (输出文件: {prefix}.asrtc.txt)", "short": "-p"},
+            {"name": "prefix", "type": "text", "required": False, "placeholder": "由系统自动生成", "short": "-p"},
             {"name": "rq_range", "type": "text", "required": False, "placeholder": "rq 范围过滤, 例如: 0.8:1.0"},
             {"name": "np_range", "type": "text", "required": False, "placeholder": "np 范围过滤, 例如: 1:3,5,7:9"},
         ],

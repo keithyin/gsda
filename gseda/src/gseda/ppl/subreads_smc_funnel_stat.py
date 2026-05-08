@@ -596,7 +596,7 @@ def main(args):
             print(idx, bams[idx], "\n", global_aggr(df))
 
 
-if __name__ == "__main__":
+def main_cli():
     polars_env_init()
 
     parser = argparse.ArgumentParser(prog="subreads_smc_funnel_stat")
@@ -648,3 +648,7 @@ if __name__ == "__main__":
 
     args_ = parser.parse_args()
     main(args_)
+
+
+if __name__ == "__main__":
+    main_cli()

@@ -679,6 +679,24 @@ async def execute_tool(
             json_args=json.dumps(args_dict),
             timeout=settings.CLI_TOOL_TIMEOUT,
         )
+
+    # Auto-generate prefix for asrtc tool if not provided
+    if tool_name == "asrtc" and not args_dict.get("prefix"):
+        args_dict["prefix"] = f"asrtc_{uuid.uuid4().hex[:12]}"
+
+    # Auto-register output files for asrtc tool (must be after binary execution
+    # because run_binary/_build_env() overwrites the file index with [])
+    if tool_name == "asrtc" and args_dict.get("prefix"):
+        prefix = args_dict["prefix"]
+        if isinstance(prefix, list):
+            prefix = prefix[0] if prefix else ""
+        if prefix:
+            output_file = f"{prefix}.asrtc.txt"
+            if os.path.exists(output_file):
+                fname = os.path.basename(output_file)
+                FileRegistry.register([{"name": fname, "path": output_file}])
+                print_log(f"Auto-registered output file: {fname}")
+
     print_log(f"CLI command executed: {' '.join(command)}")
     print_log(f"CLI exit code: {returncode}")
     if stdout:
@@ -688,17 +706,6 @@ async def execute_tool(
 
     # Clean up temporary files
     FileManager.cleanup_temp_files()
-
-    # Auto-register output files for asrtc tool
-    if tool_name == "asrtc" and args_dict.get("prefix"):
-        prefix = args_dict["prefix"]
-        if isinstance(prefix, list):
-            prefix = prefix[0] if prefix else ""
-        if prefix:
-            output_file = f"{prefix}.asrtc.txt"
-            if os.path.exists(output_file):
-                FileRegistry.register([{"name": output_file, "path": output_file}])
-                print_log(f"Auto-registered output file: {output_file}")
 
     # Get file outputs if available
     file_outputs = CLIRunner.get_registered_files()
