@@ -3,6 +3,8 @@ import pathlib
 import os
 import logging
 import polars as pl
+import seaborn as sns
+import matplotlib.pyplot as plt
 import shutil
 import argparse
 from multiprocessing import cpu_count
@@ -45,7 +47,8 @@ def generate_metric_file(
     no_mar=False,
     short_aln=False,
     np_range=None,
-    rq_range=None
+    rq_range=None,
+    ref_anchored: bool = False,
 ) -> str:
 
     if no_supp and no_mar:
@@ -71,6 +74,8 @@ def generate_metric_file(
         cmd += f" --np-range {np_range}"
     if rq_range is not None:
         cmd += f" --rq-range {rq_range}"
+    if ref_anchored:
+        cmd += " --refAnchored"
 
     logging.info("cmd: %s", cmd)
     subprocess.check_call(cmd, shell=True)
@@ -82,7 +87,7 @@ def stats(metric_filename, filename):
     pattern = r"\(([^)]+)\)(\d+)"
     # r"\(([^)]+)\)(\d+)"
     df = pl.read_csv(
-        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
+        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String, "rname": pl.String}
     )
     df = (
         df.filter(pl.col("rname") != "")
@@ -150,6 +155,54 @@ def stats(metric_filename, filename):
     df.write_csv(filename, include_header=True, separator="\t")
 
 
+def plot_ratio(filename: str, N: int, outpath: str, true_cnt_min: int = 1) -> str:
+    """Plot ratio_within_motif_tag vs called for pure+mixed, one subplot per motif."""
+    df = pl.read_csv(filename, separator="\t")
+    df = df.filter(
+        pl.col("tag") == "pure+mixed",
+        (pl.col("called") - pl.col("true_cnt")).abs() <= N,
+        pl.col("true_cnt") >= true_cnt_min,
+    )
+    df = (
+        df.group_by(["motif", "true_base", "true_cnt", "called"])
+        .agg([pl.col("ratio_within_motif_tag").mean().alias("ratio")])
+        .sort("called")
+    )
+    motifs = (
+        df.select(["motif", "true_base", "true_cnt"])
+        .unique()
+        .sort("true_base", "true_cnt")["motif"]
+        .to_list()
+    )
+    n = len(motifs)
+    if n == 0:
+        logging.warning("No pure+mixed data after filtering, skip plotting")
+        return outpath
+    cols = min(n, 3)
+    rows = (n + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 4), squeeze=False)
+    axes = axes.flatten()
+    for ax, motif in zip(axes, motifs):
+        sub = df.filter(pl.col("motif") == motif).sort("called")
+        ax.plot(
+            sub["called"].to_numpy(),
+            sub["ratio"].to_numpy(),
+            marker="o",
+            markersize=4,
+            linewidth=1.5,
+        )
+        ax.set_title(motif)
+        ax.set_xlabel("called")
+        ax.set_ylabel("ratio")
+        ax.grid(visible=True)
+    for ax in axes[n:]:
+        ax.set_visible(False)
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=150)
+    plt.close(fig)
+    return outpath
+
+
 def main(
     bam_file: str,
     ref_fa: str,
@@ -160,7 +213,9 @@ def main(
     copy_bam_file=False,
     np_range=None,
     rq_range=None,
-
+    max_n: int = 5,
+    ref_anchored: bool = False,
+    true_cnt_min: int = 1,
 
 ) -> str:
     """
@@ -188,7 +243,7 @@ def main(
     """
 
     env_prepare.check_and_install(
-        "gsmm2-metric", semver.Version.parse("0.5.1"), "cargo install gsmm2-metric")
+        "gsmm2-metric", semver.Version.parse("0.6.0"), "cargo install gsmm2-metric")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -217,7 +272,8 @@ def main(
         threads=threads,
         short_aln=short_aln,
         np_range=np_range,
-        rq_range=rq_range
+        rq_range=rq_range,
+        ref_anchored=ref_anchored
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
@@ -225,6 +281,11 @@ def main(
 
     # if not os.path.exists(aggr_metric_filename):
     stats(fact_metric_filename, filename=aggr_metric_filename)
+
+    # Plot ratio chart
+    plot_filename = f"{outdir}/{stem}.pure-mixed-ratio.png"
+    plot_ratio(aggr_metric_filename, N=max_n, outpath=plot_filename, true_cnt_min=true_cnt_min)
+    
     # else:
     #     logging.warning(
     #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
@@ -251,6 +312,9 @@ def main_cli():
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument("--np-range", type=str, default=None, dest="np_range")
     parser.add_argument("--rq-range", type=str, default=None, dest="rq_range")
+    parser.add_argument("--max-n", type=int, default=5, dest="max_n")
+    parser.add_argument("--ref-anchored", action="store_true", default=False, dest="ref_anchored")
+    parser.add_argument("--true-cnt-min", type=int, default=1, dest="true_cnt_min")
     parser.add_argument(
         "-f", "--force",
         action="store_true",
@@ -268,7 +332,8 @@ def main_cli():
 
     for bam, ref in zip(bam_files, refs):
         main(bam_file=bam, ref_fa=ref, force=args.force,
-             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
+             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range,
+             max_n=args.max_n, ref_anchored=args.ref_anchored, true_cnt_min=args.true_cnt_min)
 
 
 if __name__ == "__main__":
