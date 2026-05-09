@@ -60,6 +60,11 @@ subreads-smc-funnel-stat = "gseda.ppl.subreads_smc_funnel_stat:main_cli"
 # Server web service entry point
 gseda-server = "gseda.server.start_server:main"
 
+[tool.hatch.build]
+exclude = [
+  "src/gseda/server"
+]
+
 # 构建后端，默认为 Hatchling
 [build-system]
 requires = ["hatchling"]

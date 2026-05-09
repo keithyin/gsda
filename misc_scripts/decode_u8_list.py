@@ -8,3 +8,7 @@ data_bytes = bytes(u8_list)
 # 解码为UTF-8字符串
 utf8_string = data_bytes.decode('utf-8')
 print(utf8_string)  # 输出: Hello 世界
+
+
+import pathlib
+pathlib.Path().name
