@@ -163,9 +163,13 @@ def plot_ratio(filename: str, N: int, outpath: str, true_cnt_min: int = 1) -> st
         (pl.col("called") - pl.col("true_cnt")).abs() <= N,
         pl.col("true_cnt") >= true_cnt_min,
     )
+    # ratio_within_motif_tag
+    # ratio
     df = (
         df.group_by(["motif", "true_base", "true_cnt", "called"])
-        .agg([pl.col("ratio_within_motif_tag").mean().alias("ratio")])
+        .agg([
+            pl.col("ratio").mean().alias("ratio"),
+            pl.col("ratio_within_motif_tag").mean().alias("ratio2")])
         .sort("called")
     )
     motifs = (
@@ -180,7 +184,8 @@ def plot_ratio(filename: str, N: int, outpath: str, true_cnt_min: int = 1) -> st
         return outpath
     cols = min(n, 3)
     rows = (n + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 4), squeeze=False)
+    fig, axes = plt.subplots(rows, cols, figsize=(
+        cols * 5, rows * 4), squeeze=False)
     axes = axes.flatten()
     for ax, motif in zip(axes, motifs):
         sub = df.filter(pl.col("motif") == motif).sort("called")
@@ -190,11 +195,49 @@ def plot_ratio(filename: str, N: int, outpath: str, true_cnt_min: int = 1) -> st
             marker="o",
             markersize=4,
             linewidth=1.5,
+            label="ratio",
+        )
+        ax.plot(
+            sub["called"].to_numpy(),
+            sub["ratio2"].to_numpy(),
+            marker="s",
+            markersize=4,
+            linewidth=1.5,
+            label="ratio2",
         )
         ax.set_title(motif)
         ax.set_xlabel("called")
         ax.set_ylabel("ratio")
         ax.grid(visible=True)
+        ax.legend(loc="center left")
+
+        top3 = (
+            sub.sort("ratio2", descending=True)
+            .head(3)
+        )
+        # Top-3 annotations in top-right corner (inside axes)
+        for i, row in enumerate(top3.to_dicts()):
+
+            text = (
+                f"called={row['called']}  "
+                f"ratio2={row['ratio2']:.3f}"
+            )
+
+            ax.text(
+                0.98,                  # right side
+                0.98 - i * 0.08,       # move downward
+                text,
+                transform=ax.transAxes,
+                fontsize=10,
+                color="red",
+                ha="right",
+                va="top",
+                bbox=dict(
+                    boxstyle="round,pad=0.2",
+                    fc="white",
+                    alpha=0.7,
+                ),
+            )
     for ax in axes[n:]:
         ax.set_visible(False)
     plt.tight_layout()
@@ -243,7 +286,7 @@ def main(
     """
 
     env_prepare.check_and_install(
-        "gsmm2-metric", semver.Version.parse("0.6.0"), "cargo install gsmm2-metric")
+        "gsmm2-metric", semver.Version.parse("0.6.1"), "cargo install gsmm2-metric")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -284,8 +327,9 @@ def main(
 
     # Plot ratio chart
     plot_filename = f"{outdir}/{stem}.pure-mixed-ratio.png"
-    plot_ratio(aggr_metric_filename, N=max_n, outpath=plot_filename, true_cnt_min=true_cnt_min)
-    
+    plot_ratio(aggr_metric_filename, N=max_n,
+               outpath=plot_filename, true_cnt_min=true_cnt_min)
+
     # else:
     #     logging.warning(
     #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
@@ -313,8 +357,10 @@ def main_cli():
     parser.add_argument("--np-range", type=str, default=None, dest="np_range")
     parser.add_argument("--rq-range", type=str, default=None, dest="rq_range")
     parser.add_argument("--max-n", type=int, default=5, dest="max_n")
-    parser.add_argument("--ref-anchored", action="store_true", default=False, dest="ref_anchored")
-    parser.add_argument("--true-cnt-min", type=int, default=1, dest="true_cnt_min")
+    parser.add_argument("--ref-anchored", action="store_true",
+                        default=False, dest="ref_anchored")
+    parser.add_argument("--true-cnt-min", type=int,
+                        default=1, dest="true_cnt_min")
     parser.add_argument(
         "-f", "--force",
         action="store_true",

@@ -32,12 +32,12 @@
 #     --sbr_qv_thr 10
 #      /data/ccs_data/ccs_eval2024q3/jinpu/jinpu-test/20240711-ghm.icing.bam \
 
-python subreads_smc_funnel_stat_speed_up.py /data/ccs_data/ccs_eval2024q3/jinpu/ref_Saureus_ATCC25923.m.new.corrected.fasta \
-    --s_bam /data/ccs_data/ccs_eval2024q3/jinpu/20240711_Sync_Y0006_02_H01_Run0001_called.subreads.bam \
-    --smc_bams \
-        /data/ccs_data/ccs_eval2024q3/jinpu/smc-align-param-search/20240711_Sync_Y0006_02_H01_Run0001_called_m3_mm5_ins2_del2.smc_all_reads.bam \
-        /data/ccs_data/smc-poa-3-5-2-2-noPolish/noPolish-icing/20240711-nopolish.icing.bam \
-    --sbr_qv_thr 10
+# python subreads_smc_funnel_stat_speed_up.py /data/ccs_data/ccs_eval2024q3/jinpu/ref_Saureus_ATCC25923.m.new.corrected.fasta \
+#     --s_bam /data/ccs_data/ccs_eval2024q3/jinpu/20240711_Sync_Y0006_02_H01_Run0001_called.subreads.bam \
+#     --smc_bams \
+#         /data/ccs_data/ccs_eval2024q3/jinpu/smc-align-param-search/20240711_Sync_Y0006_02_H01_Run0001_called_m3_mm5_ins2_del2.smc_all_reads.bam \
+#         /data/ccs_data/smc-poa-3-5-2-2-noPolish/noPolish-icing/20240711-nopolish.icing.bam \
+#     --sbr_qv_thr 10
 
 # /data/ccs_data/ccs_eval2024q3/jinpu/hg-ecoli-jinpu-np3-15-ConsensusModelBiGRU/20240711_Sync_Y0006_02_H01_Run0001_called.subreads.icing.bam \
 
@@ -170,3 +170,18 @@ python subreads_smc_funnel_stat_speed_up.py /data/ccs_data/ccs_eval2024q3/jinpu/
 #     --smc_bams \
 #         /data/four/run1/test_bam/exp/20240929_240601Y0009_Run0001_called_dbscan3522.smc_all_reads.bam \
 #     --sbr_qv_thr 10
+
+
+
+python subreads_smc_funnel_stat.py /data1/ccs_data/202603-rna-data/rna_data/RNA1K/RNA1k-nopoly-ccaa.fa  \
+    --s_bam /data1/ccs_data/202603-rna-data/rna_data/RNA1K/20260327_240601Y0004_Run0003_demuxed.bam \
+    --smc_bams \
+        /data1/ccs_data/202603-rna-data/rna_data/RNA1K/20260327_240601Y0004_Run0003_demuxed.0521.smc_all_reads.bam \
+    --sbr_qv_thr 10
+
+
+python subreads_smc_funnel_stat.py /data1/ccs_data/202603-rna-data/rna_data/RNA2K/RNA2K-nopoly-ccaa.fa  \
+    --s_bam /data1/ccs_data/202603-rna-data/rna_data/RNA2K/20260327_240601Y0004_Run0005_demuxed.bam \
+    --smc_bams \
+        /data1/ccs_data/202603-rna-data/rna_data/RNA2K/20260327_240601Y0004_Run0005_demuxed.0521.smc_all_reads.bam \
+    --sbr_qv_thr 10

@@ -1,4 +1,3 @@
-import bam_concordance
 from typing import List, Tuple
 import polars as pl
 import subprocess
