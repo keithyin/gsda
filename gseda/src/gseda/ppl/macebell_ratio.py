@@ -92,7 +92,7 @@ def consumer(queue):
 # 生产者：从 BAM 读取并放入队列
 # =========================
 def producer(paths, queue):
-    
+
     for path in paths:
         if path.endswith("bam"):
             bam_record_producer(path, queue=queue)
@@ -119,10 +119,10 @@ def fastx_record_producer(path, queue):
     with pysam.FastxFile(path) as in_file:
         for read in in_file:
             seq = read.sequence
-            
+
             if len(seq) < 2500:
                 continue
-            
+
             if seq:
                 queue.put(seq)
                 count += 1
@@ -137,6 +137,8 @@ def fastx_record_producer(path, queue):
 
 
 def main(bam_path, threads):
+    if not isinstance(bam_path, list):
+        bam_path = [bam_path]
     start = time.time()
 
     # 创建队列（适当大小避免爆内存）
@@ -151,6 +153,7 @@ def main(bam_path, threads):
 
     # 启动生产者（在主进程中运行，简化控制）
     print("Starting producer...")
+
     producer(bam_path, queue)
 
     # 发送终止信号

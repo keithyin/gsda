@@ -1,6 +1,6 @@
 [project]
 name = "gseda"
-version = "1.21.15"
+version = "1.21.19"
 authors = [{ name = "keithyin", email = "yinpenghhz@hotmail.com" }]
 description = "gsetl"
 readme = "README.md"
@@ -33,6 +33,7 @@ reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
 reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
 reads-quality-hp-cli = "gseda.ppl.reads_quality_stats_hp:main_cli"
 sequencing-report-v2-cli = "gseda.ppl.sequencing_report_v2:main_cli"
+sequencing-report-v2-np-level-cli = "gseda.ppl.sequencing_report_v2_np_level:main_cli"
 
 sequencing-report-overall-cli = "gseda.ppl.sequencing_report_overall:main_cli"
 

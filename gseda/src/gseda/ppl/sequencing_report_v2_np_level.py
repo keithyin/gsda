@@ -102,7 +102,7 @@ def dump_bam_basic(bam_file: str, output_dir: str) -> str:
             if record.has_tag("cq"):  # called.bam or adapter.bam
                 rq = record.get_tag('cq')
             else:
-                rq = -10 * math.log10(1-record.get_tag("rq"))
+                rq = -10 * math.log10(1-record.get_tag("rq") + 1e-6)
             qnames.append(record.query_name)
             num_passes.append(num_pass)
             rq_values.append(rq)
