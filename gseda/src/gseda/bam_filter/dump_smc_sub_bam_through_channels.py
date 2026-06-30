@@ -39,7 +39,26 @@ def dump_smc_bam_subset(inp_bam_path: str, out_bam_path: str, channels):
 
 
 def main(args):
+    """
+    通过 channel_id 子采样 BAM 文件，只保留指定 channel 的 reads。
+
+    流程：
+    1. 读取 channel_filename 中列出的 channel_id（每行一个整数），去重后得到白名单。
+    2. 遍历 in_bam 的每一条 alignment record，读取其 "ch" 标签（即 channel_id）。
+    3. 若该 channel_id 在白名单中，则写入 out_bam；否则丢弃。
+    4. 完成后打印总记录数、丢弃数和丢弃比例。
+
+    典型用途：SMC（Structured Matrix Capture）分析中，从全 BAM 中提取特定 channel 的
+    sub-BAM，用于后续定量或对比分析。
+
+    用法：
+        python dump_smc_sub_bam_through_channels.py input.bam output.bam channel_list.txt
+    """
+    # 1. 加载 channel 白名单
     channels = read_channels(args.channel_filename)
+    print(f"Loaded {len(channels)} channels from {args.channel_filename}")
+
+    # 2. 按 channel 白名单过滤 BAM，输出 sub-BAM
     dump_smc_bam_subset(args.in_bam, args.out_bam, channels)
 
 

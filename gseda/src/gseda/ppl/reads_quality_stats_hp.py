@@ -83,12 +83,15 @@ def generate_metric_file(
     return out_filename
 
 
-def stats(metric_filename, filename):
+def stats(metric_filename, filename, print_df=True) -> bool:
     pattern = r"\(([^)]+)\)(\d+)"
     # r"\(([^)]+)\)(\d+)"
     df = pl.read_csv(
         metric_filename, separator="\t", schema_overrides={"longIndel": pl.String, "rname": pl.String}
     )
+    if df.is_empty():
+        return False
+
     df = (
         df.filter(pl.col("rname") != "")
         .with_columns([
@@ -102,6 +105,8 @@ def stats(metric_filename, filename):
                 "true_cnt") - pl.lit(5)).alias("called")
         ])
     )
+
+    origin_df = df
 
     df1 = (df
            .group_by(["motif", "true_base", "true_cnt", "called", "tag"])
@@ -150,9 +155,19 @@ def stats(metric_filename, filename):
          .over(["motif", "tag"])
          ).alias("ratio")
     )
+    if print_df:
+        print(df)
 
-    print(df)
+    print(
+        origin_df
+        .group_by(["qname", "motif"])
+        .agg([pl.col("eq").min(), pl.col("alignspan").min()])
+        .select(pl.col("eq").sum(), pl.col("alignspan").sum())
+        .with_columns((pl.col("eq") / pl.col("alignspan")).alias("homoregionIdentity"))
+    )
+
     df.write_csv(filename, include_header=True, separator="\t")
+    return True
 
 
 def plot_ratio(filename: str, N: int, outpath: str, true_cnt_min: int = 1) -> str:
@@ -259,6 +274,8 @@ def main(
     max_n: int = 5,
     ref_anchored: bool = False,
     true_cnt_min: int = 1,
+    print_df=True,
+    enable_plot_ratio=True
 
 ) -> str:
     """
@@ -286,7 +303,7 @@ def main(
     """
 
     env_prepare.check_and_install(
-        "gsmm2-metric", semver.Version.parse("0.6.1"), "cargo install gsmm2-metric")
+        "gsmm2-metric", semver.Version.parse("0.7.1"), "cargo install gsmm2-metric")
 
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
@@ -319,22 +336,31 @@ def main(
         ref_anchored=ref_anchored
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-aggr.csv"
-    if force and os.path.exists(aggr_metric_filename):
+    # if force and os.path.exists(aggr_metric_filename):
+    #     os.remove(aggr_metric_filename)
+
+    if os.path.exists(aggr_metric_filename):
         os.remove(aggr_metric_filename)
 
     # if not os.path.exists(aggr_metric_filename):
-    stats(fact_metric_filename, filename=aggr_metric_filename)
+    try:
+        succ = stats(fact_metric_filename,
+                     filename=aggr_metric_filename, print_df=print_df)
+    except Exception as e:
+        raise RuntimeError(
+            f"fact_metric_filename:{fact_metric_filename}, aggr_metric_filename:{aggr_metric_filename}. error:{e}")
 
     # Plot ratio chart
-    plot_filename = f"{outdir}/{stem}.pure-mixed-ratio.png"
-    plot_ratio(aggr_metric_filename, N=max_n,
-               outpath=plot_filename, true_cnt_min=true_cnt_min)
+    if enable_plot_ratio and succ:
+        plot_filename = f"{outdir}/{stem}.pure-mixed-ratio.png"
+        plot_ratio(aggr_metric_filename, N=max_n,
+                   outpath=plot_filename, true_cnt_min=true_cnt_min)
 
     # else:
     #     logging.warning(
     #         "aggr_metric_file exists, use existing one. %s", aggr_metric_filename
     #     )
-    return (aggr_metric_filename, fact_metric_filename)
+    return (succ, aggr_metric_filename, fact_metric_filename)
 
 
 def test_stat():

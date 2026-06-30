@@ -23,10 +23,20 @@ def _parse_range(range_str: str):
     return float(parts[0]), float(parts[1])
 
 
+def remove_tags(record, tags):
+    for tag in tags:
+        if record.has_tag(tag):
+            record.set_tag(tag, value=None)
+    return record
+
+
 def _extract_partition(args) -> dict:
     """Extract a partition of channels from subreads.bam. Returns {ch: count, ...}."""
     partition_channels, subreads_bam, outdir = args
     valid_channels = set(partition_channels)
+
+    unwanted_tags = ["dw", "cr", "ar"]
+
     valid_bams = []
     with pysam.AlignmentFile(subreads_bam, "rb", check_sq=False, threads=1) as in_bam:
         header = in_bam.header
@@ -46,28 +56,37 @@ def _extract_partition(args) -> dict:
                 out_path = os.path.join(
                     outdir, f"{pathlib.Path(subreads_bam).stem}.ch{ch}.filtered.bam")
                 valid_bams.append(out_path)
-                out_handle = pysam.AlignmentFile(
-                    out_path, "wb", header=header, check_sq=False, threads=1)
+                out_handle = None
+                if not os.path.exists(out_path):
+                    out_handle = pysam.AlignmentFile(
+                        out_path, "wb", header=header, check_sq=False, threads=1)
 
                 current_ch = ch
-
-            out_handle.write(record)
+            if out_handle is not None:
+                record = remove_tags(record, unwanted_tags)
+                out_handle.write(record)
 
         if out_handle is not None:
             out_handle.close()
     return valid_bams
 
 
-def _process_partition(partition_bams: list, ref_fa: str) -> list:
+def process_partition_stats_np(partition_bams: list, ref_fa: str) -> list:
     """Process a partition of channel BAMs with reads_quality_stats_hp."""
     results = []
     for ch_bam in partition_bams:
         logging.info(f"processing {ch_bam} with ref_fa={ref_fa}")
-        aggr_csv, fact_csv = reads_quality_stats_hp.main(
-            bam_file=ch_bam, ref_fa=ref_fa, force=True, threads=10)
-        results.append((ch_bam, (aggr_csv, fact_csv)))
-        logging.info(f"  aggr={aggr_csv}, fact={fact_csv}")
+        succ, aggr_csv, fact_csv = reads_quality_stats_hp.main(
+            bam_file=ch_bam, ref_fa=ref_fa, force=True, threads=10, print_df=False, enable_plot_ratio=False)
+        if succ:
+            results.append((ch_bam, (aggr_csv, fact_csv)))
+            logging.info(f"  aggr={aggr_csv}, fact={fact_csv}")
     return results
+
+
+def process_partition_stats_np_wrapper(param):
+    partition_bams, ref_fa = param
+    return process_partition_stats_np(partition_bams, ref_fa)
 
 
 def chunked(iterable, batch_size, *args):
@@ -89,7 +108,21 @@ def dump_channel_bams(
     rq_range: str,
     outdir: str,
     ref_fa: str,
+    force: bool = True
 ) -> list:
+    """
+        每个 channel 的 subreads 构成一个 bam, 将其输出
+        然后对于每个 bam, 计算 hp 的指标， 会生成对应的 csv
+    Args:
+        subreads_bam (str): 
+        smc_bam (str): 
+        np_range (str): 
+        rq_range (str): 
+        outdir (str): 
+        ref_fa (str): 
+    Returns:
+        list:  
+    """
     np_min, np_max = _parse_range(np_range)
     rq_min, rq_max = _parse_range(rq_range)
 
@@ -123,13 +156,18 @@ def dump_channel_bams(
 
     with Pool(processes=os.cpu_count() // 2) as pool:
         valid_bams = []
-        for result in tqdm(pool.imap(_extract_partition, chunked(valid_channels, 100, subreads_bam, outdir), chunksize=1), desc=f"extrating channel subreads"):
+        for result in tqdm(pool.imap_unordered(
+            _extract_partition,
+            chunked(valid_channels, 300, subreads_bam, outdir),
+            chunksize=1),
+                desc=f"extrating channel subreads"):
             valid_bams.extend(result)
 
-    print(valid_bams)
+    # print(valid_bams)
 
     # Process channel BAMs with multiprocessing, each process handles a partition
     n_workers = os.cpu_count() // 10
+    n_workers = 10
     n_channels = len(valid_bams)
     partition_size = max(1, n_channels // n_workers)
     partitions = [
@@ -139,15 +177,20 @@ def dump_channel_bams(
     logging.info(
         f"processing {n_channels} channels with {len(partitions)} partitions")
     with Pool(processes=n_workers) as pool:
-        all_results = pool.starmap(
-            _process_partition, [(p, ref_fa) for p in partitions]
-        )
+        all_results = []
+        for result in tqdm(pool.imap_unordered(
+                process_partition_stats_np_wrapper,
+                [(p, ref_fa) for p in partitions]), desc="processing stats hp"):
+            all_results.append(result)
     results = [r for sublist in all_results for r in sublist]
 
     return results
 
 
 def main_cli():
+    """
+        channel 粒度分析 hp 的一些准确率信息
+    """
     parser = argparse.ArgumentParser(prog="channel_subreads_ref_analysis")
     parser.add_argument("subreads_bam", help="subreads BAM file")
     parser.add_argument("smc_bam", help="SMC BAM file (has ch/np/rq tags)")
@@ -157,6 +200,7 @@ def main_cli():
                         help="np range start:end")
     parser.add_argument("--rq-range", default="0.95:1.1", dest="rq_range",
                         help="rq range start:end")
+    parser.add_argument("-f", action="store_true")
     parser.add_argument("--outdir", default=None, dest="out_dir",
                         help="output directory")
     args = parser.parse_args()
@@ -181,12 +225,7 @@ def main_cli():
 if __name__ == "__main__":
     """
         /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K
-
         /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/20260327_240601Y0004_Run0001_demuxed.bam /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/20260327_240601Y0004_Run0001_demuxed.smc_all_reads.bam /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/ref_0.5K-nopoly.fa --np-range 3:100 --rq-range 0.99:1.1
-        
-        
-        
-        
         python channel_subreads_ref_analysis.py /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/20260327_240601Y0004_Run0001_demuxed.bam  /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/20260327_240601Y0004_Run0001_demuxed.smc_all_reads.bam /data1/ccs_data/202603-rna-data/rna_data/RNA0.5K/ref_0.5K-nopoly.fa --np-range 5:100 --rq-range 0.99:1.1
     """
     main_cli()

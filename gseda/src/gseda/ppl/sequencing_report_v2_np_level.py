@@ -261,31 +261,9 @@ def analisys_long_indel(df: pl.DataFrame) -> pl.DataFrame:
 
 def align_stats(dataframe: pl.DataFrame):
 
-    # all_dfs = []
-    # for metric_fname in metric_filenames:
-    #     if metric_fname is None:
-    #         continue
-
-    #     all_dfs.append(pl.read_csv(
-    #         metric_fname, separator="\t", schema_overrides={"longIndel": pl.String}
-    #     ))
-
-    # if len(all_dfs) == 0:
-    #     return None
-
-    # df = pl.concat(all_dfs)
-
     grouped_dataframe = dataframe.group_by(["np"])
 
     counts = grouped_dataframe.agg([pl.len().alias("num")])
-
-    # global_query_coverage_metric = global_query_coverage_metric.transpose(
-    #     include_header=True, header_name="name", column_names=["value"]
-    # )
-
-    # metric_aligned_not_aligned = analysis_aligned(df=df)
-    # metric_long_indel = analisys_long_indel(df=df)
-    # df = df.filter(pl.col("rname") != "")
 
     identity_metric = grouped_dataframe.agg([
         (pl.col("identity").filter(pl.col("identity") >= pl.lit(0.83)
@@ -302,44 +280,16 @@ def align_stats(dataframe: pl.DataFrame):
                                    ).count() / pl.len()).cast(pl.Float64).alias("identity≥0.99999"),
 
     ])
-
-    # df = df.with_columns(
-    #     [
-    #         ((pl.col("qOvlpRatio") < 0.01).and_(pl.col("rOvlpRatio") < 0.01))
-    #         .or_(
-    #             (pl.col("qOvlpRatio") < 0.01)
-    #             .and_(pl.col("rOvlpRatio") > 0.90)
-    #             .and_(pl.col("oriQGaps").str.split(",").list.get(1).cast(pl.Int32) < 20)
-    #         )
-    #         .alias("valid")
-    #     ]
-    # )
-
-    # df = df.with_columns(
-    #     [
-    #         pl.when(pl.col("valid"))
-    #         .then(pl.col("covlen"))
-    #         .otherwise(pl.col("primaryCovlen"))
-    #         .alias("miscCovlen")
-    #     ]
-    # )
-
-    # df = df.with_columns(row_align_span())
     aggr_metrics = grouped_dataframe.agg(aggr_expressions())
-    # aggr_metrics = aggr_metrics.transpose(
-    #     include_header=True, header_name="name", column_names=["value"]
-    # )
 
-    # all_metrics = pl.concat(
-    #     all_metrics
-    # )
+    np_level_aggr_metrics = counts.join(aggr_metrics, on="np", how="inner").select([
+        "np", "num", "identity", "mmRate",
+        "NHInsRate", "HomoInsRate", "NHDelRate", "HomoDelRate",
+        "queryCoverage", "identity-p25", "identity-p50", "identity-p75", "queryCoverage-p25", "queryCoverage-p50", "queryCoverage-p75"]).sort(by=["np"], descending=[False])
 
-    # print(identity_metric.head(10))
-    print(counts.join(aggr_metrics, on="np", how="inner").select([
-        "np", "num", "identity", "mmRate", "NHInsRate", "HomoInsRate", "NHDelRate", "HomoDelRate", "queryCoverage", "identity-p25", "identity-p50", "identity-p75", "queryCoverage-p25", "queryCoverage-p50", "queryCoverage-p75", ])
-        .sort(by=["np"], descending=[False]))
+    print(np_level_aggr_metrics)
 
-    return None
+    return np_level_aggr_metrics
 
 
 def aggr_expressions(base_level=False):
@@ -541,18 +491,12 @@ def main(
     # print(joined_dataframe.head(10))
     # os._exit(0)
 
-    inner = align_stats(joined_dataframe)
+    np_level_aggr = align_stats(joined_dataframe)    
+    if os.path.exists(aggr_metric_filename):
+        os.remove(aggr_metric_filename)
 
-    os._exit(0)
-
-    if len(all_metrics) > 0:
-        all_metrics = pl.concat(all_metrics)
-        print(all_metrics)
-        if os.path.exists(aggr_metric_filename):
-            os.remove(aggr_metric_filename)
-
-        all_metrics.write_csv(aggr_metric_filename,
-                              include_header=True, separator="\t")
+    np_level_aggr.write_csv(aggr_metric_filename,
+                            include_header=True, separator="\t")
 
     return (aggr_metric_filename, fact_metric_filename, basic_metric_filename)
 

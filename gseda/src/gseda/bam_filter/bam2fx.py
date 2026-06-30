@@ -1,61 +1,69 @@
-import pysam
 import argparse
-from tqdm import tqdm
 import multiprocessing as mp
+from pathlib import Path
+import math
+import pysam
+from tqdm import tqdm
 
 
-def bam_to_fastx(bam_path, fastx_path: str, rq_threshold):
+def bam_to_fastx(bam_path: str, out_path: str, fmt: str, min_rq: float):
+    """Dump reads with rq >= min_rq to a single FASTA/FASTQ file."""
     tot = 0
     dumped = 0
-    output_fq = fastx_path.endswith("fastq")
 
+    ext = "fastq" if fmt == "fq" else "fasta"
     with pysam.AlignmentFile(
         bam_path, "rb", threads=mp.cpu_count(), check_sq=False
-    ) as bam_file, open(fastx_path, "w") as fastx_out:
+    ) as bam_file, open(out_path, "w") as fout:
         for read in tqdm(
-            bam_file.fetch(until_eof=True), desc=f"dumping {bam_path} to {fastx_path}"
+            bam_file.fetch(until_eof=True), desc=f"dumping {bam_path} to {out_path}"
         ):
             tot += 1
-
-            # 尝试获取 rq 字段
             try:
                 rq = read.get_tag("rq")
-                if rq < rq_threshold:
+                if rq < min_rq:
                     continue
             except KeyError:
                 pass
 
-            # 构造 FASTQ 格式
             name = read.query_name
             seq = read.query_sequence
-            qual = read.qual  # 转换为 ASCII 的质量字符串
+            qual = read.qual
+            if seq is None or qual is None:
+                continue
 
             dumped += 1
-
-            if seq is None or qual is None:
-                continue  # 有可能 read 被软裁剪或缺失，跳过
-            if output_fq:
-                fastx_out.write(f"@{name}\n{seq}\n+\n{qual}\n")
+            if ext == "fastq":
+                fout.write(f"@{name}\n{seq}\n+\n{qual}\n")
             else:
-                fastx_out.write(f">{name}\n{seq}\n")
+                fout.write(f">{name}\n{seq}\n")
 
     print(f"Tot:{tot}, dumped:{dumped}, ratio:{dumped / tot: .4f}")
-    print(f"转换完成，输出文件: {fastx_path}")
+    print(f"转换完成，输出文件: {out_path}")
 
 
 def main_cli():
     parser = argparse.ArgumentParser(
-        description="Convert BAM to FASTQ with rq filter.")
+        description="Convert BAM to FASTA/FASTQ files grouped by rq threshold.")
     parser.add_argument("bam", help="Input BAM file path")
-    parser.add_argument("fastx", help="Output FASTX file path. fasta/fastq")
     parser.add_argument(
-        "--rq", type=float, default=0.0, help="Minimum rq threshold (default: 0.0)"
+        "fastx", choices=["fa", "fq"],
+        help="Output format: 'fa' for FASTA, 'fq' for FASTQ",
+    )
+    parser.add_argument(
+        "--phreqs", type=int, default=[20, 30], nargs="+",
+        help="Phred-scaled rq thresholds (default: [20, 30]). "
+             "Produces one output file per threshold.",
     )
 
     args = parser.parse_args()
-    assert args.fastx.endswith("fastq") or args.fastx.endswith(
-        "fasta"), "only fastq/fasta are supported"
-    bam_to_fastx(args.bam, args.fastx, args.rq)
+    bam_path_abs = str(Path(args.bam).resolve())
+    parent = Path(bam_path_abs).parent
+    stem = Path(bam_path_abs).stem
+    for thresh in args.phreqs:
+        out_path = str(parent / f"{stem}.q{thresh}.{args.fastx}")
+        bam_to_fastx(args.bam, out_path, args.fastx,
+                     1.0 - math.pow(10.0, -thresh / 10.0))
 
 
 if __name__ == "__main__":
