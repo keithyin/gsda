@@ -25,6 +25,8 @@ logging.basicConfig(
 
 def is_empty_file(filepath: str):
     valid_line_cnt = 0
+    if not os.path.exists(filepath):
+        return True
     with open(filepath, mode="r", encoding="utf8") as f:
         for line in f:
             if line.strip() != "":
@@ -57,12 +59,12 @@ def compute_percentile_length(bam_path: str, percentile: int) -> int:
     return lengths[pos]
 
 
-def dump_sub_bam(bam_path: str, out_path: str, length_thr: int, n: int, first=True):
+def dump_sub_bam(bam_path: str, out_path: str, length_min: int, length_max: int, n: int, first=True):
     with pysam.AlignmentFile(bam_path, mode="rb", check_sq=False, threads=cpu_count() // 2) as bam_in:
         with pysam.AlignmentFile(
                 out_path, mode="wb", check_sq=False, header=bam_in.header, threads=cpu_count() // 2) as bam_out:
             for read in tqdm(bam_in.fetch(until_eof=True), desc=f"reading {bam_path} for dump to {out_path}"):
-                if read.query_length < length_thr:
+                if read.query_length < length_min or read.query_length >= length_max:
                     continue
                 n = min(n, read.query_length)
 
@@ -107,16 +109,28 @@ def main(
     bam_file: str,
     n: int,
     ref_fa: str,
-    length_thr=None,
-    length_percentile_thr=None,
+    length_min=None,
+    length_max=None,
+    length_percentile_min=None,
+    length_percentile_max=None,
     force=False,
     outdir=None,
 ) -> str:
+    # length_min = 0
+    # length_max = 99999999999999999999999999
 
-    if length_thr is None:
-        length_thr = compute_percentile_length(
-            bam_file, percentile=length_percentile_thr)
-    logging.info(f"length thr = {length_thr}")
+    if length_min is None:
+        length_min = 0
+        if length_percentile_min is not None:
+            length_min = compute_percentile_length(
+                bam_file, percentile=length_percentile_min)
+    if length_max is None:
+        length_max = 999999999999999999999
+        if length_percentile_max is not None:
+            length_max = compute_percentile_length(
+                bam_file, percentile=length_percentile_max)
+
+    logging.info(f"length min = {length_min}, length max = {length_max}")
     bam_file_dir = os.path.dirname(bam_file)
     stem = pathlib.Path(bam_file).stem
     if outdir is None:
@@ -129,8 +143,10 @@ def main(
 
     final_res_csv = os.path.join(outdir, f"{stem}.seq-n-stats-aggr.csv")
 
-    dump_sub_bam(bam_file, first_n_bam, length_thr=length_thr, n=n, first=True)
-    dump_sub_bam(bam_file, last_n_bam, length_thr=length_thr, n=n, first=False)
+    dump_sub_bam(bam_file, first_n_bam, length_min=length_min,
+                 length_max=length_max,  n=n, first=True)
+    dump_sub_bam(bam_file, last_n_bam, length_min=length_min,
+                 length_max=length_max, n=n, first=False)
 
     (first_n_aligned_aggr, _, first_n_non_aligned_aggr, _) = reads_quality_stats_v3.main(
         bam_file=first_n_bam, ref_fa=ref_fa, force=force)
@@ -179,10 +195,14 @@ def main_cli():
                         required=True, help="wildcard '*' is supported")
     parser.add_argument("-n", required=True,
                         type=int)
-    parser.add_argument("--length-thr", default=None,
-                        type=int, dest="length_thr")
-    parser.add_argument("--length-percentile-thr", default=None, type=int,
-                        help="[0, 100], compute the length-thr according to the length-percentile-thr", dest="length_percentile_thr")
+    parser.add_argument("--length-min", default=None,
+                        type=int)
+    parser.add_argument("--length-max", default=None,
+                        type=int)
+    parser.add_argument("--length-percentile-min", default=None, type=int,
+                        help="[0, 100], compute the length-min according to the length-percentile-min")
+    parser.add_argument("--length-percentile-max", default=None, type=int,
+                        help="[0, 100], compute the length-min according to the length-percentile-max")
     parser.add_argument("--ref-fa", default="", type=str,
                         help="ref fasta", dest="ref_fa")
     parser.add_argument(
@@ -193,7 +213,8 @@ def main_cli():
     )
     args = parser.parse_args()
 
-    assert args.length_thr is not None or args.length_percentile_thr is not None, "--length-thr and --length-percentile-thr can't all be None"
+    assert args.length_min is not None or args.length_percentile_min is not None, "--length-min and --length-percentile-min can't all be None"
+    assert args.length_max is not None or args.length_percentile_max is not None, "--length-max and --length-percentile-max can't all be None"
 
     ref_fa = args.ref_fa
 
@@ -201,8 +222,10 @@ def main_cli():
     bam_files = expand_bam_files(bam_files)
 
     for bam in bam_files:
-        main(bam_file=bam, n=args.n, force=args.force, length_thr=args.length_thr,
-             length_percentile_thr=args.length_percentile_thr, ref_fa=ref_fa)
+        main(bam_file=bam, n=args.n, force=args.force, length_min=args.length_min, length_max=args.length_max,
+             length_percentile_min=args.length_percentile_min,
+             length_percentile_max=args.length_percentile_max,
+             ref_fa=ref_fa)
 
 
 if __name__ == "__main__":

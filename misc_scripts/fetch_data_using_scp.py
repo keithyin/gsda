@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     uris = [
         # "user@192.168.3.125:/data1/EurusResV3/20260303_250302Y0004_Run0002/*.bam",
-        "user@192.168.3.125:/data1/EurusResV3/20260529_250302Y0004_Run0001/*_adapter.bam",
+        # "user@192.168.3.125:/data1/EurusResV3/20260629_250302Y0004_Run0002",
         # "user@192.168.3.123:/data1/EurusResV3/20260601_250214YJ006_Run0005/*.bam",
         # "user@192.168.3.117:/data1/EurusResV3/20260522_240601Y0012_Run0004/*.bam",
 
@@ -95,9 +95,9 @@ if __name__ == "__main__":
         # "user@192.168.3.189:/data1/EurusResV3/20260315_240901Y0006_Run0003/*.bam",
 
         # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0001/*.bam",
-        # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0002/*.bam",
-        # "user@192.168.3.72:/data1/EurusResV3/20260316_250302Y0001_Run0003/*.bam",
-
+        "user@192.168.3.72:/data1/EurusResV3/20260630_250302Y0001_Run0001",
+        "user@192.168.3.72:/data1/EurusResV3/20260630_250302Y0001_Run0002",
+        
         # "user@192.168.3.72:/data1/EurusResV3/20260318_250302Y0001_Run0001/*_called.bam",
         # "user@192.168.3.72:/data1/EurusResV3/20260318_250302Y0001_Run0002/*_called.bam",
         # "user@192.168.3.170:/data1/EurusResV3/20260318_250804Y0005_Run0002/*_called.bam",
@@ -119,7 +119,7 @@ if __name__ == "__main__":
             remote_user=user,
             remote_host=remote_host,
             remote_path=remote_path,
-            local_target_path="/data1/ccs_data/20260522-rna-1k/cDNA",
+            local_target_path="/data1/ccs_data/20260701-plasmid-amplicon/plasmid",
             ssh_key_path="~/.ssh/id_rsa",  # 可选
             port=22
         )

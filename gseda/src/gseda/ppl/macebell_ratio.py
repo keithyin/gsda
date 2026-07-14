@@ -120,9 +120,6 @@ def fastx_record_producer(path, queue):
         for read in in_file:
             seq = read.sequence
 
-            if len(seq) < 2500:
-                continue
-
             if seq:
                 queue.put(seq)
                 count += 1
