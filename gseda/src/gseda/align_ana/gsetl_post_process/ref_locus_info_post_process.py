@@ -58,9 +58,12 @@ def main() -> None:
             if cnt == 0:
                 break
             pos_val = row["pos"]
+            depth_val = int(row["depth"])
+            prop = cnt / depth_val if depth_val > 0 else float("inf")
             ab = row.get("aroundBases", "") or ""
             print(
-                f"  #{i+1:2d}  pos={pos_val:>8d}  {err_type:>3s}={cnt:>5d}  aroundBases={ab}")
+                f"  #{i+1:2d}  pos={pos_val:>8d}  {err_type:>3s}={cnt:>5d}/{depth_val:>5d}"
+                f"  ({prop:.2%})  aroundBases={ab}")
 
     # ---- aggregate errors by curBase + curIsHomo, compare homo vs non-homo ----
     # count total positions for each (base, curIsHomo) from the FULL dataframe (incl. zero-error rows)
