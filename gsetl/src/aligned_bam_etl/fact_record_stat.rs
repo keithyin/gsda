@@ -31,7 +31,7 @@ impl RecordReplica {
         Self {
             qname: record_ext.get_qname(),
             refname: refname,
-            ch: record_ext.get_ch().unwrap(), 
+            ch: record_ext.get_ch().unwrap_or(0), 
             q_len: record_ext.get_seq().len(), 
             passes: record_ext.get_np().unwrap_or(1), 
             rq: record_ext.get_rq(), 

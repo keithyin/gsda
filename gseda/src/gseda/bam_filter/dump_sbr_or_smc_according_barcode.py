@@ -67,10 +67,10 @@ def main_cli():
 
 if __name__ == "__main__":
     cli_args = {
-        "bam": "/data1/ccs_data/202603-henan-nongda/20260325_240601Y0009_Run0001/20260325_240601Y0009_Run0001_smc_8.bam",
+        "bam": "/data1/ccs_data/20260714-ggc-str/20260714_250701Y0006_Run0001_called_demuxed666_v4.bam",
         # "demuxed_file": "/data1/ccs_data/202603-henan-nongda/20260325_240601Y0009_Run0001/barcodes_reads_fastq_amplicon/Single-1_Double-231.fastq",
-        "demuxed_file": "/data1/ccs_data/202603-henan-nongda/20260325_240601Y0009_Run0001/Clust_0.reads.fasta",
-        "barcode_name": "231"
+        "demuxed_file": "/data1/ccs_data/20260714-ggc-str/257-0_STR_filtered.cutBarcodes.fastq",
+        "barcode_name": "257"
     }
     cli_args = Namespace(**cli_args)
     dump_bam_according_to_fastx_channel(cli_args.bam, cli_args.demuxed_file, cli_args.barcode_name)

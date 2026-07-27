@@ -70,12 +70,12 @@
 #  /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003.newmodel.stage1.norna-nofwdrev-nopoly.smc_all_reads.bam \
 
 
-python subreads_smc_funnel_stat.py /data1/REF_GENOMES/MG1655.fa  \
-    --s_bam /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003_adapter.bam \
-    --smc_bams \
-        /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003.newmodel.stage2.baseline.smc_all_reads.bam \
-        /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003.newmodel.stage2.smc_all_reads.bam \
-    --sbr_qv_thr 10
+# python subreads_smc_funnel_stat.py /data1/REF_GENOMES/MG1655.fa  \
+#     --s_bam /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003_adapter.bam \
+#     --smc_bams \
+#         /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003.newmodel.stage2.baseline.smc_all_reads.bam \
+#         /data1/ccs_data/202603-good-ecoli-data/20260311_240601Y0012_Run0003.newmodel.stage2.smc_all_reads.bam \
+#     --sbr_qv_thr 10
 
 
 
@@ -85,5 +85,8 @@ python subreads_smc_funnel_stat.py /data1/REF_GENOMES/poly-N-20260428_250302Y000
     --smc_bams \
         /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage2.baseline.smc_all_reads.bam \
         /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage2.smc_all_reads.bam \
-        /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage2.smc_all_reads.post.bam \
+        /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage2.denosing_polyn.smc_all_reads.bam \
+        /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage2.denosing_polyn_2.smc_all_reads.bam \
+        /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage3.smc_all_reads.bam \
+        /data1/ccs_data/20260428_250302Y0004_Run0002_polyN/20260428_250302Y0004_Run0002_adapter.newmodel.stage3.v5.smc_all_reads.bam \
     --sbr_qv_thr 10
