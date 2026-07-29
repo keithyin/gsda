@@ -32,11 +32,25 @@ fn base_cnt_map_2_str(base_cnt: &HashMap<u8, usize>) -> String {
     items.join(",")
 }
 
+fn ins_cnt_map_2_str(base_cnt: &HashMap<String, usize>) -> String {
+    let mut items = base_cnt
+        .iter()
+        .map(|(base, cnt)| (base.to_owned(), *cnt))
+        .collect::<Vec<_>>();
+    items.sort_by_key(|v| v.0.to_owned());
+
+    let items = items
+        .into_iter()
+        .map(|(base, cnt)| format!("{}:{}", base, cnt))
+        .collect::<Vec<_>>();
+    items.join(",")
+}
+
 struct LocusStat {
     pos: usize,
     eq: usize,
     diff: HashMap<u8, usize>,
-    ins: HashMap<u8, usize>,
+    ins: HashMap<String, usize>,
     del: usize,
     depth: usize, // how much records that aligned to this position
     cur_base: String,
@@ -79,7 +93,7 @@ impl LocusStat {
     }
 
     fn ins_str(&self) -> String {
-        base_cnt_map_2_str(&self.ins)
+        ins_cnt_map_2_str(&self.ins)
     }
 
     fn diff_tot(&self) -> usize {
@@ -156,7 +170,7 @@ pub fn fact_ref_locus_info(
         let mut ref_locus_stat = (0..refseq.len())
             .into_iter()
             .map(|pos| {
-                let around_start = if pos < 10 { 0 } else { pos - 10 };
+                let around_start = pos.saturating_sub(10);
                 let around_end = cmp::min(pos + 11, ref_seq_len);
 
                 let cur_is_homo = is_homo_pos(ref_seq_bytes, pos);
@@ -215,12 +229,18 @@ pub fn fact_ref_locus_info(
 
             let query_seq = record.seq().as_bytes();
 
+            let mut ins_base_tracker = "".to_string();
+
             for [qpos, rpos] in record.aligned_pairs_full() {
                 if qpos.is_some() {
                     qpos_cursor = qpos;
                 }
                 if rpos.is_some() {
                     rpos_cursor = rpos;
+                }
+
+                if qpos.is_none() && rpos.is_none() {
+                    continue;
                 }
 
                 if let Some(rpos_cursor_) = rpos_cursor {
@@ -259,7 +279,17 @@ pub fn fact_ref_locus_info(
                     // deletion
                     unsafe {
                         ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).del += 1;
+                        if !ins_base_tracker.is_empty() {
+                            *ref_locus_stat
+                                .get_unchecked_mut(rpos.unwrap() as usize)
+                                .ins
+                                .entry(ins_base_tracker)
+                                .or_insert(0) += 1;
+
+                            ins_base_tracker = "".to_string();
+                        }
                     }
+
                     continue;
                 }
 
@@ -267,27 +297,32 @@ pub fn fact_ref_locus_info(
                     // insertion
                     unsafe {
                         let ins_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
-                        *ref_locus_stat
-                            .get_unchecked_mut(rpos_cur_or_pre)
-                            .ins
-                            .entry(ins_base)
-                            .or_insert(0) += 1;
+                        ins_base_tracker.push(ins_base as char);
                     }
                     continue;
                 }
 
                 unsafe {
-                    if *refseq.get_unchecked(rpos.unwrap() as usize)
-                        == *query_seq.get_unchecked(qpos.unwrap() as usize)
-                    {
+                    let refbase = *refseq.get_unchecked(rpos.unwrap() as usize);
+                    let querybase = *query_seq.get_unchecked(qpos.unwrap() as usize);
+                    if refbase == querybase {
                         ref_locus_stat.get_unchecked_mut(rpos_cur_or_pre).eq += 1;
                     } else {
-                        let diff_base = *query_seq.get_unchecked(qpos.unwrap() as usize);
                         *ref_locus_stat
                             .get_unchecked_mut(rpos_cur_or_pre)
                             .diff
-                            .entry(diff_base)
+                            .entry(querybase)
                             .or_insert(0) += 1;
+                    }
+
+                    if !ins_base_tracker.is_empty() {
+                        *ref_locus_stat
+                            .get_unchecked_mut(rpos.unwrap() as usize)
+                            .ins
+                            .entry(ins_base_tracker)
+                            .or_insert(0) += 1;
+
+                        ins_base_tracker = "".to_string();
                     }
                 }
             }
