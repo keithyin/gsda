@@ -41,6 +41,7 @@ class Settings:
         ("low-q-analysis", "gseda.ppl.low_q_analysis:main_cli"),
         ("homo-and-str-ratio", "gseda.ppl.homo_and_str_region_coverage:main_cli"),
         ("macebell-ratio", "gseda.ppl.macebell_ratio:main_cli"),
+        ("raw-bam-analysis", "gseda.md_analysis.raw_bam_analysis:main_cli"),
     ]
 
     # Binary tool executables - tools that are pre-compiled binaries (Rust, C, etc.)

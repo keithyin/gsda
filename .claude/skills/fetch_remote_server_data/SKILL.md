@@ -31,7 +31,7 @@ Use this skill when user requests:
 
 The data fetching script is:
 
-/root/projects/gsda/misc_scripts/fetch_data_using_scp_cli.py
+misc_scripts/fetch_data_using_scp_cli.py
 
 
 Never implement scp manually.
@@ -170,7 +170,7 @@ Only continue after verification succeeds.
 
 Use:
 
-python3 /root/projects/gsda/misc_scripts/fetch_data_using_scp_cli.py
+python3 misc_scripts/fetch_data_using_scp_cli.py
 
 
 Arguments:
@@ -199,7 +199,7 @@ Target:
 Example:
 
 
-python3 /root/projects/gsda/misc_scripts/fetch_data_using_scp_cli.py \
+python3 misc_scripts/fetch_data_using_scp_cli.py \
     -i 37 \
     -d Run0002 \
     -p bam \
@@ -225,7 +225,7 @@ Before fetching data:
 
 Run:
 
-scripts/ensure_ssh_access.sh <ip>
+.claude/skills/fetch_remote_server_data/scripts/ensure_ssh_access.sh <ip>
 
 Only continue if output contains:
 
