@@ -46,6 +46,7 @@ def generate_metric_file(
     short_aln=False,
     np_range=None,
     rq_range=None,
+    ref_anchored=False
 ) -> str:
 
     if no_supp and no_mar:
@@ -64,7 +65,9 @@ def generate_metric_file(
             -t {ref_fasta} \
             --out {out_filename} \
             --kmer 11 \
-            --wins 1 """
+            --wins 1  """
+    if ref_anchored:
+        cmd += " --refAnchored "
     if short_aln:
         cmd += " --short-aln"
 
@@ -82,9 +85,20 @@ def generate_metric_file(
 def stats(metric_filename, filename):
     pattern = r"\(([^)]+)\)(\d+)"
     # r"\(([^)]+)\)(\d+)"
-    df = pl.read_csv(
-        metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
-    )
+    if isinstance(metric_filename, (list, tuple)):
+        dfs = [
+            pl.read_csv(
+                mf,
+                separator="\t",
+                schema_overrides={"longIndel": pl.String},
+            )
+            for mf in metric_filename
+        ]
+        df = pl.concat(dfs)
+    else:
+        df = pl.read_csv(
+            metric_filename, separator="\t", schema_overrides={"longIndel": pl.String}
+        )
     df = df.filter(pl.col("rname") != "")
 
     df = (df
@@ -125,6 +139,7 @@ def main(
     copy_bam_file=False,
     np_range=None,
     rq_range=None,
+    ref_anchored=False,
 ) -> str:
     """
         step1: generate detailed metric info
@@ -182,6 +197,7 @@ def main(
         short_aln=short_aln,
         np_range=np_range,
         rq_range=rq_range,
+        ref_anchored=ref_anchored
     )
     aggr_metric_filename = f"{outdir}/{stem}.gsmm2-hp-tr-aggr.csv"
     if force and os.path.exists(aggr_metric_filename):
@@ -212,6 +228,12 @@ def main_cli():
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
+            "--ref-anchored",
+            action="store_true",
+            default=False,
+            help="regenerate the metric file if exists",
+        )
+    parser.add_argument(
         "-f", "--force",
         action="store_true",
         default=False,
@@ -226,9 +248,20 @@ def main_cli():
 
     assert len(bam_files) == len(refs)
 
+    all_fact_filenames = []
+    last_outdir = None
     for bam, ref in zip(bam_files, refs):
-        main(bam_file=bam, ref_fa=ref, force=args.force,
-             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range)
+        _, fact_metric_filename = main(bam_file=bam, ref_fa=ref, force=args.force,
+             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range, ref_anchored=args.ref_anchored)
+        all_fact_filenames.append(fact_metric_filename)
+        last_outdir = os.path.dirname(fact_metric_filename)
+
+    # 最终整合：合并所有样本的 fact 数据，重算 motif 级统计
+    if all_fact_filenames and last_outdir:
+        merged_aggr_filename = os.path.join(
+            last_outdir, "merged.gsmm2-hp-tr-aggr.csv")
+        stats(all_fact_filenames, filename=merged_aggr_filename)
+        logging.info("merged aggr: %s", merged_aggr_filename)
 
 
 if __name__ == "__main__":

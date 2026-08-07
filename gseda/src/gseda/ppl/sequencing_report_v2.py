@@ -95,18 +95,21 @@ def dump_bam_basic(bam_file: str, output_dir: str) -> str:
     output_csv = f"{output_dir}/{stem}.basic.csv"
     with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False, threads=os.cpu_count()) as in_bam:
         for record in tqdm(in_bam.fetch(until_eof=True), desc=f"bam_basic_ana, reading {bam_file}"):
-            num_pass = 0
-            if record.has_tag("np"):
-                num_pass = record.get_tag("np")
+            try:
+                num_pass = 0
+                if record.has_tag("np"):
+                    num_pass = record.get_tag("np")
 
-            if record.has_tag("cq"):  # called.bam or adapter.bam
-                rq = record.get_tag('cq')
-            else:
-                rq = -10 * math.log10(1-record.get_tag("rq") + 1e-6)
-            qnames.append(record.query_name)
-            num_passes.append(num_pass)
-            rq_values.append(rq)
-            read_lengths.append(len(record.query_sequence))
+                if record.has_tag("cq"):  # called.bam or adapter.bam
+                    rq = record.get_tag('cq')
+                else:
+                    rq = -10 * math.log10(1-record.get_tag("rq") + 1e-6)
+                qnames.append(record.query_name)
+                num_passes.append(num_pass)
+                rq_values.append(rq)
+                read_lengths.append(len(record.query_sequence))
+            except Exception as _:
+                pass
 
     if len(qnames) == 0:
         return None
