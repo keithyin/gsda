@@ -128,6 +128,15 @@ def stats(metric_filename, filename):
 
     df.write_csv(filename, include_header=True, separator="\t")
 
+    df_agg_all = df.select([pl.col("aligned_span").sum(), pl.col(
+        "eq").sum(), pl.col("diff").sum(), pl.col("ins").sum(), pl.col("del").sum()]).with_columns([
+            (pl.col("eq") / pl.col("aligned_span")).alias("eq_rate"),
+            (pl.col("diff") / pl.col("aligned_span")).alias("diff_rate"),
+            (pl.col("ins") / pl.col("aligned_span")).alias("ins_rate"),
+            (pl.col("del") / pl.col("aligned_span")).alias("del_rate"),
+        ])
+    print(df_agg_all)
+
 
 def main(
     bam_file: str,
@@ -167,8 +176,7 @@ def main(
 
     env_prepare.check_and_install(
         "gsmm2-metric", semver.Version.parse("0.4.1"), "cargo install gsmm2-metric")
-   
-        
+
     if copy_bam_file:
         assert outdir is not None, "must provide outdir when copy_bam_file=True"
         if not os.path.exists(outdir):
@@ -228,11 +236,11 @@ def main_cli():
     parser.add_argument("--short-aln", type=int, default=0,
                         help="for query or target in [30, 200]", dest="short_aln")
     parser.add_argument(
-            "--ref-anchored",
-            action="store_true",
-            default=False,
-            help="regenerate the metric file if exists",
-        )
+        "--ref-anchored",
+        action="store_true",
+        default=False,
+        help="regenerate the metric file if exists",
+    )
     parser.add_argument(
         "-f", "--force",
         action="store_true",
@@ -252,7 +260,7 @@ def main_cli():
     last_outdir = None
     for bam, ref in zip(bam_files, refs):
         _, fact_metric_filename = main(bam_file=bam, ref_fa=ref, force=args.force,
-             short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range, ref_anchored=args.ref_anchored)
+                                       short_aln=args.short_aln == 1, np_range=args.np_range, rq_range=args.rq_range, ref_anchored=args.ref_anchored)
         all_fact_filenames.append(fact_metric_filename)
         last_outdir = os.path.dirname(fact_metric_filename)
 
