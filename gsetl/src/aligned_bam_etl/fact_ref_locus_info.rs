@@ -161,9 +161,13 @@ pub fn fact_ref_locus_info(
     let pb = set_spin_pb(pbar, format!("fact_ref_locus_info"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
-        bam_h
-            .fetch((refname, 0, refseq.len() as u64))
-            .expect(&format!("fetch {} error", refname));
+        match bam_h.fetch((refname, 0, refseq.len() as u64)) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("fetch error target_name:{}, err={} ", refname, err);
+                continue;
+            }
+        }
         let ref_seq_len = refseq.len();
         let ref_seq_bytes = refseq.as_bytes();
 

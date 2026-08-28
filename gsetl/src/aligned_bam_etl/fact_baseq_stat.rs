@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    eprintln,
     fmt::Display,
     fs,
     io::{BufWriter, Write},
@@ -80,9 +81,13 @@ pub fn fact_baseq_stat(
     let pb = set_spin_pb(pbar, format!("fact_baseq_stat"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
-        bam_h
-            .fetch((refname, 0, refseq.len() as u64))
-            .expect(&format!("fetch {} error", refname));
+        match bam_h.fetch((refname, 0, refseq.len() as u64)) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("fact_baseq_stat --> fetch error target_name:{}, err={} ", refname, err);
+                continue;
+            }
+        }
 
         let mut baseq2stat = HashMap::new();
 
@@ -110,6 +115,8 @@ pub fn fact_baseq_stat(
             let qual = record.qual();
 
             let mut pre_is_del = false;
+
+            // let mut pre_del_cnt = 0;
             /*
                ref  : ACGTA--GT
                query: A--GTACGT
@@ -169,18 +176,18 @@ pub fn fact_baseq_stat(
                     let baseq = qual[qpos_cursor.unwrap() as usize];
                     let stat = baseq2stat.entry(baseq).or_insert(BaseQStat::new(baseq));
                     stat.depth += 1;
+                    // stat.
                     if pre_is_del {
                         stat.del += 1;
-                    } else {
-                        if let Some(r_pos_) = rpos.map(|v| v as usize) {
-                            if refseq_bytes[r_pos_] == query_seq[q_pos_] {
-                                stat.eq += 1;
-                            } else {
-                                stat.diff += 1;
-                            }
+                    }
+                    if let Some(r_pos_) = rpos.map(|v| v as usize) {
+                        if refseq_bytes[r_pos_] == query_seq[q_pos_] {
+                            stat.eq += 1;
                         } else {
-                            stat.ins += 1;
+                            stat.diff += 1;
                         }
+                    } else {
+                        stat.ins += 1;
                     }
                 }
 

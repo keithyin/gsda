@@ -65,3 +65,23 @@ gsetl -f --outdir ${outdir} aligned-bam --bam ../asts/aligned.bam --ref-file ../
 * qseq	
 * rseq
 
+
+## 错误位点分析
+
+```
+gsmm2 align -q 20260728_240601Y0004_Run0004_demuxed.boost50.even-odd.smc_all_reads.post.bam -t ../ref_1k.fasta -p boost2ref-1k-rna --np-range 5:100
+
+
+
+ asrtc --ref-fa ../ref_1k.fasta    -q 20260728_240601Y0004_Run0004_demuxed.boost50.even-odd.bam    -t 20260728_240601Y0004_Run0004_demuxed.boost50.even-odd.smc_all_reads.post.bam  -p boost50  --np-range 7:100 --oupIyT 0.8 --oupCovT 0.3
+
+
+
+gsetl --outdir boost50-gsetl  aligned-bam --ref-file ../ref_1k.fasta --bam boost2ref-1k-rna.bam
+
+
+
+python /root/projects/gsda/gseda/src/gseda/align_ana/gsetl_post_process/ref_locus_info_post_process.py  boost50-gsetl/fact_aligned_bam_ref_locus_info.csv
+
+
+```

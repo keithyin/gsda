@@ -262,7 +262,7 @@ def main(args):
 
     o_prefix = f"{smc_root}/{smc_stem}.aligned"
 
-    gsmm2_cmd = f"gsmm2 align -q {args.smc_bam} -t {args.ref} --noMar -p {o_prefix}"
+    gsmm2_cmd = f"gsmm2 align -q {args.smc_bam} -t {args.ref} --noMar -p {o_prefix} --query-forward --polyNGapLeftAlign "
     if args.np_range is not None:
         gsmm2_cmd += f" --np-range {args.np_range}"
     if args.rq_range is not None:

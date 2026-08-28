@@ -71,6 +71,13 @@ pub struct AlignedBamParams {
     pub use_supp: bool,
 
     #[arg(
+        long = "polyGapLeftAlign",
+        help = "normalize homopolymer indel placement (left-align gaps) before walking the \
+                alignment. only affects factBaseQStat"
+    )]
+    pub poly_gap_left_align: bool,
+
+    #[arg(
         long = "factRecordStat",
         default_value_t = 1,
         help = "generate factRecordStat table or not"

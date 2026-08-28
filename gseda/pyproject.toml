@@ -59,6 +59,7 @@ dump-specified-barcode-sbr = "gseda.bam_filter.dump_sbr_according_barcode:main_c
 subreads-smc-funnel-stat = "gseda.ppl.subreads_smc_funnel_stat:main_cli"
 
 raw-bam-analysis = "gseda.md_analysis.raw_bam_analysis:main_cli"
+seq-search-cli = "gseda.seq_search.seq_search:main_cli"
 
 # Server web service entry point
 gseda-server = "gseda.server.start_server:main"

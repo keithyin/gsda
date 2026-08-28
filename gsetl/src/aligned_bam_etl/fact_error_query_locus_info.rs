@@ -6,7 +6,9 @@ use std::{
 };
 
 use gskits::{
-    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo}, gsbam::bam_record_ext::BamRecordExt, pbar
+    file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
+    gsbam::bam_record_ext::BamRecordExt,
+    pbar,
 };
 use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
@@ -66,7 +68,7 @@ pub fn fact_error_query_locus_info(
     hc_regions: Option<&BedInfo>,
     hc_variants: Option<&VcfInfo>,
     fasta_data: &FastaData,
-    pbar: ProgressBar
+    pbar: ProgressBar,
 ) {
     let bam_file = &args.bam;
 
@@ -83,12 +85,20 @@ pub fn fact_error_query_locus_info(
     )
     .unwrap();
 
-    let pb = set_spin_pb(pbar, format!("fact_error_query_locus_info"), pbar::DEFAULT_INTERVAL);
+    let pb = set_spin_pb(
+        pbar,
+        format!("fact_error_query_locus_info"),
+        pbar::DEFAULT_INTERVAL,
+    );
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
-        bam_h
-            .fetch((refname, 0, refseq.len() as u64))
-            .expect(&format!("fetch {} error", refname));
+        match bam_h.fetch((refname, 0, refseq.len() as u64)) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("fetch error target_name:{}, err={} ", refname, err);
+                continue;
+            }
+        }
 
         let refseq_bytes = refseq.as_bytes();
 
@@ -214,18 +224,17 @@ pub fn fact_error_query_locus_info(
                         }
                     }
                 }
-
-
             }
 
             // dump
             let record_ext = BamRecordExt::new(&record);
             let qname = record_ext.get_qname();
 
-            record_err_locus_info.into_iter().for_each(|error_locus_info| {
-                writeln!(&mut o_file_buff_writer, "{}\t{}", qname, error_locus_info).unwrap();
-            });
-
+            record_err_locus_info
+                .into_iter()
+                .for_each(|error_locus_info| {
+                    writeln!(&mut o_file_buff_writer, "{}\t{}", qname, error_locus_info).unwrap();
+                });
         }
     }
     pb.finish();

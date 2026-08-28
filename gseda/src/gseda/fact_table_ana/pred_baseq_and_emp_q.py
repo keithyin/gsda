@@ -46,7 +46,7 @@ def main(args):
         perfect_line.to_pandas(), x="x", y="y", ax=axs, color="blue", linestyle="--"
     )
 
-    print(df.head(60))
+    print(df)
 
     summary = df.select([
         (pl.col("depth").filter(pl.col("baseq") >= 20).sum() /

@@ -5,6 +5,17 @@ import os
 import argparse
 import json
 
+import pysam
+
+def smc_bam_has_directional_qname(smc_bam: str):
+    """Return True if any record qname ends with 'fwd' or 'rev'."""
+    with pysam.AlignmentFile(smc_bam, mode="rb", check_sq=False) as bam_in:
+        for record in bam_in:
+            if record.query_name.endswith(("fwd", "rev")):
+                return True
+    return False
+
+
 def asts_alignment(query_bam: str, target_bam: str, np_thr: int, rq_thr: float):
     target_bam_path = pathlib.Path(target_bam)
     o_dir = str(target_bam_path.parent)
@@ -26,6 +37,9 @@ def main(args):
 
     smc_bam = args.smc_bam
     sbr_bam = args.sbr_bam
+
+    if smc_bam_has_directional_qname(smc_bam):
+        return ""
 
     sbr2smc_alignment = asts_alignment(
         sbr_bam, smc_bam, np_thr=args.np_thr, rq_thr=args.rq_thr)

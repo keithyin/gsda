@@ -82,7 +82,8 @@ def fetch_by_pattern(
     local_target,
     ssh_key_path,
     port,
-    pattern
+    pattern,
+    full_path=False
 ):
     """
     根据指定模式拉取远程数据
@@ -94,6 +95,7 @@ def fetch_by_pattern(
     :param ssh_key_path: SSH 私钥路径
     :param port: SSH 端口
     :param pattern: all=全目录, bam=*.bam, called=*_called.bam, adapter=*_adapter.bam
+    :param full_path: True 时 base_remote 为完整远程路径（目录或单个文件），不做前缀拼接且不加尾部斜杠
     """
     # 创建本地目标目录
     mkdir_p(local_target)
@@ -114,7 +116,11 @@ def fetch_by_pattern(
             "-o", "UserKnownHostsFile=/dev/null"
         ]
 
-        remote_spec = f"{remote_user}@{remote_host}:{base_remote}/"
+        remote_spec = f"{remote_user}@{remote_host}:{base_remote}"
+        # full_path 模式下 base_remote 可能是单个文件（不能加尾部斜杠）；
+        # 否则视为目录，加尾部斜杠以便 scp 复制到本地目标目录下
+        if not full_path:
+            remote_spec += "/"
         cmd += [remote_spec, local_target]
 
         print(f"\n{'='*60}")
@@ -200,6 +206,9 @@ def main():
 
   # 自定义目标目录和 SSH key
   python fetch_data_using_scp_cli.py -i 37 -d Run0002 -t /data1/my_dir -k ~/.ssh/my_key
+
+  # 拉取远程任意完整路径（目录或单个文件，不拼接默认前缀）
+  python fetch_data_using_scp_cli.py -i 37 -d /data2/ReProcess/Run0002_called.bam -p all --full-path
 """
     )
 
@@ -207,6 +216,8 @@ def main():
                         help="IP 地址最后一位，如 37（完整 IP: 192.168.3.<IP>）")
     parser.add_argument("--dir", "-d", type=str, required=True,
                         help="远程目录名，如 Run0002 或 20260722_250302Y0006_Run0002")
+    parser.add_argument("--full-path", "--fp", dest="full_path", action="store_true",
+                        help="将 --dir/-d 视为远程完整路径（支持任意目录或文件），不拼接 /data1/EurusResV3/ 前缀")
     parser.add_argument("--pattern", "-p", type=str, default="all",
                         choices=["all", "bam", "called", "adapter"],
                         help="拉取模式：all=全目录, bam=*.bam, called=*_called.bam, adapter=*_adapter.bam (默认: all)")
@@ -224,8 +235,11 @@ def main():
     # 拼接远程主机 IP
     remote_host = f"192.168.3.{args.ip}"
 
-    # 构建基准远程路径
-    base_remote = f"/data1/EurusResV3/{args.dir}"
+    # 构建基准远程路径（--full-path 时视为完整路径，否则拼接默认前缀）
+    if args.full_path:
+        base_remote = args.dir
+    else:
+        base_remote = f"/data1/EurusResV3/{args.dir}"
 
     # 展开 SSH key 路径（处理 ~ 符号）
     ssh_key_path = os.path.expanduser(args.key)
@@ -245,6 +259,7 @@ def main():
         ssh_key_path=ssh_key_path,
         port=args.port,
         pattern=args.pattern,
+        full_path=args.full_path,
     )
 
     sys.exit(0 if success else 1)

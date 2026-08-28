@@ -4,10 +4,7 @@ use std::{
     io::{BufWriter, Write},
 };
 
-use gskits::{
-    gsbam::bam_record_ext::BamRecordExt,
-    pbar,
-};
+use gskits::{gsbam::bam_record_ext::BamRecordExt, pbar};
 use indicatif::ProgressBar;
 use rust_htslib::bam::{self, ext::BamRecordExtensions, Read};
 
@@ -30,7 +27,7 @@ struct BasicInfo<'a> {
     qlen: usize,
     is_forward: bool,
     ori_start: usize,
-    ori_end: usize
+    ori_end: usize,
 }
 
 impl<'a> BasicInfo<'a> {
@@ -49,7 +46,7 @@ impl<'a> BasicInfo<'a> {
         qlen: usize,
         is_forward: bool,
         ori_start: usize,
-        ori_end: usize
+        ori_end: usize,
     ) -> Self {
         Self {
             qname,
@@ -66,7 +63,7 @@ impl<'a> BasicInfo<'a> {
             qlen,
             is_forward,
             ori_start,
-            ori_end
+            ori_end,
         }
     }
 
@@ -104,7 +101,7 @@ pub fn fact_bam_basic(
     args: &AlignedBamParams,
     output_dir: &str,
     fasta_data: &FastaData,
-    pbar: ProgressBar
+    pbar: ProgressBar,
 ) {
     let bam_file = &args.bam;
 
@@ -119,9 +116,13 @@ pub fn fact_bam_basic(
     let pb = set_spin_pb(pbar, format!("fact_bam_basic"), pbar::DEFAULT_INTERVAL);
 
     for (refname, refseq) in fasta_data.get_ref_name2seq() {
-        bam_h
-            .fetch((refname, 0, refseq.len() as u64))
-            .expect(&format!("fetch {} error", refname));
+        match bam_h.fetch((refname, 0, refseq.len() as u64)) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("fetch error target_name:{}, err={} ", refname, err);
+                continue;
+            }
+        }
 
         for record in bam_h.records() {
             pb.inc(1);
@@ -160,7 +161,7 @@ pub fn fact_bam_basic(
                 qlen,
                 !record.is_reverse(),
                 be[0] as usize,
-                be[1] as usize
+                be[1] as usize,
             );
 
             writeln!(&mut o_file_buff_writer, "{}", basic_info).unwrap();

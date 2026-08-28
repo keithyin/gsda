@@ -17,6 +17,14 @@ import pysam
 from tqdm import tqdm
 
 
+def _typecode_bounds(typecode: str) -> tuple:
+    """Return the (min, max) values representable by array.array's `typecode`."""
+    nbits = array.array(typecode).itemsize * 8
+    if typecode.islower():  # lowercase typecodes are signed
+        return (-(2 ** (nbits - 1)), 2 ** (nbits - 1) - 1)
+    return (0, 2**nbits - 1)
+
+
 def boost_dw(
     input_bam: str,
     output_bam: str,
@@ -42,8 +50,13 @@ def boost_dw(
                 dw = record.get_tag("dw")
                 if isinstance(dw, array.array):
                     # Preserve the original typecode (B/S/I) so the stored BAM type is unchanged
+                    lo, hi = _typecode_bounds(dw.typecode)
                     record.set_tag(
-                        "dw", array.array(dw.typecode, (v + boost for v in dw))
+                        "dw",
+                        array.array(
+                            dw.typecode,
+                            (min(max(v + boost, lo), hi) for v in dw),
+                        ),
                     )
                 elif isinstance(dw, (list, tuple)):
                     record.set_tag("dw", [v + boost for v in dw])

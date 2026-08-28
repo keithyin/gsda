@@ -77,6 +77,6 @@ def main_cli():
     args = parser.parse_args()
     dump_deletion_reads(args.bam, args.positions, args.num)
 
-
+# python /root/projects/gsda/gseda/src/gseda/aligned_bam_ana/dump_deletion_channels.py --bam boost2ref-1k-rna.bam --positions 557 --nums 100000000000000 > failed-channels.txt
 if __name__ == "__main__":
     main_cli()

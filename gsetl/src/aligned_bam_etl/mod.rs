@@ -1,6 +1,7 @@
-use std::{collections::HashMap, fs, io::BufReader};
+use std::{collections::HashMap, format, fs, io::BufReader};
 
 use gskits::{
+    dna::reverse_complement,
     fastx_reader::{fasta_reader::FastaFileReader, fastq_reader::FastqReader},
     file_reader::{bed_reader::BedInfo, vcf_reader::VcfInfo},
     gsbam::bam_record_ext::{BamReader, BamRecord, BamRecordExt},
@@ -9,12 +10,12 @@ use rust_htslib::bam::Read;
 
 use crate::cli::AlignedBamParams;
 
-pub mod fact_record_stat;
-pub mod fact_ref_locus_info;
-pub mod fact_error_query_locus_info;
 pub mod fact_bam_basic;
 pub mod fact_baseq_stat;
+pub mod fact_error_query_locus_info;
 pub mod fact_poly_info;
+pub mod fact_record_stat;
+pub mod fact_ref_locus_info;
 
 pub struct FastaData {
     ref_name2seq: HashMap<String, String>,
@@ -55,6 +56,18 @@ impl FastaData {
                 );
             };
 
+        let ref_name2seq = ref_name2seq
+            .into_iter()
+            .flat_map(|(key, value)| {
+                [
+                    (key.clone(), value.clone()),
+                    (format!("{}___fwd", key), value.clone()),
+                    (format!("{}___rev", key), reverse_complement(&value)),
+                ]
+                .into_iter()
+            })
+            .collect::<HashMap<String, String>>();
+
         Self { ref_name2seq }
     }
 
@@ -89,7 +102,6 @@ pub fn get_hcvariants(vcf_file: Option<&str>) -> Option<VcfInfo> {
         None
     }
 }
-
 
 pub fn audit(record: &BamRecord, param: &AlignedBamParams) -> bool {
     if record.is_unmapped() {

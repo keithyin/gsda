@@ -35,11 +35,34 @@ def asts_bam_identity(asts_bam_file: str):
     return identity_count, coverage_count, identity_m_coverage_count
 
 
-def plot_core(counts, ax, tag):
+def _probabilities(counts):
+    # 将 {value: frequency} 换算成 0-100 全量概率向量
     all_values = list(range(0, 101))
     total_count = sum([v for _, v in counts.items()])
     frequencies = [counts.get(value, 0) for value in all_values]
-    probabilities = [freq/total_count for freq in frequencies]
+    return all_values, [freq/total_count for freq in frequencies]
+
+
+def top5_report(counts, tag):
+    # 统计：返回频次最高的前 5 个值的报告字符串
+    all_values, probabilities = _probabilities(counts)
+    top5_indices = sorted(range(len(probabilities)),
+                          key=lambda i: probabilities[i],
+                          reverse=True)[:5]
+
+    report_str_inner = ""
+    # 打印结果
+    for i, idx in enumerate(top5_indices):
+        prob = probabilities[idx]
+        value = all_values[idx]  # 获取对应的原始值
+        inner = f"- {tag} Rank: {i+1}, Value={value}, Freq={prob*100:.2f}% \n"
+        report_str_inner += inner
+    return report_str_inner
+
+
+def draw_axis(counts, ax, tag):
+    # 绘图：在 ax 上画出频数直方图
+    all_values, probabilities = _probabilities(counts)
     # 频数直方图
     bars1 = ax.bar(all_values, probabilities, color='skyblue',
                    edgecolor='navy', alpha=0.7, width=0.8)
@@ -56,50 +79,56 @@ def plot_core(counts, ax, tag):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height + max(probabilities)*0.01,
                     f'{freq:.2f}', ha='center', va='bottom', fontsize=8)
+    return ax
 
-    # print(f"{tag}: 覆盖的数值个数> {sum(1 for f in frequencies if f > 0)}")
-    # print(f"缺失的数值: {[i for i in range(0, 41) if i not in counts]}")
 
-    sorted_indices = sorted(range(len(probabilities)),
-                            key=lambda i: probabilities[i],
-                            reverse=True)
-    top5_indices = sorted_indices[:5]
+def threshold_report(counts, tag, thresholds):
+    # 统计：value 分别大于各阈值的 read 占比（累计比例）
+    total_count = sum([v for _, v in counts.items()])
+    lines = []
+    for t in thresholds:
+        pass_count = sum(v for k, v in counts.items() if k > t)
+        ratio = pass_count / total_count if total_count else 0.0
+        lines.append(f"- {tag} > {t}: {pass_count}/{total_count} ({ratio*100:.2f}%) \n")
+    return "".join(lines)
 
-    report_str_inner = ""
-    # 打印结果
-    for i, idx in enumerate(top5_indices):
-        prob = probabilities[idx]
-        value = all_values[idx]  # 获取对应的原始值
-        inner = f"- {tag} Rank: {i+1}, Value={value}, Freq={prob*100:.2f}% \n"
-        report_str_inner += inner
-    return report_str_inner
+
+def build_report(identity_count, coverage_count, id_cv_count):
+    # 组装文本报告
+    total_count = sum([v for _, v in identity_count.items()])
+    report_str_inner = f"- Subreads Processed: {total_count} \n"
+
+    report_str_inner += top5_report(identity_count, "Identity")
+    report_str_inner += threshold_report(
+        identity_count, "Identity", [91, 90, 89, 88, 87, 86, 85, 75, 50])
+    report_str_inner += "- \n"
+
+    report_str_inner += top5_report(coverage_count, "Coverage")
+    report_str_inner += threshold_report(
+        coverage_count, "Coverage",
+        [99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 75, 50])
+    report_str_inner += "- \n"
+
+    report_str_inner += top5_report(id_cv_count, "Identity * Coverage")
+
+    return f"""
+================= Asts Report =================
+{report_str_inner}
+===============================================
+"""
 
 
 def plot(identity_count, coverage_count, id_cv_count, dest_filepath):
     # 创建子图
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(15, 10))
 
-    total_count = sum([v for _, v in identity_count.items()])
-    report_str_inner = f"- Subreads Processed: {total_count} \n"
-
-    report_str_inner += plot_core(identity_count, ax1, tag="Identity")
-    report_str_inner += "- \n"
-
-    report_str_inner += plot_core(coverage_count, ax2, tag="Coverage")
-    report_str_inner += "- \n"
-
-    report_str_inner += plot_core(id_cv_count, ax3, tag="Identity * Coverage")
-
-    report_str = f"""
-================= Asts Report =================
-{report_str_inner}
-===============================================
-"""
+    draw_axis(identity_count, ax1, tag="Identity")
+    draw_axis(coverage_count, ax2, tag="Coverage")
+    draw_axis(id_cv_count, ax3, tag="Identity * Coverage")
 
     plt.tight_layout()
     plt.savefig(dest_filepath)
-    print(report_str)
-    return report_str
+    return
 
 
 def main_cli():
@@ -116,6 +145,21 @@ def main_cli():
     pass
 
 
+def smc_has_stranded_reads(smc_bam: str) -> bool:
+    with pysam.AlignmentFile(smc_bam, mode="rb") as bam:
+        for record in bam:
+            name = record.query_name
+            if name.endswith("fwd") or name.endswith("rev"):
+                return True
+    return False
+
+
+def concat_bams(bam_files, out_bam: str):
+    cmd = "samtools cat " + " ".join(bam_files) + f" -o {out_bam}"
+    subprocess.check_call(cmd, shell=True)
+    subprocess.check_call(f"samtools index {out_bam}", shell=True)
+
+
 def main(args):
 
     subreads_bam = args.sbr_bam
@@ -124,18 +168,39 @@ def main(args):
     smc_path = pathlib.Path(smc_bam)
     prefix = smc_path.parent.joinpath(f"{smc_path.stem}.asts")
 
-    asts_cmd = f"asts -q {subreads_bam} -t {smc_bam} -p {prefix} --np-range {args.np_range} --rq-range {args.rq_range} --ptTags dw"
-    print(f"running: {asts_cmd}")
+    shared_flags = (f"--np-range {args.np_range} "
+                    f"--rq-range {args.rq_range} "
+                    f"--ptTags dw")
 
-    subprocess.check_call(asts_cmd, shell=True)
-    print("")
+    if smc_has_stranded_reads(smc_bam):
+        for strand, flag in (("fwd", "--fwd-only"), ("rev", "--rev-only")):
+            prefix_strand = f"{prefix}.{strand}"
+            asts_cmd = (f"asts -q {subreads_bam} -t {smc_bam} "
+                        f"-p {prefix_strand} {flag} {shared_flags}")
+            print(f"running: {asts_cmd}")
+            subprocess.check_call(asts_cmd, shell=True)
+            print("")
+        concat_bams([f"{prefix}.fwd.bam", f"{prefix}.rev.bam"],
+                    f"{prefix}.bam")
+    else:
+        asts_cmd = (f"asts -q {subreads_bam} -t {smc_bam} -p {prefix} "
+                    f"{shared_flags}")
+        print(f"running: {asts_cmd}")
+        subprocess.check_call(asts_cmd, shell=True)
+        print("")
 
     identity_count, coverage_count, id_cv_count = asts_bam_identity(
         f"{prefix}.bam")
     dest_img_path = f"{prefix}.q_dist.jpg"
-    report_str = plot(identity_count=identity_count, coverage_count=coverage_count,
-                      id_cv_count=id_cv_count, dest_filepath=dest_img_path)
+
+    plot(identity_count=identity_count, coverage_count=coverage_count,
+         id_cv_count=id_cv_count, dest_filepath=dest_img_path)
     print(f"dest_image_path: {dest_img_path}")
+
+    report_str = build_report(identity_count=identity_count,
+                              coverage_count=coverage_count,
+                              id_cv_count=id_cv_count)
+    print(report_str)
     return report_str
 
 
