@@ -8,6 +8,7 @@ import numpy as np
 import subprocess
 import pathlib
 import sys
+import shutil
 cur_path = pathlib.Path(os.path.abspath(__file__))
 cur_dir = cur_path.parent
 prev_dir = cur_path.parent.parent
@@ -123,6 +124,7 @@ def plot_rq_iy_scatter(df: pl.DataFrame, o_prefix=None):
     if o_prefix is not None:
         fname = f"{o_prefix}-{fname}"
     figure.savefig(fname=fname)
+    return fname
 
 
 def plot_predQ20_but_lower_Q20(df: pl.DataFrame, o_prefix=None):
@@ -148,12 +150,12 @@ def plot_predQ20_but_lower_Q20(df: pl.DataFrame, o_prefix=None):
     if o_prefix is not None:
         fname = f"{o_prefix}-{fname}"
     figure.savefig(fname=fname)
-
-    pass
+    return fname
 
 
 def stat(fname: str, o_prefix):
-    df = pl.read_csv(fname, separator="\t", schema_overrides={"iy": pl.Float64})
+    df = pl.read_csv(fname, separator="\t",
+                     schema_overrides={"iy": pl.Float64})
     df = df.with_columns(
         [
             pl.when(pl.col("rq") > 0.99999)
@@ -167,8 +169,10 @@ def stat(fname: str, o_prefix):
         ]
     ).with_columns([q2phreqExpr("rq", "phreq_rq"), q2phreqExpr("iy", "phreq_iy")])
 
-    plot_rq_iy_scatter(df=df, o_prefix=o_prefix)
-    plot_predQ20_but_lower_Q20(df=df, o_prefix=o_prefix)
+    images = []
+
+    images.append(plot_rq_iy_scatter(df=df, o_prefix=o_prefix))
+    images.append(plot_predQ20_but_lower_Q20(df=df, o_prefix=o_prefix))
 
     stat_res = df.select(
         (pl.col("rq") - pl.col("iy")).mean().alias("ME(pred-real)(rq-iy)"),
@@ -252,6 +256,7 @@ def stat(fname: str, o_prefix):
     )
     # stats3.rept
     print(stats3)
+    return images
 
 
 def main(args):
@@ -280,15 +285,25 @@ def main(args):
     stat_o_prefix = f"{gsetl_o_dir}/{smc_stem}"
 
     print(f"CHANNEL_Q_ANALYSIS")
-    stat(fact_table_path, stat_o_prefix)
+    images = []
+    channel_q_images = stat(fact_table_path, stat_o_prefix)
+    images.extend(channel_q_images)
 
     print("BASE_Q_ANALYSIS")
-
     baseq_ana_args = {
         "fact_table": f"{gsetl_o_dir}/fact_baseq_stat.csv",
-        "o_prefix": f"{gsetl_o_dir}/{smc_stem}"
+        "o_prefix": f"{gsetl_o_dir}/{smc_stem}",
+        "union_fwd_rev": args.union_fwd_rev
     }
-    pred_baseq_and_emp_q.main(argparse.Namespace(**baseq_ana_args))
+    base_q_images = pred_baseq_and_emp_q.main(
+        argparse.Namespace(**baseq_ana_args))
+    images.extend(base_q_images)
+
+    gsda_tmp_path = pathlib.Path("/root/projects/gsda/tmp-data-dir")
+    if gsda_tmp_path.exists():
+        for image_path in images:
+            shutil.copy(image_path, gsda_tmp_path /
+                        pathlib.Path(image_path).name)
 
 
 if __name__ == "__main__":
@@ -299,6 +314,7 @@ if __name__ == "__main__":
                         help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
     parser.add_argument("--rq-range", default=None, type=str, dest="rq_range",
                         help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
+    parser.add_argument("--union-fwd-rev", action="store_true", default=False)
 
     args_ = parser.parse_args()
 

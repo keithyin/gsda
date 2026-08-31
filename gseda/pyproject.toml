@@ -43,6 +43,7 @@ seq-n-stats-v2-cli = "gseda.ppl.seq_n_stats_v2:main_cli"
 low-high-q-quality-stats-cli = "gseda.ppl.low_high_q_quality_stats:main_cli"
 
 bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
+bam-qual-dist-cli = "gseda.bam_ana.bam_qual_dist:main_cli"
 fastx-basic-stat-cli = "gseda.fastx_ana.fastx_basic_stat:main_cli"
 
 msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"

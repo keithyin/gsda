@@ -18,6 +18,16 @@ def main(args):
     # plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
     fact_table_path = pathlib.Path(args.fact_table)
     df = pl.read_csv(args.fact_table, separator="\t")
+
+    if args.union_fwd_rev:
+        df = df.with_columns(
+            pl.col("refname").str.replace(r"___fwd$|___rev$", ""))
+
+        df = df.group_by(["refname", "baseq"]).agg(
+            [pl.col("eq").sum(), pl.col("diff").sum(), pl.col(
+                "ins").sum(), pl.col("del").sum(), pl.col("depth").sum()]
+        ).sort(by=["refname", "baseq"], descending=[False, False])
+
     df = df.with_columns(
         [
             (pl.col("eq") / (pl.col("eq") + pl.col("diff") + pl.col("ins") + pl.col("del"))).alias(
@@ -55,6 +65,8 @@ def main(args):
          pl.col("depth").sum()).alias("baseq30Ratio"),
         (pl.col("depth").filter(pl.col("baseq") >= 35).sum() /
          pl.col("depth").sum()).alias("baseq35Ratio"),
+        (pl.col("depth").filter(pl.col("baseq") >= 40).sum() /
+         pl.col("depth").sum()).alias("baseq40Ratio"),
     ])
     print("Base Q Summary:\n", summary.transpose(
         include_header=True, header_name="name", column_names=["value"]
@@ -79,42 +91,36 @@ def main(args):
 
               ])
               )
-    
+
     metric = metric.transpose(
         include_header=True, header_name="name", column_names=["value"]
     )
     print("Base Q Metric: \n", metric)
-    
 
     baseq2emp_baseq_fpath = f"{args.o_prefix}.baseq2empq.png"
     figure.savefig(fname=baseq2emp_baseq_fpath)
     print(f"check image {baseq2emp_baseq_fpath}")
-    
+
     baseq_cnt = (df.filter(pl.col("depth") > 10000)
-        .select([pl.col("baseq"), pl.col("depth")]))
+                 .select([pl.col("baseq"), pl.col("depth")]))
     baseq_cnt = baseq_cnt.to_pandas()
-    
-    
-    
+
     # TODO baseq distribution
     figure = plt.figure(figsize=(10, 10))
     axs = figure.add_subplot(1, 1, 1)
     plt.sca(axs)
     plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
-    sns.barplot(baseq_cnt, x="baseq", y="depth", ax=axs, order=list(range(0, 50)),)
+    sns.barplot(baseq_cnt, x="baseq", y="depth",
+                ax=axs, order=list(range(0, 50)),)
 
     axs.set_xticks(list(range(0, 50, 2)))
     axs.set_xlabel("PredictedBaseQ", fontdict={"size": 16})
     axs.set_ylabel("Count", fontdict={"size": 16})
-    
+
     baseq_dist_fpath = f"{args.o_prefix}.baseq-dist.png"
     figure.savefig(fname=baseq_dist_fpath)
     print(f"check image {baseq_dist_fpath}")
-    
-    
-    
-    
-    
+    return [baseq2emp_baseq_fpath, baseq_dist_fpath ]
 
 
 if __name__ == "__main__":
@@ -129,5 +135,6 @@ if __name__ == "__main__":
     parser.add_argument("fact_table", metavar="fact_baseq_stat")
     parser.add_argument("--o-path", metavar="o-path",
                         default=None, dest="o_path")
+    parser.add_argument("--union-fwd-rev", action="store_true", default=False)
 
     main(parser.parse_args())
