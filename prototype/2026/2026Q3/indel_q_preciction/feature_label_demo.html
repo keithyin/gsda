@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCS 三类错误预测 — 特征与 label 示例</title>
+<style>
+  /* ============ 主题令牌（light / dark 双套，随系统或手动切换） ============ */
+  :root, :root[data-theme="light"] {
+    color-scheme: light;
+    --page:      #f9f9f7;
+    --surface:   #fcfcfb;
+    --ink:       #0b0b0b;
+    --ink2:      #52514e;
+    --muted:     #898781;
+    --gridline:  #e1e0d9;
+    --baseline:  #c3c2b7;
+    --border:    rgba(11,11,11,0.10);
+    --sel:       #2a78d6;          /* 选中列 */
+    --err:       #d03b3b;          /* label = 1 / 错误列 */
+    --cand:      #2a78d6;          /* Model B 候选（非错误） */
+    --err-wash:  rgba(208,59,59,0.06);
+    --cand-wash: rgba(42,120,214,0.05);
+    --bg-A: #008300;  --ink-A: #ffffff;
+    --bg-C: #2a78d6;  --ink-C: #ffffff;
+    --bg-G: #eda100;  --ink-G: #0b0b0b;
+    --bg-T: #e34948;  --ink-T: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --ink:       #ffffff;
+      --ink2:      #c3c2b7;
+      --muted:     #898781;
+      --gridline:  #2c2c2a;
+      --baseline:  #383835;
+      --border:    rgba(255,255,255,0.10);
+      --sel:       #3987e5;
+      --err:       #e66767;
+      --cand:      #3987e5;
+      --err-wash:  rgba(230,103,103,0.10);
+      --cand-wash: rgba(57,135,229,0.08);
+      --bg-A: #008300;  --ink-A: #ffffff;
+      --bg-C: #3987e5;  --ink-C: #ffffff;
+      --bg-G: #c98500;  --ink-G: #1a1a19;
+      --bg-T: #e66767;  --ink-T: #ffffff;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --ink:       #ffffff;
+    --ink2:      #c3c2b7;
+    --muted:     #898781;
+    --gridline:  #2c2c2a;
+    --baseline:  #383835;
+    --border:    rgba(255,255,255,0.10);
+    --sel:       #3987e5;
+    --err:       #e66767;
+    --cand:      #3987e5;
+    --err-wash:  rgba(230,103,103,0.10);
+    --cand-wash: rgba(57,135,229,0.08);
+    --bg-A: #008300;  --ink-A: #ffffff;
+    --bg-C: #3987e5;  --ink-C: #ffffff;
+    --bg-G: #c98500;  --ink-G: #1a1a19;
+    --bg-T: #e66767;  --ink-T: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* ============ 页头 ============ */
+  header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  .lede { margin: 0; max-width: 74ch; color: var(--ink2); font-size: 14px; }
+  .lede b, .lede strong { color: var(--ink); font-weight: 600; }
+  .theme-btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink2); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .theme-btn:hover { color: var(--ink); border-color: var(--baseline); }
+
+  /* ============ 快速跳转 ============ */
+  .jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 4px; }
+  .jump button {
+    appearance: none; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink);
+    border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  }
+  .jump button:hover { border-color: var(--muted); }
+  .jump button .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .jump button.d-err .dot { background: var(--err); }
+  .jump button.d-cand .dot { background: var(--cand); }
+
+  /* ============ 主图区 ============ */
+  .figure { display: grid; grid-template-columns: 600px minmax(0, 1fr); gap: 28px; margin-top: 8px; align-items: start; }
+  @media (max-width: 1000px) { .figure { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 16px; }
+  .figure > .card:first-child { overflow-x: auto; }   /* 极窄屏时左卡片内滚动 */
+  .card h2 { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; }
+
+  /* 共享列网格：标签列 + 15 个等宽列 */
+  .row {
+    display: grid;
+    grid-template-columns: 92px repeat(15, 30px);
+    column-gap: 2px;
+    align-items: stretch;
+    margin-bottom: 2px;
+  }
+  .rl {
+    grid-column: 1;
+    display: flex; align-items: center; justify-content: flex-end;
+    font-size: 12px; color: var(--ink2); padding-right: 10px; white-space: nowrap;
+  }
+  .rl small { color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+
+  /* MSA 单元格 */
+  .cell {
+    appearance: none; border: 0; padding: 0; cursor: pointer; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    height: 30px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px; font-weight: 600; line-height: 1;
+  }
+  .cell .gapdot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55; }
+  .cell.b-A { background: var(--bg-A); color: var(--ink-A); }
+  .cell.b-C { background: var(--bg-C); color: var(--ink-C); }
+  .cell.b-G { background: var(--bg-G); color: var(--ink-G); }
+  .cell.b-T { background: var(--bg-T); color: var(--ink-T); }
+  .cell.b-  { background: transparent; }
+  .cell:hover { filter: brightness(1.05); }
+  .cell:focus-visible { outline: 2px solid var(--sel); outline-offset: 1px; }
+  .cell.sel { outline: 2px solid var(--sel); outline-offset: 1px; }
+  .cell.cell-err { box-shadow: inset 0 0 0 99px var(--err-wash); }
+  .cell.cell-cand { box-shadow: inset 0 0 0 99px var(--cand-wash); }
+
+  /* 列号行 */
+  .nums { margin-top: 4px; margin-bottom: 6px; }
+  .num { display: flex; align-items: center; justify-content: center; height: 22px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .num.err { color: var(--err); font-weight: 700; }
+  .num.cand { color: var(--cand); font-weight: 700; }
+
+  /* 列类型徽标行 */
+  .type .t { display: flex; align-items: center; justify-content: center; height: 24px; cursor: pointer; }
+  .type .badge {
+    font-size: 11px; font-weight: 650; color: var(--ink2);
+    border: 1px solid var(--baseline); border-radius: 4px; padding: 1px 7px; letter-spacing: .02em;
+  }
+  .type .badge.err { color: var(--err); border-color: var(--err); }
+  .type .badge.cand { color: var(--cand); border-color: var(--cand); }
+  .type .badge.x { color: var(--muted); border-style: dashed; }
+
+  /* 模型 label 条 */
+  .strip { margin-bottom: 4px; }
+  .strip .chip { display: flex; align-items: center; justify-content: center; height: 24px; border-radius: 4px; cursor: pointer; }
+  .strip .chip.na { font-size: 12px; color: var(--muted); }
+  .strip .chip .lbl {
+    font-size: 11px; font-weight: 650; min-width: 22px; text-align: center; line-height: 1;
+    padding: 4px 0; border-radius: 4px; font-variant-numeric: tabular-nums;
+  }
+  .strip .chip .lbl.one { background: var(--err); color: #fff; }
+  .strip .chip .lbl.zero { border: 1px solid var(--baseline); color: var(--ink2); background: transparent; }
+  .strip .chip:hover .lbl { box-shadow: 0 0 0 2px var(--sel); }
+  .strip-caption { margin: 6px 0 0 92px; font-size: 11.5px; color: var(--muted); max-width: 60ch; }
+
+  /* ============ 特征面板 ============ */
+  .panel h2 { margin-bottom: 14px; }
+  .ptarget { margin: 0 0 14px; }
+  .ptarget .big { font-size: 15px; font-weight: 650; }
+  .ptarget .meta { font-size: 12.5px; color: var(--ink2); margin-top: 4px; }
+  .ptarget .badge { display: inline-block; font-size: 11px; font-weight: 650; border-radius: 4px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+  .ptarget .badge.M  { border: 1px solid var(--baseline); color: var(--ink2); }
+  .ptarget .badge.I, .ptarget .badge.D { border: 1px solid var(--err); color: var(--err); }
+  .ptarget .badge.X  { border: 1px dashed var(--muted); color: var(--muted); }
+
+  .fsec { margin-bottom: 18px; }
+  .fsec h3 { font-size: 12px; font-weight: 650; margin: 0 0 8px; color: var(--ink); }
+  .fsec h3 .dim { color: var(--muted); font-weight: 500; font-size: 11px; margin-left: 6px; }
+
+  .win { display: grid; grid-template-columns: repeat(var(--k), 26px); column-gap: 2px; row-gap: 2px; }
+  .win .wcell {
+    display: flex; align-items: center; justify-content: center; height: 26px; border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600;
+  }
+  .win .wcell.gap { background: var(--gridline); color: var(--muted); }
+  .win .wcell.hl { outline: 2px solid var(--sel); outline-offset: 1px; }
+
+  .votes { display: grid; grid-template-columns: repeat(var(--k), 26px); column-gap: 2px; margin-top: 8px; }
+  .votes .vb { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .votes .vbst { display: flex; flex-direction: column-reverse; gap: 2px; height: 24px; justify-content: flex-end; }
+  .votes .seg { width: 18px; border-radius: 2px; }
+  .votes .vbcnt { font-size: 10px; color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .votes .vbcnt b { font-weight: 700; }
+  .votes .vbcnt .bA { color: var(--bg-A); } .votes .vbcnt .bC { color: var(--bg-C); }
+  .votes .vbcnt .bG { color: var(--bg-G); } .votes .vbcnt .bT { color: var(--bg-T); }
+  .votes .vbcnt .b- { color: var(--muted); }
+
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
+  .kv .k { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .kv .k .name { font-size: 11px; color: var(--muted); }
+  .kv .k .val { font-size: 16px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kv .k .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .lblrows { display: grid; gap: 6px; }
+  .lblrows .lr { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline; border-top: 1px solid var(--gridline); padding-top: 6px; }
+  .lblrows .lr .who { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .lblrows .lr .why { font-size: 12px; color: var(--ink2); }
+  .lblrows .lr .why .tag { display: inline-block; font-size: 11px; font-weight: 650; border-radius: 4px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
+  .lblrows .lr .why .tag.t1 { background: var(--err); color: #fff; }
+  .lblrows .lr .why .tag.t0 { border: 1px solid var(--baseline); color: var(--ink2); }
+  .lblrows .lr .why .tag.na { border: 1px dashed var(--muted); color: var(--muted); }
+
+  /* ============ 图例 & 注记 ============ */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 28px; font-size: 12px; color: var(--ink2); }
+  .legend .lg { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 16px; height: 16px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center; }
+  .sw.gap { background: var(--gridline); color: var(--muted); }
+  .swdash { width: 16px; height: 16px; border: 1px solid var(--baseline); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--ink2); }
+  .chipdash { display: inline-block; font-size: 10px; font-weight: 650; border-radius: 3px; padding: 1px 6px; }
+  .chipdash.one { background: var(--err); color: #fff; }
+  .chipdash.zero { border: 1px solid var(--baseline); color: var(--ink2); }
+  .notes { margin-top: 18px; font-size: 12.5px; color: var(--ink2); border-top: 1px solid var(--gridline); padding-top: 14px; }
+  .notes ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; max-width: 92ch; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  .notes .small { margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+
+  /* ============ tooltip ============ */
+  .tip {
+    position: fixed; z-index: 50; pointer-events: none; display: none;
+    background: var(--ink); color: var(--page);
+    font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 8px;
+    white-space: pre; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    max-width: 260px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>CCS 三类错误预测 — 特征与 label 示例</h1>
+      <p class="lede">
+        同一分子上 3 条 subreads 与 SMC 一致序列、reference（Sanger，视为真值）的<b>玩具比对</b>。
+        三类错误住在<b>不同列类型</b>里、互斥：M 列 / I 列 / D 列分别喂给 SNP / 插入 / 删除三个二分类模型。
+        <b>点击任意列</b>查看该位点进入 GBDT 的窗口特征与 label 推导。
+      </p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="切换明暗主题">明暗</button>
+  </header>
+
+  <div class="jump" id="jump"></div>
+
+  <div class="figure">
+    <div class="card">
+      <h2>比对与 label</h2>
+
+      <div class="row nums" id="row-nums"></div>
+      <div class="row msa-row" id="row-sub1"></div>
+      <div class="row msa-row" id="row-sub2"></div>
+      <div class="row msa-row" id="row-sub3"></div>
+      <div class="row msa-row" id="row-smc"></div>
+      <div class="row msa-row" id="row-ref"></div>
+
+      <div class="row type" id="row-type"></div>
+
+      <div class="strip row" id="row-A"></div>
+      <div class="strip row" id="row-B"></div>
+      <div class="strip row" id="row-C"></div>
+      <p class="strip-caption">
+        Model B 只在 SMC 为 − 且 subreads 有覆盖的列打分（候选位点）；Model A 只看 M 列；Model C 看 SMC 有碱基的列（M+I）。
+        每个模型输出的 label 由该列类型决定，互不重叠。
+      </p>
+    </div>
+
+    <div class="card panel">
+      <h2>目标位点特征</h2>
+      <div id="panel"></div>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="notes">
+    <ul>
+      <li><b>前提：</b>reference = 该分子的 Sanger 真值，因此「consensus 相对 ref 的差异」即错误。</li>
+      <li><b>列类型：</b>M（SMC、ref 均有碱基）；I（ref 无碱基，SMC 多 call）；D（ref 有碱基，SMC 漏 call）。</li>
+      <li><b>label：</b>A 在 M 列判 SMC≠ref；B 在候选列判 ref 是否被漏 call；C 判是否为 I 列。三个模型独立训练，输出三个独立 Q 通道、不归一。</li>
+      <li><b>特征：</b>窗口 [t−k, t+k] 内每列 subread 碱基计数(A/C/G/T/−) + SMC 碱基 one-hot + 上下文标量（均聚长度、到最近 gap 距离、深度、pass 数 N）；Model B 额外加 subread 支撑度。</li>
+    </ul>
+    <p class="small">示意图例：数据为虚构玩具比对，仅用于说明特征与 label 的对应关系。碱基颜色为基因组学惯例色并通过 CVD 校验；每格始终显示碱基字母，颜色为冗余副编码。</p>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+/* ==================== 数据 ==================== */
+const SUB = [
+  ['G','C','A','A','A','A','A','C','G','T','A','-','C','C','-'],
+  ['G','C','A','A','A','A','A','C','G','C','A','T','C','C','C'],
+  ['G','C','A','A','A','A','A','C','G','T','A','T','C','C','C'],
+];
+const SMC = ['G','C','A','A','A','A','-','C','G','C','A','T','C','C','-'];
+const REF = ['G','C','A','A','A','A','A','C','G','T','A','-','C','C','-'];
+const N = SMC.length;
+const K = 2;                       // 窗口半径
+const DEPTH = SUB.length;          // subread 条数（覆盖深度，玩具=3）
+
+/* ==================== 语义 ==================== */
+function colType(i) {
+  const s = SMC[i], r = REF[i];
+  if (s !== '-' && r !== '-') return 'M';
+  if (s !== '-' && r === '-') return 'I';
+  if (s === '-' && r !== '-') return 'D';
+  return 'X';                       // 两者均无碱基
+}
+function modelA(i)   { return colType(i) === 'M' ? (SMC[i] !== REF[i] ? 1 : 0) : null; }
+function modelBApplicable(i) { return SMC[i] === '-' && SUB.some(row => row[i] !== '-'); }
+function modelB(i)   { return modelBApplicable(i) ? (REF[i] !== '-' ? 1 : 0) : null; }
+function modelC(i)   { return SMC[i] === '-' ? null : (REF[i] === '-' ? 1 : 0); }
+
+function subCounts(i) {
+  const c = { A:0, C:0, G:0, T:0, '-':0 };
+  SUB.forEach(row => c[row[i]]++);
+  return c;
+}
+function homopolymerLen(i) {
+  const s = SMC;
+  if (s[i] !== '-') {               // 普通碱基列：SMC 侧连续同碱基段
+    const b = s[i];
+    let len = 1, j = i - 1;
+    while (j >= 0 && s[j] === b) { len++; j--; }
+    j = i + 1;
+    while (j < s.length && s[j] === b) { len++; j++; }
+    return len;
+  }
+  // gap 列：gap 两侧同一碱基的同聚段合并（gap 视为把同聚体打断）
+  const lb = (() => { let j = i - 1; while (j >= 0 && s[j] === '-') j--; return j >= 0 ? s[j] : null; })();
+  const rb = (() => { let j = i + 1; while (j < s.length && s[j] === '-') j++; return j < s.length ? s[j] : null; })();
+  if (!lb && !rb) return 0;
+  const base = lb || rb;
+  let len = 0, j = i - 1;
+  while (j >= 0 && (s[j] === base || s[j] === '-')) { if (s[j] === base) len++; j--; }
+  j = i + 1;
+  while (j < s.length && (s[j] === base || s[j] === '-')) { if (s[j] === base) len++; j++; }
+  return len;
+}
+function nearestGap(i) {
+  if (SMC[i] === '-') return 0;
+  let d = 1;
+  while (true) {
+    if (i - d >= 0 && SMC[i - d] === '-') return d;
+    if (i + d < N && SMC[i + d] === '-') return d;
+    if (i - d < 0 && i + d >= N) return null;
+    d++;
+  }
+}
+
+/* ==================== 渲染 ==================== */
+const BASE_CLS = { A:'b-A', C:'b-C', G:'b-G', T:'b-T', '-':'b-' };
+
+function esc(s){ return s; }       // 本页数据均为受控字符，无需转义
+
+function rowHTML(row, key) {
+  // key 决定取哪一行序列
+  const seq = key === 'ref' ? REF : key === 'smc' ? SMC : SUB[key];
+  const ERR = [6, 9, 11], CAND = [14];
+  return '<div class="rl">' + (key === 'ref' ? 'reference <small>Sanger 真值</small>'
+        : key === 'smc' ? 'SMC 一致序列'
+        : 'subread ' + (key + 1)) + '</div>' +
+    seq.map((b, i) =>
+      `<button type="button" class="cell ${BASE_CLS[b]} ${ERR.includes(i) ? 'cell-err' : ''} ${CAND.includes(i) ? 'cell-cand' : ''}" data-col="${i}" tabindex="0"
+        aria-label="列 ${i+1}：${b}">${b === '-' ? '<span class="gapdot"></span>' : esc(b)}</button>`
+    ).join('');
+}
+
+function numsHTML() {
+  let h = '<div class="rl"></div>';
+  for (let i = 0; i < N; i++) {
+    const isErr = [6, 9, 11].includes(i), isCand = i === 14;
+    h += `<div class="num ${isErr ? 'err' : ''} ${isCand ? 'cand' : ''}">${i + 1}</div>`;
+  }
+  return h;
+}
+
+function typeHTML() {
+  let h = '<div class="rl">列类型</div>';
+  for (let i = 0; i < N; i++) {
+    const t = colType(i);
+    const isErr = [6, 9, 11].includes(i), isCand = i === 14;
+    const cls = isErr ? 'err' : isCand ? 'cand' : (t === 'X' ? 'x' : '');
+    h += `<div class="t" data-col="${i}"><span class="badge ${cls}">${t === 'X' ? '–' : t}</span></div>`;
+  }
+  return h;
+}
+
+function stripHTML(model, title) {
+  let h = `<div class="rl">${title}</div>`;
+  for (let i = 0; i < N; i++) {
+    let v = null;
+    if (model === 'A') v = modelA(i);
+    if (model === 'B') v = modelB(i);
+    if (model === 'C') v = modelC(i);
+    if (v === null) h += `<div class="chip na" data-col="${i}">·</div>`;
+    else h += `<div class="chip" data-col="${i}"><span class="lbl ${v ? 'one' : 'zero'}">${v}</span></div>`;
+  }
+  return h;
+}
+
+/* ==================== 特征面板 ==================== */
+function windowCols(t) {
+  const lo = Math.max(0, t - K), hi = Math.min(N - 1, t + K);
+  const out = [];
+  for (let i = lo; i <= hi; i++) out.push(i);
+  return out;
+}
+
+function voteCountHTML(i) {
+  const c = subCounts(i);
+  const order = ['A','C','G','T','-'];
+  const tokens = order.filter(b => c[b] > 0)
+    .map(b => `<b class="b${b === '-' ? '-' : b}">${b}</b>${c[b]}`);
+  return tokens.join('·') || '–';
+}
+
+function panelHTML(t) {
+  const type = colType(t);
+  const typeBadge = type === 'X' ? '–' : type;
+  const cols = windowCols(t);
+
+  // ① 窗口 subread 网格 + 投票柱
+  const wcellHTML = (base, hl) => {
+    if (base === '-') return `<div class="wcell gap ${hl ? 'hl' : ''}">−</div>`;
+    return `<div class="wcell ${hl ? 'hl' : ''}" style="background:${getCssBg(base)};color:${getCssInk(base)}">${base}</div>`;
+  };
+  let winHTML = '';
+  for (let r = 0; r < DEPTH; r++) {
+    winHTML += cols.map(i => wcellHTML(SUB[r][i], false)).join('') + '\n';
+  }
+  // 投票柱
+  const ORDER = ['A','C','G','T','-'];
+  let votesHTML = '';
+  for (const i of cols) {
+    const c = subCounts(i);
+    const segs = ORDER.filter(b => c[b] > 0).map(b =>
+      `<div class="seg" style="background:${getCssBg(b)};height:${c[b] * 8}px"></div>`
+    ).join('');
+    votesHTML += `<div class="vb"><div class="vbst">${segs}</div><div class="vbcnt">${voteCountHTML(i)}</div></div>`;
+  }
+  // SMC 窗口行（one-hot 高亮目标列）
+  let smcWin = '';
+  for (const i of cols) {
+    smcWin += wcellHTML(SMC[i], i === t);
+  }
+  const smcBase = SMC[t];
+  const oneHot = ['A','C','G','T'].map(b => (b === smcBase ? 1 : 0)).join(' ');
+
+  // ③ 上下文标量
+  const hom = homopolymerLen(t);
+  const gap = nearestGap(t);
+  const bSupp = SUB.filter(row => row[t] !== '-').length / DEPTH;
+
+  // ④ label 推导
+  const lr = (who, tagCls, tagText, why) =>
+    `<div class="lr"><div class="who">${who}</div><div class="why"><span class="tag ${tagCls}">${tagText}</span>${why}</div></div>`;
+
+  let lblRows = '';
+  // Model A
+  if (type === 'M') {
+    const v = modelA(t);
+    lblRows += lr('Model A · SNP', v ? 't1' : 't0', String(v),
+      v ? `SMC ${SMC[t]} ≠ ref ${REF[t]} → 该位点错配` : `SMC ${SMC[t]} = ref ${REF[t]} → 一致`);
+  } else {
+    lblRows += lr('Model A · SNP', 'na', '–', `非 M 列（ref 无碱基 / SMC 无碱基），不参与`);
+  }
+  // Model B
+  if (modelBApplicable(t)) {
+    const v = modelB(t);
+    const supp = (SUB.filter(row => row[t] !== '-').length) + '/' + DEPTH;
+    lblRows += lr('Model B · DEL', v ? 't1' : 't0', String(v),
+      v ? `SMC 漏 call：subreads ${supp} 支撑 ${REF[t]}，ref 有碱基` : `ref 无碱基，SMC 未漏 call（仅 subreads 有 ${supp} 覆盖）`);
+  } else {
+    lblRows += lr('Model B · DEL', 'na', '–', `非候选（SMC 非 − 或无 subread 覆盖）`);
+  }
+  // Model C
+  if (SMC[t] !== '-') {
+    const v = modelC(t);
+    lblRows += lr('Model C · INS', v ? 't1' : 't0', String(v),
+      v ? `I 列：SMC 多 call ${SMC[t]}，ref 无碱基` : `M 列：SMC 有碱基且 ref 有碱基 → 非插入`);
+  } else {
+    lblRows += lr('Model C · INS', 'na', '–', `SMC 无碱基，不参与`);
+  }
+
+  return `
+    <div class="ptarget">
+      <div class="big">列 ${t + 1}
+        <span class="badge ${type}">${typeBadge}</span>
+        <span style="color:var(--muted);font-weight:400;font-size:12.5px">SMC ${SMC[t] === '-' ? '−' : SMC[t]} ｜ ref ${REF[t] === '-' ? '−' : REF[t]}</span>
+      </div>
+      <div class="meta">窗口 [${t - K}, ${t + K}]（裁剪到边界），特征来自比对程序产出的 MSA 行</div>
+    </div>
+
+    <div class="fsec">
+      <h3>① 每列 subread 碱基计数 <span class="dim">(2k+1)×5 = ${cols.length}×5 维</span></h3>
+      <div class="win" style="--k:${cols.length}">${winHTML}</div>
+      <div class="votes" style="--k:${cols.length}">${votesHTML}</div>
+    </div>
+
+    <div class="fsec">
+      <h3>② SMC 碱基 one-hot <span class="dim">目标位点 = 高亮</span></h3>
+      <div class="win" style="--k:${cols.length}">${smcWin}</div>
+      <div class="meta" style="margin-top:6px;font-size:12px;color:var(--ink2)">SMC(t) = <b>${smcBase === '-' ? '−' : smcBase}</b> → one-hot [${oneHot}]（顺序 A C G T）</div>
+    </div>
+
+    <div class="fsec">
+      <h3>③ 上下文标量</h3>
+      <div class="kv">
+        <div class="k"><div class="name">均聚长度（SMC 侧）</div><div class="val">${hom}</div></div>
+        <div class="k"><div class="name">到最近 gap 距离</div><div class="val">${gap}</div></div>
+        <div class="k"><div class="name">覆盖深度</div><div class="val">${DEPTH}</div></div>
+        <div class="k"><div class="name">pass 数 N</div><div class="val">3</div></div>
+        ${modelBApplicable(t) ? `<div class="k"><div class="name">B·subread 支撑度</div><div class="val">${bSupp.toFixed(2)}</div><div class="sub">非 gap ${SUB.filter(r => r[t] !== '-').length}/${DEPTH}</div></div>` : ''}
+      </div>
+    </div>
+
+    <div class="fsec" style="margin-bottom:0">
+      <h3>④ label 推导</h3>
+      <div class="lblrows">${lblRows}</div>
+    </div>`;
+}
+
+function getCssBg(b) {
+  const map = { A:'var(--bg-A)', C:'var(--bg-C)', G:'var(--bg-G)', T:'var(--bg-T)', '-':'var(--muted)' };
+  return map[b];
+}
+function getCssInk(b) {
+  const map = { A:'var(--ink-A)', C:'var(--ink-C)', G:'var(--ink-G)', T:'var(--ink-T)', '-':'var(--muted)' };
+  return map[b];
+}
+
+/* ==================== 关键列快速跳转 ==================== */
+const JUMP = [
+  { col: 6,  cls: 'd-err',  label: '同聚物删除 · 列7' },
+  { col: 9,  cls: 'd-err',  label: 'SNP · 列10' },
+  { col: 11, cls: 'd-err',  label: '插入 · 列12' },
+  { col: 14, cls: 'd-cand', label: '候选·非错 · 列15' },
+];
+
+/* ==================== 组装 ==================== */
+const $ = id => document.getElementById(id);
+let sel = 9;                       // 默认选中 SNP 列（列10）
+
+function highlightSelection() {
+  document.querySelectorAll('[data-col]').forEach(el => {
+    el.classList.toggle('sel', Number(el.dataset.col) === sel);
+  });
+}
+
+function render() {
+  $('row-nums').innerHTML = numsHTML();
+  $('row-sub1').innerHTML = rowHTML(null, 0);
+  $('row-sub2').innerHTML = rowHTML(null, 1);
+  $('row-sub3').innerHTML = rowHTML(null, 2);
+  $('row-smc').innerHTML = rowHTML(null, 'smc');
+  $('row-ref').innerHTML = rowHTML(null, 'ref');
+  $('row-type').innerHTML = typeHTML();
+  $('row-A').innerHTML = stripHTML('A', 'Model A · SNP');
+  $('row-B').innerHTML = stripHTML('B', 'Model B · DEL');
+  $('row-C').innerHTML = stripHTML('C', 'Model C · INS');
+  $('panel').innerHTML = panelHTML(sel);
+
+  $('jump').innerHTML = JUMP.map(j =>
+    `<button type="button" class="${j.cls}" data-jump="${j.col}"><span class="dot"></span>${j.label}</button>`
+  ).join('');
+
+  $('legend').innerHTML = `
+    <span class="lg"><span class="sw b-A" style="background:var(--bg-A);color:var(--ink-A)">A</span>A</span>
+    <span class="lg"><span class="sw b-C" style="background:var(--bg-C);color:var(--ink-C)">C</span>C</span>
+    <span class="lg"><span class="sw b-G" style="background:var(--bg-G);color:var(--ink-G)">G</span>G</span>
+    <span class="lg"><span class="sw b-T" style="background:var(--bg-T);color:var(--ink-T)">T</span>T</span>
+    <span class="lg"><span class="sw gap">−</span>gap</span>
+    <span class="lg"><span class="swdash">M</span> M 列</span>
+    <span class="lg"><span class="swdash" style="border-color:var(--err);color:var(--err)">I/D</span> I / D 列</span>
+    <span class="lg"><span class="chipdash one">1</span> label 1（该位点是此类错误）</span>
+    <span class="lg"><span class="chipdash zero">0</span> label 0</span>
+    <span class="lg"><span class="swdash" style="border-style:dashed;border-color:var(--muted)">–</span> 两行皆 gap</span>
+    <span class="lg"><span style="color:var(--err)">红号</span> 错误列</span>
+    <span class="lg"><span style="color:var(--cand)">蓝号</span> Model B 候选（非错）</span>`;
+
+  highlightSelection();
+}
+
+/* ==================== 交互 ==================== */
+const tip = $('tip');
+function tooltipText(i) {
+  const t = colType(i);
+  const tl = t === 'X' ? '两行皆 gap' : t === 'I' ? 'I 列（插入）' : t === 'D' ? 'D 列（删除）' : 'M 列';
+  const rows = [`列 ${i + 1} · ${tl}`, `SMC ${SMC[i] === '-' ? '−' : SMC[i]} ｜ ref ${REF[i] === '-' ? '−' : REF[i]}`];
+  const a = modelA(i);
+  if (a !== null) rows.push(`Model A (SNP) → ${a}`);
+  if (modelBApplicable(i)) rows.push(`Model B (DEL) → ${modelB(i)}`);
+  const c = modelC(i);
+  if (c !== null) rows.push(`Model C (INS) → ${c}`);
+  return rows.join('\n');
+}
+
+document.addEventListener('click', e => {
+  const jumpBtn = e.target.closest('[data-jump]');
+  if (jumpBtn) { sel = Number(jumpBtn.dataset.jump); $('panel').innerHTML = panelHTML(sel); highlightSelection(); return; }
+  const hit = e.target.closest('[data-col]');
+  if (hit) {
+    sel = Number(hit.dataset.col);
+    $('panel').innerHTML = panelHTML(sel);
+    highlightSelection();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  const hit = e.target.closest('[data-col]');
+  if (hit && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    sel = Number(hit.dataset.col);
+    $('panel').innerHTML = panelHTML(sel);
+    highlightSelection();
+  }
+});
+
+let tipTimer = null;
+document.addEventListener('mouseover', e => {
+  const hit = e.target.closest('[data-col]');
+  if (!hit) { hideTip(); return; }
+  const i = Number(hit.dataset.col);
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => {
+    tip.textContent = tooltipText(i);
+    tip.style.display = 'block';
+    const r = hit.getBoundingClientRect();
+    let x = r.left, y = r.bottom + 8;
+    if (x + 260 > innerWidth) x = innerWidth - 268;
+    if (y + 110 > innerHeight) y = r.top - 110;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }, 80);
+});
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('[data-col]')) hideTip();
+});
+function hideTip() {
+  clearTimeout(tipTimer);
+  tip.style.display = 'none';
+}
+
+/* 明暗切换 */
+const themeBtn = $('themeBtn');
+function applyTheme() {
+  const cur = document.documentElement.dataset.theme;
+  const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const effectiveDark = cur === 'dark' || (cur !== 'light' && sysDark);
+  themeBtn.textContent = effectiveDark ? '明色' : '暗色';
+}
+themeBtn.addEventListener('click', () => {
+  const cur = document.documentElement.dataset.theme;
+  document.documentElement.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  $('panel').innerHTML = panelHTML(sel);   // 重渲投票柱颜色
+});
+
+render();
+applyTheme();
+</script>
+</body>
+</html>
