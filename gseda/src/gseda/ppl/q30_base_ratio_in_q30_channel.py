@@ -1,0 +1,43 @@
+import pysam
+from tqdm import tqdm
+import numpy as np
+
+def q30_base_ratio_in_q30_channel(bam_file: str):
+    q30_base_cnt = 0
+    tot_base_cnt = 0
+    with pysam.AlignmentFile(bam_file, mode="rb", check_sq=False) as bam_in:
+        for record in tqdm(bam_in.fetch(until_eof=True), desc=f"reading {bam_file}"):
+            rq = float(record.get_tag("rq"))
+            if rq < 0.999:
+                continue
+            qual = record.query_qualities
+            qual = np.array(qual)
+            q30_base_cnt += (qual >= 30).sum()
+            tot_base_cnt += len(qual)
+
+    print(f"{bam_file} --> q30_base_ratio_in_q30_channel:{q30_base_cnt / tot_base_cnt * 100. :3f}%")
+def main():
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.polish2.smc_all_reads.bam"
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
+    fname = "/data1/ccs_data/20250804-ludaopei/20250721_240601Y0005_Run0001.smc_all_reads.bam"
+    fnames = [
+        
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002_adapter.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.bystrand.qcali.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.polish3.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv4.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.0.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002.pplv5.bystrand.smc_all_reads.bam",
+        "/data1/ccs_data/20250804-ludaopei/20250804_240601Y0005_Run0002_adapter.xgb.smc_all_reads.bam",
+        
+    ]
+    
+    for fname in fnames:
+        q30_base_ratio_in_q30_channel(fname)
+
+
+if __name__ == "__main__":
+    main()
+    pass

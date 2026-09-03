@@ -1,0 +1,80 @@
+{
+  "tool": "low-q-analysis",
+  "title": "低质量产率问题分析",
+  "overview": "综合分析低 Q20/Q30 产率问题的诊断工具，集成四项分析：(1) ASTS 分析（subreads-SMC 比对质量及 homo+STR 区域覆盖），(2) DNA 链不一致检测（正反链比对不一致分析），(3) homo+STR 区域覆盖率统计，(4) Macebell reads 比例估计。通过 subreads BAM 和 SMC（Single Molecule Consensus）BAM 的联合分析，定位低产率的原因。",
+  "parameters": [
+    {
+      "name": "sbr_bam",
+      "cli_flag": "SBR BAM 文件",
+      "type": "file",
+      "required": true,
+      "description": "Subreads BAM 文件路径。通过左侧\"SBR BAM 文件来源\"区域选择文件来源方式（本地/上传/SCP）后，在输入框中填写路径。包含原始 subreads 的比对结果，用于子级别分析"
+    },
+    {
+      "name": "smc_bam",
+      "cli_flag": "SMC BAM 文件",
+      "type": "file",
+      "required": true,
+      "description": "SMC (Single Molecule Consensus) BAM 文件路径。通过左侧\"SMC BAM 文件来源\"区域选择文件来源方式后，在输入框中填写路径。包含 SM-C 级别的共识比对结果，用于分子级别的深度分析"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：使用服务器本地文件进行分析",
+      "steps": [
+        "1. 在\"SBR BAM 文件来源\"中选择\"服务器本地\"",
+        "2. 在 SBR BAM 文件路径输入框中填写 subreads BAM 路径，如 /data/sbr.bam",
+        "3. 在\"SMC BAM 文件来源\"中选择\"服务器本地\"",
+        "4. 在 SMC BAM 文件路径输入框中填写 SMC BAM 路径，如 /data/smc.bam",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：从远程服务器拉取文件进行分析",
+      "steps": [
+        "1. 在\"SBR BAM 文件来源\"中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 输入远程 SBR BAM 路径",
+        "4. 在\"SMC BAM 文件来源\"中选择\"SCP 远程文件\"",
+        "5. 填写 SSH 服务器地址和密码，输入远程 SMC BAM 路径",
+        "6. 点击\"开始分析\"按钮\n系统自动通过 SCP 拉取两个文件并执行分析"
+      ]
+    },
+    {
+      "title": "场景三：从本地上传文件进行分析",
+      "steps": [
+        "1. 在\"SBR BAM 文件来源\"中选择\"客户端上传\"",
+        "2. 点击上传区域，选择本地的 SBR BAM 文件",
+        "3. 在\"SMC BAM 文件来源\"中选择\"客户端上传\"",
+        "4. 点击上传区域，选择本地的 SMC BAM 文件",
+        "5. 上传成功后路径自动填入",
+        "6. 点击\"开始分析\"按钮"
+      ]
+    }
+  ],
+  "output": {
+    "description": "执行完成后，结果区域以文本报告形式展示四项分析的汇总（Summary）：",
+    "sections": [
+      {
+        "name": "1. ASTS 分析（Subreads-SMC 一致性）",
+        "content": "分析 subreads 与 SMC 之间的比对质量，包括：\n- reads 比对数量统计（aligned vs notAligned）\n- 比对质量分布（identity 等级统计）\n- homo+STR 区域覆盖统计\n- np 分布（按核苷酸位点分组）"
+      },
+      {
+        "name": "2. DNA 链不一致检测",
+        "content": "检测正链和反链之间的比对不一致性：\n- 正反链 reads 数量对比\n- 不一致 reads 的比例统计\n- 可能暗示测序偏差或参考基因组问题"
+      },
+      {
+        "name": "3. Homo+STR 区域覆盖率",
+        "content": "统计 SMC 文件中 homo（同源重复）和 STR（串联重复）区域的覆盖情况：\n- homo 区域占比\n- STR 区域占比\n- 总覆盖比例"
+      },
+      {
+        "name": "4. Macebell reads 比例",
+        "content": "估计 Macebell reads（嵌合体 reads）占总 reads 的比例：\n- Macebell Ratio（百分比）\n- 处理时间和 reads 总数"
+      },
+      {
+        "name": "结果解读指南",
+        "content": "根据各项指标判断低产率原因：\n- 链不一致比例高 → 可能是参考基因组质量问题\n- homo+STR 覆盖低 → 重复区域导致测序困难\n- Macebell Ratio 高 → 嵌合体 reads 比例异常，需排查建库或测序环节"
+      }
+    ]
+  }
+}

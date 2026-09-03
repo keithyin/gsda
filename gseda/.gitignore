@@ -1,0 +1,18 @@
+# Pure data — keep out of the repo (玉米SSR分析)
+src/gseda/玉米SSR分析/data/
+
+# Build / cache / bytecode
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Env / editor
+.venv/
+.env
+.vscode/
+.idea/
+*.log

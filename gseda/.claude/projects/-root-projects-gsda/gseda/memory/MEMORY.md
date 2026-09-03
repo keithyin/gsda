@@ -1,0 +1,1 @@
+- [Terminal Output Display](terminal_output_display.md) - Show CLI tool outputs with terminal-style formatting

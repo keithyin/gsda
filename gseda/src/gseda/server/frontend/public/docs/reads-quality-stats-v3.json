@@ -1,0 +1,121 @@
+{
+  "tool": "reads-quality-stats-v3",
+  "title": "Reads 多维度质量统计（V3）",
+  "overview": "结合 pysam 本地读取和 gsmm2-aligned-metric 远程对齐分析，对 BAM + Reference 对生成多维度质量指标。首先通过 pysam 提取 reads 基本统计（读长、质量分布、NP 分布），然后调用 gsmm2-aligned-metric 生成对齐指标 CSV 文件（包含覆盖率、一致性、indel 率、SegsRatio 等）。适用于对测序数据进行全面的质量分析和参考基因组比对评估。",
+  "parameters": [
+    {
+      "name": "bams",
+      "cli_flag": "BAM 文件",
+      "type": "file",
+      "required": true,
+      "description": "待分析的 BAM 文件路径，支持通配符 *。通过左侧\"BAM 文件来源\"选择文件来源方式（本地/上传/SCP）后，在输入框中填写路径"
+    },
+    {
+      "name": "refs",
+      "cli_flag": "Reference 文件",
+      "type": "file",
+      "required": false,
+      "description": "Reference FASTA 文件路径，通过下方\"Reference FASTA 文件来源\"区域选择来源方式后填写路径。\n- 提供 Reference：将输出比对相关指标\n- 不提供：仅输出基本统计\n- 单个 Reference 可自动对应多个 BAM 文件（广播机制）"
+    },
+    {
+      "name": "short_aln",
+      "cli_flag": "Short Alignment",
+      "type": "select",
+      "required": false,
+      "default": "不使用",
+      "options": ["不使用 Short Alignment", "使用 Short Alignment"],
+      "description": "Short Alignment 模式开关。\n- 不使用（默认）：常规对齐模式\n- 使用：添加 --short-aln 参数，用于处理长度在 [30, 200] bp 范围内的 Reference 序列\n如果您的 Reference 序列长度 < 200，建议启用"
+    },
+    {
+      "name": "force",
+      "cli_flag": "强制重新生成",
+      "type": "boolean",
+      "required": false,
+      "default": "未勾选",
+      "description": "勾选后：如果已有指标文件则删除并重新计算。\n不勾选（默认）：如果已有指标文件则跳过重新计算，直接使用已有结果"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：基础分析 - BAM + Reference 全量分析",
+      "steps": [
+        "1. 在\"BAM 文件来源\"选择\"服务器本地\"，输入 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"选择\"服务器本地\"，输入 Reference 路径",
+        "3. Short Alignment 选择\"不使用\"",
+        "4. 勾选/取消勾选\"强制重新生成\"",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：仅基本统计（不提供 Reference）",
+      "steps": [
+        "1. 在\"BAM 文件来源\"选择来源方式并输入 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"不填写任何路径（留空）",
+        "3. 点击\"开始分析\"按钮\n系统将仅输出本地基本统计（读长/质量/NP 分布）"
+      ]
+    },
+    {
+      "title": "场景三：Reference 长度 < 200，启用 Short Alignment",
+      "steps": [
+        "1. 在\"BAM 文件来源\"选择来源方式并输入 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"选择来源方式并输入 Reference 路径",
+        "3. Short Alignment 选择\"使用 Short Alignment\"",
+        "4. 点击\"开始分析\"按钮\n系统将对 Reference 添加 --short-aln 参数执行分析"
+      ]
+    },
+    {
+      "title": "场景四：一个 Reference 对应多个 BAM",
+      "steps": [
+        "1. 在\"BAM 文件来源\"添加多个 BAM 文件（逐个添加或使用通配符）",
+        "2. 在\"Reference FASTA 文件来源\"添加一个 Reference 文件",
+        "3. 点击\"开始分析\"按钮\n系统自动广播 Reference 给所有 BAM 文件"
+      ]
+    },
+    {
+      "title": "场景五：强制重新生成已有结果",
+      "steps": [
+        "1. 在\"BAM 文件来源\"和\"Reference FASTA 文件来源\"分别输入文件路径",
+        "2. 勾选\"强制重新生成指标文件\"复选框",
+        "3. 点击\"开始分析\"按钮\n即使已有指标文件，系统也会删除并重新计算"
+      ]
+    },
+    {
+      "title": "场景六：BAM 和 Reference 均从远程服务器拉取（SCP）",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 在 BAM 文件路径输入框中填写远程 BAM 路径",
+        "4. 在\"Reference FASTA 文件来源\"中选择\"SCP 远程文件\"",
+        "5. 填写 SSH 服务器地址和密码，输入远程 Reference 路径",
+        "6. 设置 Short Alignment 模式",
+        "7. 点击\"开始分析\"按钮\n系统自动通过 SCP 拉取两个文件并执行分析"
+      ]
+    },
+    {
+      "title": "场景七：仅 BAM 远程拉取，Reference 本地提供",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"SCP 远程文件\"，填写 SSH 信息和远程 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"中选择\"服务器本地\"，输入本地 Reference 路径",
+        "3. 设置 Short Alignment 模式",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    }
+  ],
+  "output": {
+    "description": "结果区域包含文本统计结果和文件下载链接：",
+    "sections": [
+      {
+        "name": "本地基本统计（文本输出）",
+        "content": "通过 pysam 读取 BAM 的 reads 基本统计：通道数、碱基总数、读长统计（含 N50）、质量分数分布（Q8~Q30 各级别计数及百分比）"
+      },
+      {
+        "name": "对齐指标 CSV 文件（文件下载）",
+        "content": "调用 gsmm2-aligned-metric 生成的 fact CSV 文件，包含：\n- 比对分类统计（aligned / notAligned 的数量及比例）\n- 一致性（identity）分布\n- 插入缺失（indel）统计\n- SegsRatio（分段比）统计（含 SV candidate 分类）\n- 覆盖度分布\n- 深度分布（depth）"
+      },
+      {
+        "name": "下载方式",
+        "content": "执行完成后，在结果区域会出现 CSV 文件的下载链接，点击即可下载"
+      }
+    ]
+  }
+}

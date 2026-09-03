@@ -1,0 +1,131 @@
+{
+  "tool": "reads-quality-hp-tr",
+  "title": "Reads Quality HP-TR（Poly-N + STR 分析）",
+  "overview": "使用 gsmm2-metric (hp-tr-v2) 对 BAM + Reference 分析 poly-N（同聚物）区域和 STR（短串联重复）区域的质量。与 reads-quality-hp 的区别在于同时分析 poly-N 和 STR 两类特殊序列区域。适用于评估 poly-N 和 STR 对测序数据质量及分析结果的影响。",
+  "parameters": [
+    {
+      "name": "bams",
+      "cli_flag": "BAM 文件",
+      "type": "file",
+      "required": true,
+      "description": "待分析的 BAM 文件路径，通过左侧\"BAM 文件来源\"选择文件来源方式（本地/上传/SCP）后填写路径"
+    },
+    {
+      "name": "refs",
+      "cli_flag": "Reference 文件",
+      "type": "file",
+      "required": true,
+      "description": "Reference FASTA 文件路径，通过下方\"Reference FASTA 文件来源\"选择来源方式后填写路径。单个 Reference 可自动对应多个 BAM 文件"
+    },
+    {
+      "name": "np_range",
+      "cli_flag": "NP Range",
+      "type": "text",
+      "required": false,
+      "description": "Nominal Purity 范围过滤，格式为 \"low:high\"（用连字符 - 或冒号 : 均可）。\n例如输入 \"0.9-1.0\" 表示只保留 nominal purity 在 [0.9, 1.0] 范围内的 reads\n留空表示不做过滤"
+    },
+    {
+      "name": "rq_range",
+      "cli_flag": "RQ Range",
+      "type": "text",
+      "required": false,
+      "description": "Read Quality 范围过滤，格式为 \"low:high\"（用连字符 - 或冒号 : 均可）。\n例如输入 \"0.8-1.0\" 表示只保留 read quality 在 [0.8, 1.0] 范围内的 reads\n留空表示不做过滤"
+    },
+    {
+      "name": "short_aln",
+      "cli_flag": "Short Alignment",
+      "type": "select",
+      "required": false,
+      "default": "不使用",
+      "options": ["不使用 Short Alignment", "使用 Short Alignment"],
+      "description": "Short Alignment 模式开关。\n- 不使用（默认）：常规对齐模式\n- 使用：对长度在 [30, 200] bp 范围的 Reference 序列启用特殊对齐处理"
+    },
+    {
+      "name": "force",
+      "cli_flag": "强制重新生成",
+      "type": "boolean",
+      "required": false,
+      "default": "未勾选",
+      "description": "勾选后：强制删除已有指标文件并重新计算。不勾选：跳过已有结果"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：基础分析 - poly-N + STR 全量分析",
+      "steps": [
+        "1. 在\"BAM 文件来源\"选择来源方式，输入 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"选择来源方式，输入 Reference 路径",
+        "3. NP Range 和 RQ Range 留空（不做过滤）",
+        "4. Short Alignment 选择\"不使用\"",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：仅筛选高纯度 reads",
+      "steps": [
+        "1. 在\"BAM 文件来源\"和\"Reference FASTA 文件来源\"分别输入路径",
+        "2. NP Range 输入 \"0.95-1.0\"（筛选 nominal purity >= 0.95 的 reads）",
+        "3. RQ Range 输入 \"0.9-1.0\"（筛选 read quality >= 0.9 的 reads）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景三：Reference 长度 < 200，启用 Short Alignment",
+      "steps": [
+        "1. 在\"BAM 文件来源\"和\"Reference FASTA 文件来源\"分别输入路径",
+        "2. Short Alignment 选择\"使用 Short Alignment\"",
+        "3. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景四：强制重新生成",
+      "steps": [
+        "1. 输入 BAM 和 Reference 路径",
+        "2. 勾选\"强制重新生成指标文件\"",
+        "3. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景五：BAM 和 Reference 均从远程服务器拉取（SCP）",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 在 BAM 文件路径输入框中填写远程 BAM 路径",
+        "4. 在\"Reference FASTA 文件来源\"中选择\"SCP 远程文件\"",
+        "5. 填写 SSH 服务器地址和密码，输入远程 Reference 路径",
+        "6. 设置 NP Range 和 RQ Range（可选）",
+        "7. 点击\"开始分析\"按钮\n系统自动通过 SCP 拉取两个文件并执行分析"
+      ]
+    },
+    {
+      "title": "场景六：仅 BAM 远程拉取，Reference 本地提供",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"SCP 远程文件\"，填写 SSH 信息和远程 BAM 路径",
+        "2. 在\"Reference FASTA 文件来源\"中选择\"服务器本地\"，输入本地 Reference 路径",
+        "3. 设置 NP Range 和 RQ Range（可选）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    }
+  ],
+  "output": {
+    "description": "结果区域包含文本结果和 CSV 文件下载：",
+    "sections": [
+      {
+        "name": "Poly-N 区域分析",
+        "content": "各 poly-N 区域的长度分布、对应质量值、覆盖度统计。按 poly-N 长度分组统计 reads 数量和比例"
+      },
+      {
+        "name": "STR 区域分析",
+        "content": "短串联重复（STR）区域的长度分布、重复单元分析、质量统计。识别和分析基因组中的微卫星区域"
+      },
+      {
+        "name": "综合统计",
+        "content": "poly-N 和 STR 区域的合并统计：总覆盖比例、各区域的平均质量值、质量分布数据"
+      },
+      {
+        "name": "下载方式",
+        "content": "执行完成后，在结果区域会出现 CSV 文件的下载链接，点击即可下载"
+      }
+    ]
+  }
+}
