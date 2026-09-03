@@ -1,0 +1,74 @@
+{
+  "tool": "macebell-ratio",
+  "title": "Macebell 比例分析",
+  "overview": "使用 producer-consumer 多线程模型从 BAM 文件中估计 chimeric read split ratio（嵌合体 reads 分离比例），即 Macebell reads 的比例。工具基于 mappy（轻量级 BAM 对齐库）进行参考基因组比对，通过 pysam 读取 BAM 文件，利用多进程并行处理提高效率。适用于评估测序数据中 Macebell reads（异常 reads）对分析结果的潜在影响。",
+  "parameters": [
+    {
+      "name": "input_bam",
+      "cli_flag": "BAM 文件",
+      "type": "file",
+      "required": true,
+      "description": "输入 BAM 文件路径，通过左侧\"BAM 文件来源\"选择来源方式（本地/上传/SCP）后填写路径。BAM 文件需已完成比对（sorted 或非 sorted 均可）"
+    },
+    {
+      "name": "threads",
+      "cli_flag": "线程数",
+      "type": "number",
+      "required": false,
+      "default": 16,
+      "description": "消费者进程数（producer-consumer 模型中的 consumer 进程数），用于并行处理 reads。\n- 默认值 16：适用于大多数场景\n- 值越大处理越快，但消耗更多 CPU 资源\n- 建议根据服务器 CPU 核心数设置，不要超过物理核心数"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：使用默认设置分析本地 BAM 文件",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"服务器本地\"",
+        "2. 在 BAM 文件路径输入框中填写路径，如 /data/sample.bam",
+        "3. 线程数保持默认值 16（通常足够）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：根据服务器配置调整线程数",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择来源方式，输入 BAM 路径",
+        "2. 根据服务器 CPU 核心数设置线程数\n   - 服务器有 32 核：可设为 32\n   - 服务器有 16 核：可设为 16\n   - 服务器与其他任务共用：建议设为 8~12 避免资源竞争",
+        "3. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景三：从远程服务器获取文件进行分析",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 输入远程 BAM 路径",
+        "4. 设置线程数",
+        "5. 点击\"开始分析\"按钮\n系统自动通过 SCP 拉取文件并执行分析"
+      ]
+    },
+    {
+      "title": "场景四：从本地上传 BAM 文件",
+      "steps": [
+        "1. 在\"BAM 文件来源\"中选择\"客户端上传\"",
+        "2. 点击上传区域，选择本地的 .bam 文件",
+        "3. 上传成功后路径自动填入",
+        "4. 设置线程数",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    }
+  ],
+  "output": {
+    "description": "执行完成后，结果区域以文本报告形式展示 Macebell Ratio 分析结果：",
+    "sections": [
+      {
+        "name": "Macebell Ratio 报告",
+        "content": "包含以下关键指标：\n- Total Reads：处理的总 reads 数\n- Split Reads：被分割的 reads 数\n- Macebell Ratio：Macebell reads 占比（百分比格式）\n- Elapsed Time：处理耗时（秒）"
+      },
+      {
+        "name": "结果解读指南",
+        "content": "根据 Macebell Ratio 判断数据质量：\n- Macebell Ratio < 1%：数据质量正常，Macebell reads 比例极低\n- Macebell Ratio 1%~5%：可能存在少量异常 reads，需结合其他指标判断\n- Macebell Ratio > 5%：可能存在建库或测序问题，建议排查建库流程"
+      }
+    ]
+  }
+}

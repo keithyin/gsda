@@ -1,0 +1,92 @@
+{
+  "tool": "homo-and-str-ratio",
+  "title": "同源与串联重复比率分析",
+  "overview": "统计 BAM / FASTQ / FASTA 文件中同源重复（homo）和串联重复（STR）区域的比率。支持多种文件格式（.bam, .fq, .fastq, .fa, .fasta），通过 pysam 高效读取文件并提取序列长度信息。对于 BAM 文件，可按 read quality 阈值过滤后分析。适用于评估测序数据中重复区域的比例及其对分析结果的影响。",
+  "parameters": [
+    {
+      "name": "files",
+      "cli_flag": "文件路径",
+      "type": "file",
+      "required": true,
+      "description": "输入文件路径，通过左侧\"文件来源\"选择来源方式（本地/上传/SCP）后填写路径。支持以下文件格式：\n- BAM（.bam）：需要进行 rq 阈值过滤\n- FASTQ（.fq, .fastq）\n- FASTA（.fa, .fasta）\n可通过\"添加文件\"逐个添加多个文件，或使用通配符 * 批量匹配"
+    },
+    {
+      "name": "rq_thr",
+      "cli_flag": "最低 RQ",
+      "type": "number",
+      "required": false,
+      "default": 0.95,
+      "description": "Read Quality 阈值（0~1）。仅对 BAM 文件有效。\n- 对于 BAM：过滤 reads，只有 rq >= rq_thr 的 reads 才会被纳入统计\n- 对于 FASTQ/FASTA：此参数无效，所有 reads 均被纳入\n默认值 0.95 适用于大多数场景"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：分析本地 BAM 文件（默认 RQ 阈值 0.95）",
+      "steps": [
+        "1. 在\"文件来源\"中选择\"服务器本地\"",
+        "2. 在文件路径输入框中填写 BAM 路径，如 /data/sample.bam",
+        "3. 最低 RQ 保持默认值 0.95（或根据需要调整）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：分析 BAM 文件（自定义 RQ 阈值）",
+      "steps": [
+        "1. 在\"文件来源\"中选择\"服务器本地\"",
+        "2. 填写 BAM 路径",
+        "3. 最低 RQ 输入自定义阈值，如 0.9（更宽松）或 0.99（更严格）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景三：分析 FASTQ 文件",
+      "steps": [
+        "1. 在\"文件来源\"中选择\"客户端上传\"或\"服务器本地\"",
+        "2. 上传或填写 FASTQ 文件路径（支持 .fq 和 .fastq 格式）",
+        "3. 最低 RQ 参数对 FASTQ 无效，可忽略",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景四：分析 FASTA 文件",
+      "steps": [
+        "1. 在\"文件来源\"中选择\"服务器本地\"或\"SCP 远程文件\"",
+        "2. 填写 FASTA 文件路径（支持 .fa 和 .fasta 格式）",
+        "3. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景五：同时分析多个文件",
+      "steps": [
+        "1. 在\"文件来源\"中选择来源方式",
+        "2. 点击\"添加文件\"按钮逐个添加多个文件，或使用通配符如 /data/*.bam",
+        "3. 设置最低 RQ 阈值（BAM 文件生效）",
+        "4. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景六：从远程服务器拉取文件进行分析",
+      "steps": [
+        "1. 在\"文件来源\"中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 在文件路径输入框中填写远程文件路径",
+        "4. 如需要分析多个文件，点击\"添加文件\"逐个添加",
+        "5. 对于 BAM 文件可设置最低 RQ 阈值",
+        "6. 点击\"开始分析\"按钮\n系统自动通过 SCP 拉取文件并执行分析"
+      ]
+    }
+  ],
+  "output": {
+    "description": "执行完成后，结果区域以文本报告形式展示：",
+    "sections": [
+      {
+        "name": "Homo+STR 比率报告",
+        "content": "以表格格式输出：\n- File：文件名\n- HomoRatio：同源重复区域占比（百分比）\n- STRRatio：串联重复区域占比（百分比）\n- TotalRatio：重复区域总占比"
+      },
+      {
+        "name": "文件格式说明",
+        "content": "- BAM：通过 pysam 读取 BAM 标签（rq 等），提取 read sequence 进行 homo/STR 分析\n- FASTQ/FASTA：通过 pysam.FastxFile 读取序列信息，自动转换为 FASTA 格式后分析\n- 支持通配符 * 批量处理"
+      }
+    ]
+  }
+}

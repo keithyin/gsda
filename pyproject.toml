@@ -1,0 +1,76 @@
+[project]
+name = "gseda"
+version = "1.23.0"
+authors = [{ name = "keithyin", email = "yinpenghhz@hotmail.com" }]
+description = "gsetl"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pymsaviz==0.4.2",
+    "polars==1.8.2",
+    "tqdm>=4.67",
+    "pysam>=0.22",
+    "seaborn>=0.13",
+    "semver==3.0.2",
+    "pyarrow==17.0.0",
+    "mappy",
+    "numpy==1.24.4",
+    "anthropic==0.72.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/keithyin/gsda"
+Issues = "https://github.com/keithyin/gsda/issues"
+
+[project.scripts]
+reads-quality-stats-v3-cli = "gseda.ppl.reads_quality_stats_v3:main_cli"
+reads-time-err-cli = "gseda.ppl.reads_time_err_ana:main_cli"
+reads-quality-hp-tr-cli = "gseda.ppl.reads_quality_stats_hp_tr:main_cli"
+reads-quality-hp-cli = "gseda.ppl.reads_quality_stats_hp:main_cli"
+sequencing-report-v2-cli = "gseda.ppl.sequencing_report_v2:main_cli"
+sequencing-report-v2-np-level-cli = "gseda.ppl.sequencing_report_v2_np_level:main_cli"
+
+sequencing-report-overall-cli = "gseda.ppl.sequencing_report_overall:main_cli"
+
+seq-n-stats-cli = "gseda.ppl.seq_n_stats:main_cli"
+seq-n-stats-v2-cli = "gseda.ppl.seq_n_stats_v2:main_cli"
+
+low-high-q-quality-stats-cli = "gseda.ppl.low_high_q_quality_stats:main_cli"
+
+bam-basic-stat-cli = "gseda.bam_ana.bam_basic_stat:main_cli"
+bam-qual-dist-cli = "gseda.bam_ana.bam_qual_dist:main_cli"
+fastx-basic-stat-cli = "gseda.fastx_ana.fastx_basic_stat:main_cli"
+
+msa-view-cli = "gseda.msa_view.msa_view_using_pileup:main_cli"
+phreq-ana-cli = "gseda.ppl.phreq_analysis:main"
+wga-cli = "gseda.ppl.whole_genome_alignment:main_cli"
+bam2fx-cli = "gseda.bam_filter.bam2fx:main_cli"
+smc-mem-est = "gseda.bam_ana.mem_est:main_cli"
+
+low-q-analysis-ppl = "gseda.ppl.low_q_analysis:main_cli"
+homo-and-str-ratio = "gseda.ppl.homo_and_str_region_coverage:main_cli"
+macebell-ratio-cli = "gseda.ppl.macebell_ratio:main_cli"
+
+dump-specified-barcode-sbr = "gseda.bam_filter.dump_sbr_according_barcode:main_cli"
+subreads-smc-funnel-stat = "gseda.ppl.subreads_smc_funnel_stat:main_cli"
+
+raw-bam-analysis = "gseda.md_analysis.raw_bam_analysis:main_cli"
+seq-search-cli = "gseda.seq_search.seq_search:main_cli"
+
+# Server web service entry point
+gseda-server = "gseda.server.start_server:main"
+
+[tool.hatch.build]
+exclude = [
+  "src/gseda/server"
+]
+
+# 构建后端，默认为 Hatchling
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

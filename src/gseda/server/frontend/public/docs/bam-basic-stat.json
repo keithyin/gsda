@@ -1,0 +1,94 @@
+{
+  "tool": "bam-basic-stat",
+  "title": "BAM 基本质量统计",
+  "overview": "对 BAM 文件中的 reads 进行基本质量统计分析。通过 pysam 读取 BAM 文件，结合 Polars 高效计算多项关键指标：channel 分布、读长统计（含 N50）、质量分数分布（Q8/Q10/Q15/Q20/Q25/Q30 各级别以上 reads 数及百分比）以及按 NP（核苷酸位点数）分组的 channel 级别详细统计。适用于对 BAM 文件进行快速初步质量评估。",
+  "parameters": [
+    {
+      "name": "bams",
+      "cli_flag": "文件路径",
+      "type": "file",
+      "required": true,
+      "description": "待分析的 BAM 文件路径，支持通配符 * 进行多文件匹配。点击\"添加 BAM 文件\"可逐个添加，支持通配符如 /data/samples/*.bam",
+      "default": "-"
+    },
+    {
+      "name": "channel_tag",
+      "cli_flag": "Channel 标签",
+      "type": "select",
+      "required": false,
+      "default": "ch",
+      "options": ["ch", "zm"],
+      "description": "Channel 标签类型，决定从 BAM 标签中读取 channel 信息的方式。\n- ch：标准 channel（对应 OM2 标准）\n- zm：Zymo 标准 channel"
+    },
+    {
+      "name": "min_rq",
+      "cli_flag": "最低 RQ",
+      "type": "number",
+      "required": false,
+      "description": "最低读取质量阈值（0~1）。勾选此字段并输入数值后，只有 rq >= min_rq 的 reads 才会被纳入统计。留空表示不设置过滤"
+    }
+  ],
+  "examples": [
+    {
+      "title": "场景一：分析单个本地 BAM 文件",
+      "steps": [
+        "1. 在左侧 BAM 文件来源中选择\"服务器本地\"",
+        "2. 在 BAM 文件路径输入框中填写路径，如 /data/sample.bam",
+        "3. Channel Tag 选择 ch 或 zm",
+        "4. 最低 RQ 留空（不过滤）或输入阈值",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景二：分析多个 BAM 文件",
+      "steps": [
+        "1. 在左侧 BAM 文件来源中选择\"服务器本地\"",
+        "2. 点击\"添加 BAM 文件\"按钮新增行，逐个输入每个 BAM 路径",
+        "3. 或使用通配符 /data/samples/*.bam 自动匹配所有文件",
+        "4. 设置 Channel Tag 和最低 RQ 阈值",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    },
+    {
+      "title": "场景三：从远程服务器获取文件进行分析",
+      "steps": [
+        "1. 在左侧 BAM 文件来源中选择\"SCP 远程文件\"",
+        "2. 填写 SSH 服务器地址（格式 user@host）和密码",
+        "3. 在 BAM 文件路径输入框中填写远程路径",
+        "4. 设置 Channel Tag 和最低 RQ 阈值",
+        "5. 点击\"开始分析\"按钮，系统自动通过 SCP 拉取文件并执行分析"
+      ]
+    },
+    {
+      "title": "场景四：从本地上传 BAM 文件",
+      "steps": [
+        "1. 在左侧 BAM 文件来源中选择\"客户端上传\"",
+        "2. 点击上传区域，选择本地的 .bam 文件",
+        "3. 上传成功后文件路径自动填入",
+        "4. 设置 Channel Tag 和最低 RQ 阈值",
+        "5. 点击\"开始分析\"按钮"
+      ]
+    }
+  ],
+  "output": {
+    "description": "执行完成后，结果区域以表格形式展示以下统计：",
+    "sections": [
+      {
+        "name": "Channel 分布",
+        "content": "通道数量（numChannels）、碱基总数（num_bases）、读长统计（均值 + 各分位数）以及 N50 值"
+      },
+      {
+        "name": "质量分数计数统计",
+        "content": "各质量阈值（>=Q8 / >=Q10 / >=Q15 / >=Q20 / >=Q25 / >=Q30）以上的 reads 绝对数量（带千位分隔符）"
+      },
+      {
+        "name": "质量分数百分比统计",
+        "content": "各质量阈值（>=Q8 至 >=Q30）的 reads 占比（百分比格式），以及平均质量值（MeanQValue）和中位数质量值（MedianQValue）"
+      },
+      {
+        "name": "NP 分布（核苷酸位点数）",
+        "content": "按 NP 分组：每个 NP 值对应的通道数（numChannels）、最小质量值（minQv）、5% 分位（Qv_5）、25% 分位（Qv_25）、50% 分位（Qv_50）的质量值，以及 NP 组内总碱基数（bases）"
+      }
+    ]
+  }
+}
