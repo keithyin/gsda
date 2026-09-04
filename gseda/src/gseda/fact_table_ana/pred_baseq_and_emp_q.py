@@ -20,18 +20,21 @@ def _cdf(cnt: np.ndarray) -> np.ndarray:
     return np.cumsum(cnt) / total
 
 
-def plot_ins_vs_non_ins_baseq_dist(df: pl.DataFrame, o_prefix: str):
-    """Distribution of predicted baseQ for insertion bases vs non-insertion bases,
-    drawn as a shared histogram plus one CDF curve per category."""
+def plot_ins_eq_diff_baseq_dist(df: pl.DataFrame, o_prefix: str):
+    """Distribution of predicted baseQ for insertion, equal (match) and
+    differing substitution bases, drawn as a shared histogram plus one CDF
+    curve per category."""
     ins_dist = (
         df.group_by("baseq").agg(pl.col("ins").sum().alias("cnt")).sort("baseq"))
-    nonins_dist = (
-        df.group_by("baseq").agg(
-            (pl.col("eq") + pl.col("diff")).sum().alias("cnt")).sort("baseq"))
+    eq_dist = (
+        df.group_by("baseq").agg(pl.col("eq").sum().alias("cnt")).sort("baseq"))
+    diff_dist = (
+        df.group_by("baseq").agg(pl.col("diff").sum().alias("cnt")).sort("baseq"))
 
     ins_bq = ins_dist["baseq"].to_list()
-    nonins_bq = nonins_dist["baseq"].to_list()
-    max_baseq = max(ins_bq + nonins_bq + [0])
+    eq_bq = eq_dist["baseq"].to_list()
+    diff_bq = diff_dist["baseq"].to_list()
+    max_baseq = max(ins_bq + eq_bq + diff_bq + [0])
     baseq_axis = np.arange(0, max_baseq + 1, dtype=float)
 
     def to_axis(d, col):
@@ -39,14 +42,17 @@ def plot_ins_vs_non_ins_baseq_dist(df: pl.DataFrame, o_prefix: str):
         return np.array([m.get(b, 0) for b in baseq_axis], dtype=float)
 
     ins_cnt = to_axis(ins_dist, "cnt")
-    nonins_cnt = to_axis(nonins_dist, "cnt")
+    eq_cnt = to_axis(eq_dist, "cnt")
+    diff_cnt = to_axis(diff_dist, "cnt")
 
     # Normalize each group to its own fraction, so group-size differences
     # don't distort the visual comparison of baseQ distributions.
     ins_total = ins_cnt.sum()
-    nonins_total = nonins_cnt.sum()
+    eq_total = eq_cnt.sum()
+    diff_total = diff_cnt.sum()
     ins_prob = ins_cnt / ins_total if ins_total > 0 else ins_cnt
-    nonins_prob = nonins_cnt / nonins_total if nonins_total > 0 else nonins_cnt
+    eq_prob = eq_cnt / eq_total if eq_total > 0 else eq_cnt
+    diff_prob = diff_cnt / diff_total if diff_total > 0 else diff_cnt
 
     figure = plt.figure(figsize=(10, 10))
     axs = figure.add_subplot(1, 1, 1)
@@ -54,13 +60,16 @@ def plot_ins_vs_non_ins_baseq_dist(df: pl.DataFrame, o_prefix: str):
     plt.grid(True, linestyle=":", linewidth=0.5, color="gray")
 
     width = 0.8
-    half = width / 2
+    third = width / 3
     axs.bar(
-        baseq_axis - half / 2, ins_prob, half,
+        baseq_axis - third, ins_prob, third,
         label="Insertion base", color="#d62728")
     axs.bar(
-        baseq_axis + half / 2, nonins_prob, half,
-        label="Non-insertion base", color="#1f77b4")
+        baseq_axis, eq_prob, third,
+        label="Equal base", color="#1f77b4")
+    axs.bar(
+        baseq_axis + third, diff_prob, third,
+        label="Differing base", color="#2ca02c")
 
     axs.set_xlim((0, max_baseq + 1))
     axs.set_xticks(np.arange(0, max_baseq + 1, 2))
@@ -72,8 +81,11 @@ def plot_ins_vs_non_ins_baseq_dist(df: pl.DataFrame, o_prefix: str):
         baseq_axis, _cdf(ins_cnt), color="#d62728",
         linestyle="--", label="Insertion CDF")
     axs2.plot(
-        baseq_axis, _cdf(nonins_cnt), color="#1f77b4",
-        linestyle="--", label="Non-insertion CDF")
+        baseq_axis, _cdf(eq_cnt), color="#1f77b4",
+        linestyle="--", label="Equal CDF")
+    axs2.plot(
+        baseq_axis, _cdf(diff_cnt), color="#2ca02c",
+        linestyle="--", label="Differing CDF")
     axs2.set_ylim((0, 1.02))
     axs2.set_ylabel("CDF", fontdict={"size": 16})
 
@@ -81,9 +93,10 @@ def plot_ins_vs_non_ins_baseq_dist(df: pl.DataFrame, o_prefix: str):
     h2, l2 = axs2.get_legend_handles_labels()
     axs.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=12)
 
-    plt.title("BaseQ distribution: insertion vs non-insertion", fontdict={"size": 16})
+    plt.title("BaseQ distribution: insertion vs equal vs differing",
+              fontdict={"size": 16})
 
-    fpath = f"{o_prefix}.ins-vs-nonins-baseq-dist.png"
+    fpath = f"{o_prefix}.ins-eq-diff-baseq-dist.png"
     figure.savefig(fname=fpath)
     print(f"check image {fpath}")
     return fpath
@@ -198,10 +211,10 @@ def main(args):
     figure.savefig(fname=baseq_dist_fpath)
     print(f"check image {baseq_dist_fpath}")
 
-    ins_vs_nonins_fpath = plot_ins_vs_non_ins_baseq_dist(
+    ins_eq_diff_fpath = plot_ins_eq_diff_baseq_dist(
         df=df, o_prefix=args.o_prefix)
 
-    return [baseq2emp_baseq_fpath, baseq_dist_fpath, ins_vs_nonins_fpath]
+    return [baseq2emp_baseq_fpath, baseq_dist_fpath, ins_eq_diff_fpath]
 
 
 if __name__ == "__main__":
