@@ -1,12 +1,12 @@
 build:
-	cd gsetl; cargo build --release
+	cd third_party/gsetl; cargo build --release
 
 install:
-	cp gsetl/target/release/gsetl /usr/bin/
+	cp third_party/gsetl/target/release/gsetl /usr/bin/
 
 bai:
-	cd gsetl && cargo build --release
-	cp gsetl/target/release/gsetl /usr/bin/
+	cd third_party/gsetl && cargo build --release
+	cp third_party/gsetl/target/release/gsetl /usr/bin/
 
 clean:
-	rm -rf gsetl/target
+	rm -rf third_party/gsetl/target
