@@ -16,7 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: Build
-      run: cd gsetl && cargo build --verbose
+      run: cd third_party/gsetl && cargo build --verbose
     - name: Run tests
-      run: cd gsetl && cargo test --verbose
+      run: cd third_party/gsetl && cargo test --verbose
