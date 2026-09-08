@@ -9,3 +9,6 @@ ana/*
 *.log
 *.txt
 *.json
+# ...but dependency manifests must stay tracked (the blanket *.txt above hid them)
+!requirements.txt
+!**/requirements.txt

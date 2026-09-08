@@ -110,3 +110,20 @@ Under `--outdir`:
 - Runs are per-sample independent and idempotent per output path, but existing
   `*-metric` dirs from a previous run with a different rq-range will be
   reused. Delete `--outdir` to force a full recompute.
+- **`--mapping` barcodes must be plain integers.** `run_report.py` does
+  `int(bc)`, so a run-aware mapping whose barcode column reads `24标签-1` (or a
+  third `RUN号` column) needs splitting first — one numeric TSV per run.
+  `prototype/2026/2026Q3/STR_optimization/prepare_second_batch_runs.py` does this
+  and also builds the `BarcodeNN.fastq` view from `Adaptor-barcodeNNN-M.fastq`
+  names (chain: `24标签-N` ↔ `barcode-NN` ↔ `Adaptor-*`, table at
+  `/data1/ccs_data/str-optimization/barcode-2-barcodename.tsv`).
+- **`alignedRatio` is inflated on full-plasmid CCS data.** Each well mixes two
+  species: the target amplicon (600-1100 bp, aligns end to end) and ~2.7 kb
+  circular plasmid background that matches only a ~48 bp shared vector MCS at
+  the reference's 3' end — gsmm2 counts that as aligned. Expect
+  `alignedRatio` 0.94-0.99 and `queryCoverage-p25` ≈ 0.018 almost regardless of
+  data quality; judge samples on `identity`, `identity≥0.99`, and a
+  multi-reference best-hit check (see `cross_map_diagnostic.py` in the same
+  prototype dir). Where the reference is shorter than the target reads (e.g.
+  27-1/27-9, the STR33 series), low identity is an incomplete 一代 reference,
+  not a sequencing failure.
