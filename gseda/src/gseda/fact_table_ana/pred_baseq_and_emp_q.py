@@ -109,7 +109,7 @@ def main(args):
     fact_table_path = pathlib.Path(args.fact_table)
     df = pl.read_csv(args.fact_table, separator="\t")
 
-    if args.union_fwd_rev:
+    if not args.seperate_fwd_rev:
         df = df.with_columns(
             pl.col("refname").str.replace(r"___fwd$|___rev$", ""))
 
@@ -229,6 +229,8 @@ if __name__ == "__main__":
     parser.add_argument("fact_table", metavar="fact_baseq_stat")
     parser.add_argument("--o-path", metavar="o-path",
                         default=None, dest="o_path")
-    parser.add_argument("--union-fwd-rev", action="store_true", default=False)
+    parser.add_argument(
+        "--seperate-fwd-rev", action="store_true", default=False,
+        help="keep fwd/rev reference statistics apart (default: union them)")
 
     main(parser.parse_args())

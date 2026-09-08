@@ -293,7 +293,7 @@ def main(args):
     baseq_ana_args = {
         "fact_table": f"{gsetl_o_dir}/fact_baseq_stat.csv",
         "o_prefix": f"{gsetl_o_dir}/{smc_stem}",
-        "union_fwd_rev": args.union_fwd_rev
+        "seperate_fwd_rev": args.seperate_fwd_rev
     }
     base_q_images = pred_baseq_and_emp_q.main(
         argparse.Namespace(**baseq_ana_args))
@@ -314,7 +314,9 @@ if __name__ == "__main__":
                         help="1:3,5,7:9 means [[1, 3], [5, 5], [7, 9]]. only valid for bam input that contains np field")
     parser.add_argument("--rq-range", default=None, type=str, dest="rq_range",
                         help="0.9:1.1 means 0.9<=rq<=1.1. only valid for bam input that contains rq field")
-    parser.add_argument("--union-fwd-rev", action="store_true", default=False)
+    parser.add_argument(
+        "--seperate-fwd-rev", action="store_true", default=False,
+        help="keep fwd/rev reference statistics apart (default: union them)")
 
     args_ = parser.parse_args()
 
