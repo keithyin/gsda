@@ -93,7 +93,7 @@ np=10  <  np=11  <  np=12  (中段质量单调上升)
 | **P1** | 下游 SNP calling 时**允许 Q20+ base 参与（而非 Q30-only）** | 减少因中段 dip 丢失的信息 | SMC 对中段保守打分是模型行为，非真错误 |
 | **P2** | **联系 smicing 团队** 调 qhead 模型在 C/G-repeat 区的打分保守度 | 治本 | 需要上游配合 |
 | **P2** | 若业务目标区就是 C/G-repeat 区，**改用 `smc_15` 文件**（已预筛 np≥15, 157k reads） | per-read 达标率高 | 该目录有现成的 smc_15/20/30 预筛文件 |
-| **P3** | 用 [gseda/src/ppl/homo_and_str_region_coverage.py](../../gseda/src/gseda/ppl/homo_and_str_region_coverage.py) 输出 **STR/homopolymer 占比**（已支持 `rq-thr` 过滤） | 定量评估重复区占比 | 现有工具即可用 |
+| **P3** | 用 [gseda/src/ppl/homo_and_str_region_coverage.py](../../third_party/gseda/src/gseda/ppl/homo_and_str_region_coverage.py) 输出 **STR/homopolymer 占比**（已支持 `rq-thr` 过滤） | 定量评估重复区占比 | 现有工具即可用 |
 
 ## 附：诊断脚本 (本目录)
 - `analyze_q30_fast.py` — base-level Q30 按 np 分桶 + 位置 profile（全池 ~30s）

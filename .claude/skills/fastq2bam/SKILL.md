@@ -10,7 +10,7 @@ description: Convert FASTQ/FASTA files into BAM format
 Convert FASTQ/FASTA files into BAM format.
 
 This skill wraps the internal conversion script:
-/root/projects/gsda/gseda/src/gseda/file_format_cvt/fastq2bam.py
+/root/projects/gsda/third_party/gseda/src/gseda/file_format_cvt/fastq2bam.py
 
 The script converts sequence files into BAM format.
 
@@ -49,6 +49,6 @@ Examples:
 Run:
 
 ```bash
-python3 /root/projects/gsda/gseda/src/gseda/file_format_cvt/fastq2bam.py \
+python3 /root/projects/gsda/third_party/gseda/src/gseda/file_format_cvt/fastq2bam.py \
     <input_file> \
     <output_bam>

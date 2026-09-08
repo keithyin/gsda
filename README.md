@@ -81,7 +81,7 @@ gsetl --outdir boost50-gsetl  aligned-bam --ref-file ../ref_1k.fasta --bam boost
 
 
 
-python /root/projects/gsda/gseda/src/gseda/align_ana/gsetl_post_process/ref_locus_info_post_process.py  boost50-gsetl/fact_aligned_bam_ref_locus_info.csv
+python /root/projects/gsda/third_party/gseda/src/gseda/align_ana/gsetl_post_process/ref_locus_info_post_process.py  boost50-gsetl/fact_aligned_bam_ref_locus_info.csv
 
 
 ```

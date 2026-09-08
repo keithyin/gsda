@@ -19,7 +19,7 @@ import os
 import subprocess
 import sys
 
-REPO = "/root/projects/gsda/gseda/src/gseda"
+REPO = "/root/projects/gsda/third_party/gseda/src/gseda"
 
 
 def log(*a):

@@ -1,3 +1,6 @@
 [submodule "third_party/asts"]
 	path = third_party/asts
 	url = git@github.com:keithyin/asts.git
+[submodule "third_party/gseda"]
+	path = third_party/gseda
+	url = git@github.com:keithyin/gseda.git
