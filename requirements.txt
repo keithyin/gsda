@@ -1,0 +1,149 @@
+# =============================================================================
+# gsda — project Python requirements
+#
+# Target environment: conda env `gseda` (Python 3.10.21), the env this project
+# is standardizing on.
+#
+# Setup (use the absolute gseda paths — see the PATH warning right below):
+#   conda create -n gseda python=3.10 -y         # already exists
+#   /root/miniconda3/envs/gseda/bin/pip install -r requirements.txt
+#   /root/miniconda3/envs/gseda/bin/pip install -e ./third_party/gseda --no-deps  # see "gseda package" below
+#
+# The plain (modern) resolver works for the whole file now. (Before the 2026-09
+# chainlit 1.3.2 -> 2.12.0 upgrade, the web stack's inconsistent metadata forced
+# `--use-deprecated=legacy-resolver`; that constraint is gone — see the "Troubleshooting
+# agent web stack" section.)
+#
+# WARNING about activating on this machine: /root/miniconda3/envs/server/bin is
+# hardcoded near the front of PATH in the shell profile, so after
+# `conda activate gseda`, `which python` still prints the *server* env's python
+# 3.8. Use the absolute path until that's cleaned up (the Setup lines above
+# already do).
+#
+# Pins were taken from the env that currently runs this code (conda env
+# `server`, Python 3.8.20) so results stay comparable, then adjusted for
+# Python 3.10 — see the numpy/numba note below. The bio stack's pins were
+# verified to resolve with `pip install --dry-run` on Python 3.10; the web-stack
+# pins were verified by actually running the agent (see that section).
+#
+# Scope: the *bioinformatics* stack below plus the *agent web stack* (the
+# "Troubleshooting agent web stack" section) — the latter was consolidated into
+# this env on 2026-09-08 (it used to live in a separate env). Transitive deps
+# (typing_extensions, pillow, contourpy, anyio/httpx via fastapi,
+# PyNaCl/cryptography via paramiko, llvmlite via numba, PyYAML/python-dotenv via
+# uvicorn & chainlit, and the web stack's pydantic/starlette/uvicorn — chainlit 2.x
+# resolves them to the modern set on its own) are deliberately not pinned here.
+#
+# Python 3.8: this file also works there except `numpy`, which is 1.26.x to
+# satisfy gseda/pyproject.toml (`numpy>=1.26,<3`); on 3.8 use numpy==1.24.4
+# (1.26 dropped 3.8) and numba==0.58.0, which is what the `server` env has.
+# =============================================================================
+
+# --- Sequence / BAM / alignment ----------------------------------------------
+pysam==0.23.3             # BAM/FASTA I/O; used across gseda + every barcode pipeline
+mappy==2.30               # minimap2 bindings (barcode_ref_align, pair_end_sanger_merge)
+edlib==1.3.9.post1        # edit-distance alignment (gseda.alignment, seq_search)
+biopython==1.83           # Seq/parse utilities (circular_mapper, fx_filter, msa_view)
+pyMSAviz==0.4.2           # MSA figures (gseda.msa_view)
+
+# --- Numeric / stats ---------------------------------------------------------
+numpy==1.26.4             # >1.26 needed by gseda/pyproject.toml; <1.27 needed by scipy 1.10.1
+scipy==1.10.1             # gseda.hypothesis_testing, smc_ab_test
+numba==0.59.1             # 0.58.0 caps numpy<1.26 — see "gseda package" below
+polars==1.8.2             # main dataframe engine in gseda
+pandas==2.0.3             # gseda.ppl.demuxed_stat + notebooks
+pyarrow==17.0.0           # columnar interchange for polars & pandas
+
+# --- Plotting ----------------------------------------------------------------
+matplotlib==3.7.5         # gseda.plotter, baseq / coverage distributions
+seaborn==0.13.2
+
+# --- Reporting / I/O helpers -------------------------------------------------
+tqdm==4.67.3
+semver==3.0.2             # report/schema version handling
+openpyxl==3.1.5           # STR batch setup scripts read .xlsx sample tables
+requests==2.32.4          # trouble_shooting_pipeline HTTP probes
+anthropic==0.72.0         # declared by gseda/pyproject.toml; no in-repo import yet
+
+# =============================================================================
+# Troubleshooting agent web stack (chainlit + claude-agent-sdk) — consolidated
+# into this env on 2026-09-08 (previously a separate env). Runs agent/app.py.
+# =============================================================================
+# 2026-09 upgrade off chainlit 1.3.2 -> 2.12.0. That was the version the agent was
+# actually built against (feature-parity port from the chainlit-cc project), and 2.x
+# lines up with the modern stack that claude-agent-sdk / mcp already declare
+# (pydantic>=2.11, starlette>=0.47, fastapi>=0.116). Net effect: the old
+# self-contradictory pin set is gone — no more down-pinned pydantic/starlette/uvicorn
+# trio, no more legacy-resolver requirement (the whole reason this section was so
+# heavily commented before). A plain `pip install -r requirements.txt` now lays the
+# set down in one pass.
+#
+# History (why the old file was so hairy): chainlit 1.3.2 capped pydantic<2.10 and
+# starlette<0.42, DISJOINT from mcp/sse-starlette's pydantic>=2.12 / starlette>=0.49,
+# so the modern resolver reported ResolutionImpossible and the set had to be forced
+# down with the legacy resolver. chainlit 2.12.0 wants exactly the modern versions,
+# so the conflict self-resolves.
+chainlit==2.12.0
+claude-agent-sdk
+python-dotenv
+pyyaml
+# 聊天记录持久化用的数据层（agent/db.py）
+sqlalchemy>=2.0.28,<3.0.0
+aiosqlite>=0.20.0
+#
+# 2.12.0 pulls a large opentelemetry/traceloop instrumentation surface as
+# transitive deps — harmless for a local chat app, just know it's there. The
+# known-good set the env now holds (verify with `pip freeze`): pydantic 2.13.5,
+# pydantic-core 2.46.5, starlette 1.6.0, uvicorn 0.53.0, fastapi 0.141.1,
+# mcp 1.30.0, literalai 0.1.201.
+#
+# Install (plain resolver is fine now — the 1.3.2 self-contradictory set is gone):
+#   /root/miniconda3/envs/gseda/bin/pip install -r requirements.txt
+#
+# Run the agent (NOT with a bare `chainlit` — PATH may resolve to another env):
+#   cd agent && /root/miniconda3/envs/gseda/bin/chainlit run app.py --host 0.0.0.0 --port 8100
+
+# --- Dev / test --------------------------------------------------------------
+pytest==8.3.5
+pytest-asyncio==0.24.0
+
+# =============================================================================
+# gseda package itself (now the third_party/gseda submodule)
+# =============================================================================
+#   /root/miniconda3/envs/gseda/bin/pip install -e ./third_party/gseda --no-deps
+#
+# The deps in this file are a superset of what gseda actually imports (pyproject
+# omits matplotlib, pandas, scipy, edlib, biopython…), so --no-deps loses nothing
+# and keeps the pins in THIS file authoritative rather than pyproject's.
+#
+# `--no-deps` is no longer *required* for the py3.10 `gseda` env: pyproject.toml
+# no longer declares `numba` (it was dropped in commit e96f455 — it was imported
+# nowhere), so the old numba↔numpy ResolutionImpossible is gone and a plain
+# `pip install -e ./third_party/gseda` now resolves on py3.10 (verified
+# 2026-09-08). It's still recommended here so the pins above stay canonical, and
+# it's still REQUIRED on the py3.8 `server` env (numpy 1.24.4 can't satisfy
+# pyproject's `numpy>=1.26`).
+#
+# The editable install is what provides the console scripts
+# (reads-quality-stats-v3-cli, sequencing-report-v2-cli, smc-mem-est, …).
+#
+# Status: this file + the editable install were run against env `gseda` on
+# 2026-09-08 — all pins installed and every gseda console-script module imports
+# cleanly on Python 3.10. (Note: `gseda.server` was deleted in commit 8af6786, so
+# there is no longer a `gseda.server.main`.)
+
+# =============================================================================
+# Deliberately not in this file
+# =============================================================================
+# The agent web stack (chainlit + claude-agent-sdk) IS in this file now (the
+# "Troubleshooting agent web stack" section) — consolidated in on 2026-09-08.
+# It used to live in a separate env (pydantic 2.10.6 clash is why it was split);
+# that separation is no longer in place. A standalone `gsda-agent` env (py3.12)
+# still exists on this host as an alternative, but the canonical, documented
+# install for the agent is now this file.
+#
+# Optional single-script extras (the script is standalone or guards the import;
+# install only when you actually run it):
+#     transformers    # trouble_shooting_pipeline/claude_code_request_diff.py
+#                     # (degrades with a warning if absent)
+#     pexpect         # misc_scripts/no_pwd_login_intranet_machine.py

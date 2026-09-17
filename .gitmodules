@@ -7,3 +7,6 @@
 [submodule "third_party/gsetl"]
 	path = third_party/gsetl
 	url = git@github.com:keithyin/gsetl.git
+[submodule "third_party/mm2"]
+	path = third_party/mm2
+	url = git@github.com:keithyin/mm2.git
