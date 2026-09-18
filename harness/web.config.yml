@@ -1,0 +1,23 @@
+# Harness (dsh web) launch-parameter reference.
+#
+# These are NOT read by dsh directly — dsh is launched by docker/entrypoint.sh, which
+# derives its flags from the environment. This file is the single reference for the
+# env-var → flag mapping and is what an operator edits when changing harness launch.
+#
+#   env var              entrypoint effect
+#   -----------          -----------------
+#   HARNESS_PORT         dsh web --port
+#   PUBLIC_AUTHORITY     dsh web --trusted-host   (must equal the browser's Host)
+#   WORKSPACE_DIR        cwd (dsh workspace root = process.cwd())
+#   DSH_HOME             dsh state home (profiles/sessions/storages/settings.yaml)
+#   DSH_PERMISSION_MODE  filesystem sandbox (default workspace-write)
+#   DSH_TOOLS_MODE       dsh tool presentation (native|ptc|both) — optional
+
+# Defaults the entrypoint uses when an env var is unset:
+harness_port: 3080
+host: 0.0.0.0
+no_open: true
+
+# State / sandbox:
+dsh_home: /dsh-home
+permission_mode: workspace-write

@@ -1,6 +1,6 @@
 # 内部 AI 数据分析平台需求文档
 
-**版本：V1.2**
+**版本：V1.3**（2026-09-17：Platform Server 已实现并通过单元测试；Docker 构建 / 端到端联调待 Docker 环境）
 
 ---
 
@@ -12,22 +12,33 @@
 ## 0.1 仓库现状
 
 - 仓库名为 **`gsda`**（不是本文档早期版本里假设的 `analysis-agent/` 全新仓库）。它目前是一个
-  **生物信息学 SMC / barcode 分析仓库**，本文档描述的平台能力是要在这个仓库之上叠加建设。
-- `Dockerfile` 目前是**空文件**；仓库内**没有** `docker-compose.yml`、`entrypoint.sh`，
-  也**没有** `platform/`、`harness/`（或 `agent/`）等目录。
+  **生物信息学 SMC / barcode 分析仓库**，本文档描述的平台能力已在这个仓库之上**开始实现**。
+- Platform Server 已落地在 **`gsda_platform/`**（⚠️ 包名不是文档 §47 写的 `platform/`——
+  顶层 `platform/` 会遮蔽 Python 标准库 `platform` 模块，导致 `import fastapi` 失败，故改名为
+  `gsda_platform/`，模块结构不变）。
+- `Dockerfile`、`docker-compose.yml`、`docker/entrypoint.sh` 已写好（待有 Docker 环境的机器上
+  首次 `docker build` 验证）；`harness/` 放的是 **Harness 启动契约与说明**，不是重新实现的 Agent。
 
 ### 当前目录结构（实际）
 
 ```text
 gsda/
 ├── .claude/
-│   ├── skills/            # ✅ 已存在：14 个分析 Skills（fastq2bam、barcode_ref_align、smc_*、asrtc_analysis 等）
-│   └── agents/            # Claude Code agents（code-reviewer / coding），非平台 Agent
-├── scripts/               # ✅ 已存在：run_smc*.sh、run_smicing.sh 等驱动脚本
-├── data_analysis_task/    # 分析任务（low_q_analysis、snp_q_analysis）
-├── third_party/           # ✅ git 子模块：gseda / gsetl / asts / mm2（Python + Rust 工具）
-├── requirements.txt       # ✅ 生物信息学依赖
-├── Dockerfile             # ❌ 空文件
+│   ├── skills/            # ✅ 已存在：分析 Skills（fastq2bam、barcode_ref_align、smc_* 等）
+│   └── agents/            # Claude Code agents（非平台 Agent）
+├── gsda_platform/         # ✅ 已实现：Platform Server（auth / runtime / proxy / admin）
+│   ├── main.py            #    FastAPI 入口（ROLE=platform）
+│   ├── config.py          #    环境驱动配置
+│   ├── db/                #    SQLAlchemy + SQLite
+│   ├── auth/  runtime/  proxy/  admin/
+│   └── tests/             #    35 个单元/集成测试（含 fake Docker 后端，无需 Docker）
+├── harness/               # ✅ 已建立：Harness(dsh) 启动契约 README + web.config.yml
+├── docker/entrypoint.sh   # ✅ 已写：ROLE=platform / harness 双角色分发
+├── scripts/               # ✅ 已存在：run_smc*.sh 等驱动脚本
+├── third_party/           # ✅ git 子模块：gseda / gsetl / asts / mm2
+├── requirements.txt       # ✅ 已补充平台依赖（docker、argon2-cffi 等）
+├── Dockerfile             # ✅ 已写（单 Image 双 Role；待 build 验证）
+├── docker-compose.yml     # ✅ 已写（Platform 容器 + docker.sock 挂载）
 └── README.md
 ```
 
@@ -35,23 +46,28 @@ gsda/
 
 | 组件 | 对应章节 | 当前状态 |
 |---|---|---|
-| 分析能力（Skills / Scripts / CLI） | §29–31 | ✅ 现状：gsda 已有（`.claude/skills/`、`scripts/`、`third_party/*`） |
-| Harness（Agent Runtime + Web UI） | §28, §32–35 | ❌ 未引入；计划采用 `DeepSeek Harness`（见 §0.3） |
-| Platform Server（Auth / Runtime / Proxy / Admin） | §7, §12–27, §33–38 | ❌ 未实现，无 `platform/` |
-| Runtime Manager（用户→容器生命周期） | §19–27 | ❌ 未实现 |
-| 单 Image、双 Role（platform / harness） | §5–6, §42–44 | ❌ 未实现（Dockerfile 为空，无 entrypoint / compose） |
-| 用户数据隔离（Workspace / Results） | §25–27, §51 | ❌ 未实现（依赖 Platform / Runtime） |
-| 反向代理（HTTP / WebSocket / Streaming） | §33–34 | ❌ 未实现 |
-| Admin | §38 | ❌ 未实现 |
+| 分析能力（Skills / Scripts / CLI） | §29–31 | ✅ gsda 已有（`.claude/skills/`、`scripts/`、`third_party/*`） |
+| Harness（Agent Runtime + Web UI） | §28, §32–35 | ✅ 采用现成 `DeepSeek Harness`(`dsh`)，`harness/` 存启动契约；容器内由 `dsh web` 启动 |
+| Platform Server（Auth / Runtime / Proxy / Admin） | §7, §12–27, §33–38 | ✅ 已实现于 `gsda_platform/`（⚠️ 非 `platform/`，见 §0.1） |
+| Runtime Manager（用户→容器生命周期） | §19–27 | ✅ 已实现（create/reuse/crash-recover/idle-stop，§36 并发保护） |
+| 单 Image、双 Role（platform / harness） | §5–6, §42–44 | ✅ Dockerfile + entrypoint.sh + compose 已写（待 Docker 环境验证 build/run） |
+| 用户数据隔离（Workspace / Results / dsh-home） | §25–27, §51 | ✅ 按内部 ID 挂载；隔离依赖容器边界（待 Docker 联调验证） |
+| 反向代理（HTTP / WebSocket / Streaming） | §33–34 | ✅ 已实现（HTTP+WS+流式，保留 public Host 供 dsh 信任围栏） |
+| Admin | §38 | ✅ 已实现（users / runtimes / restart / stop / delete） |
 
-## 0.3 关于 "Harness" 的说明
+## 0.3 关于 "Harness" 的说明（已核实 dsh v0.1.5-rc.2）
 
-- 本文档把用户侧 Agent 统称为 **Harness**（Agent Runtime + Web UI）。
-- **计划采用 `DeepSeek Harness` 作为 Agent Runtime**（负责 Agent Loop / LLM 调用 /
-  Tool Calling / Skills / 文件操作 / Session / Streaming / Web UI，见 §28）。
-- 目前 `gsda` 仓库内**尚未引入** Harness（无 `harness/` 或 `agent/` 目录）。
-- 目标（尚未完成）是把 Harness 作为 `harness/` 迁入 gsda，与 Skills/Scripts 打进
-  同一个 Docker Image，从而满足 §6「一个 Image、两种 Runtime Role」。
+- 本文档把用户侧 Agent 统称为 **Harness**。已确定采用现成的 **`DeepSeek Harness`（`dsh`）**
+  作为 Agent Runtime（Agent Loop / LLM / Tool Calling / Skills / 文件操作 / Session / Streaming / Web UI）。
+- 启动方式为容器内 `dsh web --host 0.0.0.0 --port $HARNESS_PORT --no-open --trusted-host $PUBLIC_AUTHORITY`
+  （详见 `harness/README.md`，其中列出了逐条核实的 dsh 契约）。
+- **三处与本文档原假设不同的关键点**（`harness/README.md` 有完整说明）：
+  1. **dsh 没有 `/health` 端点**（§35 的 `GET /health` 不成立）——就绪探测改为「TCP 连通 + `/` 返回 200」。
+  2. **`--trusted-host` 必传**：dsh 的 `/api` 有「浏览器信任围栏」按请求 Host 校验；反向代理后
+     Host 是平台公网域名，必须通过 `--trusted-host` 告知 dsh，且代理不得改写 Host，否则 `/api` 全被拒。
+  3. 默认绑定 `127.0.0.1:3080`，容器内必须 `--host 0.0.0.0` 才能被平台访问。
+- 用户状态（`profiles/`、`sessions/`、`storages/`、`settings.yaml`）位于 `DSH_HOME`，
+  Runtime Manager 将其挂到用户持久目录 `{DATA_DIR}/users/<id>/dsh-home`，跨重启/镜像升级保留。
 
 ---
 
@@ -1052,6 +1068,11 @@ Streaming
 ---
 
 # 35. Runtime 与 Harness Ready
+
+> **⚠️ 实现更正（见 `harness/README.md`）：** 实际选用的 `dsh` **没有 `/health` 端点**。
+> 因此「Health Check」不是 `GET /health`，而是 **TCP 连通 + `GET /` 返回 HTTP 200**
+> （`gsda_platform/runtime/docker.py` 的 `readiness_probe`）。只有该探测成功，
+> `Runtime.status` 才置为 `RUNNING`。
 
 Container 启动之后：
 

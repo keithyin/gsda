@@ -1,0 +1,27 @@
+# Keep the build context lean and out of sensitive artifacts.
+# The Dockerfile COPYs only .claude/, scripts/, third_party/, gsda_platform/, docker/
+# — everything else (git history, env files, venvs, data) is dropped here so it is
+# never shipped to the Docker daemon or baked into a layer.
+
+.git
+.gitlab-ci.yml
+.env
+.env.*
+*.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+
+# Local run artifacts (SQLite DB, per-user workspaces, results).
+platform-data/
+data/
+*.db
+*.sqlite3
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store

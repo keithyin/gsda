@@ -1,0 +1,148 @@
+# GitLab CI/CD for the gsda AI Data Analysis Platform.
+#
+# Follows the house pattern (see ../airflow-jobs/.gitlab-ci.yml):
+#   * shell-executor runner (host has `docker`)
+#   * test on push, build a temp image on `main`, build + push on release tags, manual deploy
+#
+# Stages:
+#   test             → run the platform's 33-test suite (no Docker Engine needed)
+#   build_temp_image → docker build on main
+#   push_release     → build + push to the company registry on tags
+#   deploy           → manual: pull + run the Platform container on the deploy host
+
+default:
+  tags:
+    - shell-runner-38
+
+stages:
+  - test
+  - build_temp_image
+  - push_release
+  - deploy
+
+variables:
+  PROJECT_NAME: gsda
+  TEMP_TAG: tmp-$CI_COMMIT_SHORT_SHA
+  RELEASE_TAG: $CI_COMMIT_TAG
+  # Company registry (mirror of 192.168.3.38:5000; see airflow-jobs reference).
+  CI_REGISTRY_IMAGE: 192.168.3.38:5000/algo/gsda
+  # The image name/tag the Runtime Manager launches user harness containers with
+  # (design doc §5, §40). Keep in sync with docker-compose.yml.
+  PLATFORM_IMAGE_NAME: 192.168.3.38:5000/algo/gsda
+  PLATFORM_IMAGE_TAG: "1.0.0"
+
+# ===============================
+# 1. Tests — run on every push to main (no Docker Engine required)
+# ===============================
+
+test:
+  stage: test
+  script:
+    - echo "🧪 Testing gsda_platform ($CI_COMMIT_SHORT_SHA)"
+    # The platform suite is self-contained: it imports only the web/runtime stack,
+    # not the bioinformatics submodules. Install just that, fast.
+    - python3 -m pip install --user -r requirements-platform.txt
+    - python3 -m pytest gsda_platform/tests/ -q
+    # Sanity: the entrypoint parses and the app assembles.
+    - bash -n docker/entrypoint.sh
+    - python3 -c "import gsda_platform.main"
+  only:
+    - main
+    - tags
+
+# ===============================
+# 2. Push 到 main 分支流程 — 构建临时镜像
+# ===============================
+
+build_temp_image:
+  stage: build_temp_image
+  script:
+    - echo `whoami`
+    - echo "📦 Building temp image..."
+    - DOCKER_BUILDKIT=0 docker build -t $PROJECT_NAME:$TEMP_TAG .
+  only:
+    - main
+
+# ===============================
+# 3. Tag 推送流程（正式发布）
+# ===============================
+
+push_release:
+  stage: push_release
+  script:
+    - echo "📤 Building + pushing release image $RELEASE_TAG..."
+    # Build directly under the release tag. On a tag push the temp image from
+    # build_temp_image (main-only) does NOT exist, so we must build here ourselves.
+    - DOCKER_BUILDKIT=0 docker build -t $CI_REGISTRY_IMAGE:$RELEASE_TAG .
+    - docker push $CI_REGISTRY_IMAGE:$RELEASE_TAG
+    # Also keep a floating tag so consumers can track the latest release.
+    - docker tag $CI_REGISTRY_IMAGE:$RELEASE_TAG $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - tags
+
+# ===============================
+# 4. Deploy（手动触发）
+# ===============================
+#
+# Pulls the release image on the deploy host and (re)starts the Platform container.
+# The platform needs: the Docker socket (to spawn user harness containers, §10),
+# a persistent /data volume (SQLite + workspaces), and the shared user network.
+#
+# ⚠️ Set DEPLOY_HOST / DEPLOY_USER (and the data dir) in the project CI/CD variables
+#    or here before the first deploy. The harness LLM key must be present on the host.
+
+deploy:
+  stage: deploy
+  when: manual
+
+  variables:
+    DEPLOY_HOST: 192.168.3.30
+    DEPLOY_USER: user
+    DEPLOY_DATA_DIR: /data/gsda
+    PLATFORM_PORT: "8000"
+    PUBLIC_AUTHORITY: localhost:8000
+
+  script:
+    - echo "🚀 Deploying $RELEASE_TAG to ${DEPLOY_HOST}"
+    - |
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${DEPLOY_USER}@${DEPLOY_HOST} << EOF
+      set -e
+
+      echo "Pull image..."
+      docker pull ${CI_REGISTRY_IMAGE}:${RELEASE_TAG}
+
+      echo "Ensure shared network for user containers..."
+      docker network create gsda-platform 2>/dev/null || true
+
+      echo "Stop old container..."
+      docker stop gsda-platform || true
+      docker rm gsda-platform || true
+
+      echo "Start new container..."
+      docker run -d \
+        --name gsda-platform \
+        --restart always \
+        -p ${PLATFORM_PORT}:8000 \
+        --network gsda-platform \
+        -e ROLE=platform \
+        -e PLATFORM_DATA_DIR=/data \
+        -e PLATFORM_DB_PATH=/data/platform.db \
+        -e PLATFORM_IMAGE_NAME=${PLATFORM_IMAGE_NAME} \
+        -e PLATFORM_IMAGE_TAG=${RELEASE_TAG} \
+        -e PLATFORM_PUBLIC_AUTHORITY=${PUBLIC_AUTHORITY} \
+        -e PLATFORM_DOCKER_NETWORK=gsda-platform \
+        -e PLATFORM_HARNESS_PORT=3080 \
+        -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
+        -e ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-http://192.168.3.30:8910} \
+        -v ${DEPLOY_DATA_DIR}:/data \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        ${CI_REGISTRY_IMAGE}:${RELEASE_TAG}
+
+      docker image prune -f
+
+      echo "Deploy success."
+      EOF
+
+  only:
+    - tags

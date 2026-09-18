@@ -147,3 +147,23 @@ pytest-asyncio==0.24.0
 #     transformers    # trouble_shooting_pipeline/claude_code_request_diff.py
 #                     # (degrades with a warning if absent)
 #     pexpect         # misc_scripts/no_pwd_login_intranet_machine.py
+
+# =============================================================================
+# AI Data Analysis Platform — control plane (gsda_platform/)
+# =============================================================================
+# The FastAPI Platform Server (auth, runtime manager, reverse proxy, admin).
+# fastapi / uvicorn / starlette / pydantic / httpx already resolve via the
+# chainlit web stack above; the lines here make the platform's direct deps explicit
+# and add the two it needs that the web stack does not pull in.
+#
+# Web framework (already satisfied by the web stack, restated for clarity):
+fastapi>=0.141
+uvicorn[standard]>=0.53
+starlette>=1.6
+pydantic>=2.11
+httpx>=0.28
+websockets>=16.1
+#
+# Platform-only additions:
+docker>=7.0           # Docker SDK — Runtime Manager drives user containers (§10, §19)
+argon2-cffi>=23.1     # argon2id password hashing (§16)

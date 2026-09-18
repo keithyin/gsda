@@ -1,0 +1,53 @@
+# gsda Platform — local/dev bring-up (design doc §7, §10, §45, §46).
+#
+#   docker compose up --build
+#
+# Brings up the single Platform container. It mounts the Docker socket so its
+# Runtime Manager can create per-user harness containers from the same image.
+# V1 is Docker-on-a-host (no Kubernetes, §46).
+
+name: gsda-platform
+
+services:
+  platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: company/analysis-agent:${IMAGE_TAG:-1.0.0}
+    container_name: gsda-platform
+    environment:
+      ROLE: platform
+      PLATFORM_PORT: "8000"
+      PLATFORM_DATA_DIR: /data
+      # Public authority the browser uses (and dsh's --trusted-host receives).
+      PLATFORM_PUBLIC_AUTHORITY: ${PLATFORM_PUBLIC_AUTHORITY:-localhost:8000}
+      PLATFORM_DOCKER_NETWORK: gsda-platform
+      PLATFORM_HARNESS_PORT: "3080"
+      PLATFORM_IMAGE_NAME: company/analysis-agent
+      PLATFORM_IMAGE_TAG: ${IMAGE_TAG:-1.0.0}
+      PLATFORM_IDLE_TIMEOUT: "1800"
+      # LLM provider for the harness (key read straight from the process env).
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://192.168.3.30:8910}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PLATFORM_LLM_MODEL: ${PLATFORM_LLM_MODEL:-qwen3.8:27b}
+      PLATFORM_LLM_PROVIDER: ${PLATFORM_LLM_PROVIDER:-anthropic}
+    ports:
+      - "${PLATFORM_HTTP_PORT:-8000}:8000"
+    volumes:
+      # Docker Engine access for the Runtime Manager (§10). Sensitive — the
+      # platform container is the only one that gets it.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent platform + user data (SQLite DB, workspaces, results, dsh state).
+      - platform-data:/data
+      # Shared user-defined network so the platform can reach user containers by IP.
+    networks:
+      - gsda-platform
+    restart: unless-stopped
+
+networks:
+  gsda-platform:
+    name: gsda-platform
+
+volumes:
+  platform-data:
+    name: gsda-platform-data
